@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "OAuthWebApp": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:54331;http://localhost:54333"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet new:*)",
+      "Bash(dotnet run)",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\chris\\\\source\\\\repos\\\\Playground\\\\DotNetOAuth2Learning\\\\src\\\\03-JwtValidation''; dotnet run\")"
+    ]
+  }
+}
