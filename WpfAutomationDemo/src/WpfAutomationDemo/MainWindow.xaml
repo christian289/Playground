@@ -1,0 +1,101 @@
+﻿<Window
+    x:Class="WpfAutomationDemo.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:WpfAutomationDemo.Controls"
+    Title="WPF UI Automation Demo"
+    Width="500"
+    Height="400"
+    WindowStartupLocation="CenterScreen">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  Title  -->
+        <TextBlock
+            Grid.Row="0"
+            Margin="0,0,0,20"
+            FontSize="24"
+            FontWeight="Bold"
+            Text="UI Automation 데모" />
+
+        <!--  Rating Control with Automation Properties  -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,15">
+            <Label
+                Content="제품 평가:"
+                FontWeight="SemiBold"
+                Target="{Binding ElementName=ProductRating}" />
+            <controls:RatingControl
+                x:Name="ProductRating"
+                AutomationProperties.HelpText="방향키로 평점을 조절하세요. 좌/하로 감소, 우/상으로 증가합니다."
+                AutomationProperties.Name="제품 평점"
+                ValueChanged="ProductRating_ValueChanged"
+                Value="3" />
+        </StackPanel>
+
+        <!--  Current Rating Display with LiveSetting  -->
+        <TextBlock
+            x:Name="RatingDisplay"
+            Grid.Row="2"
+            Margin="0,0,0,20"
+            AutomationProperties.LiveSetting="Polite"
+            FontSize="16"
+            Text="현재 평점: 3 / 5" />
+
+        <!--  Second Rating Control (Service Rating)  -->
+        <StackPanel Grid.Row="3" Margin="0,0,0,15">
+            <Label
+                Content="서비스 평가:"
+                FontWeight="SemiBold"
+                Target="{Binding ElementName=ServiceRating}" />
+            <controls:RatingControl
+                x:Name="ServiceRating"
+                AutomationProperties.HelpText="서비스 만족도를 평가해주세요."
+                AutomationProperties.Name="서비스 평점"
+                ValueChanged="ServiceRating_ValueChanged"
+                Value="4" />
+        </StackPanel>
+
+        <!--  Service Rating Display  -->
+        <TextBlock
+            x:Name="ServiceRatingDisplay"
+            Grid.Row="4"
+            Margin="0,0,0,20"
+            AutomationProperties.LiveSetting="Polite"
+            FontSize="16"
+            Text="서비스 평점: 4 / 5" />
+
+        <!--  Instructions  -->
+        <Border
+            Grid.Row="5"
+            Padding="15"
+            Background="#F5F5F5"
+            BorderBrush="#DDD"
+            BorderThickness="1"
+            CornerRadius="4">
+            <StackPanel>
+                <TextBlock
+                    FontSize="14"
+                    FontWeight="SemiBold"
+                    Text="테스트 방법:" />
+                <TextBlock Margin="0,10,0,0" TextWrapping="Wrap">
+                    <Run FontWeight="SemiBold">키보드:</Run>
+                    <Run>Tab으로 이동, 방향키로 값 조절</Run>
+                    <LineBreak />
+                    <Run FontWeight="SemiBold">Narrator:</Run>
+                    <Run>Win+Ctrl+Enter로 활성화</Run>
+                    <LineBreak />
+                    <Run FontWeight="SemiBold">Inspect.exe:</Run>
+                    <Run>Windows SDK에서 실행</Run>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

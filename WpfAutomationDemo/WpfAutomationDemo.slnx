@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/WpfAutomationDemo/WpfAutomationDemo.csproj" />
+  <Project Path="WpfApp1/WpfApp1.csproj" Id="4372ee72-7c29-4422-8ead-d755b56b73e4" />
+</Solution>
