@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Wpf3DTutorial/Wpf3DTutorial.csproj" />
+  </Folder>
+</Solution>
