@@ -13,22 +13,36 @@ public partial class MainWindow : Window
     private string _tabId = string.Empty;
     private string _currentUrl = "about:blank";
     private IntPtr _hwnd;
+    private int? _lastHostPid;
+    private bool _isEmbedded;
 
     public MainWindow()
     {
         InitializeComponent();
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
-        SizeChanged += MainWindow_SizeChanged;
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        // 윈도우 핸들 획득
         _hwnd = new WindowInteropHelper(this).Handle;
         _tabId = App.TabId ?? Guid.NewGuid().ToString("N")[..8];
+        _lastHostPid = App.HostPid;
 
-        // 프로세스 정보 표시
+        UpdateProcessInfo();
+
+        if (App.IsHosted && App.PipeName != null)
+        {
+            await ConnectToHost(App.PipeName);
+        }
+        else
+        {
+            ShowStandaloneUI();
+        }
+    }
+
+    private void UpdateProcessInfo()
+    {
         var process = Process.GetCurrentProcess();
         ProcessIdText.Text = $"PID: {process.Id}";
         ProcessInfo.Text = $"Process ID: {process.Id}\n" +
@@ -36,26 +50,38 @@ public partial class MainWindow : Window
                            $"Window Handle: 0x{_hwnd:X}\n" +
                            $"Thread ID: {Environment.CurrentManagedThreadId}\n" +
                            $"Working Set: {process.WorkingSet64 / 1024 / 1024} MB\n" +
-                           $"Hosted: {App.IsHosted}";
+                           $"Embedded: {_isEmbedded}\n" +
+                           $"URL: {_currentUrl}";
+    }
 
-        // Host 프로세스와 연결 (Hosted 모드일 때)
-        if (App.IsHosted && App.PipeName != null)
+    private void ShowStandaloneUI()
+    {
+        AttachPanel.Visibility = Visibility.Visible;
+        ConnectionStatus.Text = "Standalone";
+        ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
+
+        if (_lastHostPid != null)
         {
-            await ConnectToHost();
+            HostPidInput.Text = _lastHostPid.ToString();
         }
     }
 
-    private async Task ConnectToHost()
+    #region Host Connection
+
+    private async Task ConnectToHost(string pipeName)
     {
         try
         {
-            _ipcClient = new IpcPipeClient(App.PipeName!);
+            _ipcClient?.Dispose();
+            _ipcClient = new IpcPipeClient(pipeName);
             _ipcClient.MessageReceived += OnHostMessage;
             _ipcClient.Disconnected += OnHostDisconnected;
 
             StatusText.Text = "Connecting to host...";
             await _ipcClient.ConnectAsync();
 
+            _isEmbedded = true;
+            AttachPanel.Visibility = Visibility.Collapsed;
             ConnectionStatus.Text = "Connected";
             ConnectionStatus.Foreground = System.Windows.Media.Brushes.LimeGreen;
             StatusText.Text = "Connected to host process";
@@ -69,24 +95,95 @@ public partial class MainWindow : Window
                 {
                     ["hwnd"] = _hwnd.ToString(),
                     ["pid"] = Process.GetCurrentProcess().Id.ToString(),
-                    ["title"] = Title,
+                    ["title"] = string.IsNullOrEmpty(_currentUrl) || _currentUrl == "about:blank"
+                        ? "New Tab"
+                        : Title,
                 }
             });
 
-            // 준비 완료 알림
             await _ipcClient.SendAsync(new IpcMessage
             {
                 Type = IpcMessageType.ChildReady,
                 TabId = _tabId,
             });
+
+            UpdateProcessInfo();
         }
         catch (Exception ex)
         {
             StatusText.Text = $"Connection failed: {ex.Message}";
-            ConnectionStatus.Text = "Standalone";
-            ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
+            _isEmbedded = false;
+            ShowStandaloneUI();
         }
     }
+
+    /// <summary>
+    /// Standalone 모드에서 Host에 attach 요청
+    /// </summary>
+    private async Task AttachToHostAsync(int hostPid)
+    {
+        try
+        {
+            var attachPipeName = $"MultiProcessBrowser_Attach_{hostPid}";
+            StatusText.Text = $"Requesting attach to host (PID: {hostPid})...";
+
+            var attachClient = new IpcPipeClient(attachPipeName);
+            await attachClient.ConnectAsync(3000);
+
+            // attach 요청 전송
+            await attachClient.SendAsync(new IpcMessage
+            {
+                Type = IpcMessageType.RequestAttach,
+                TabId = _tabId,
+                Data = new Dictionary<string, string>
+                {
+                    ["pid"] = Process.GetCurrentProcess().Id.ToString(),
+                    ["hwnd"] = _hwnd.ToString(),
+                    ["title"] = Title,
+                }
+            });
+
+            // Host가 AttachAccepted로 새 파이프 이름을 보내줌
+            var tcs = new TaskCompletionSource<IpcMessage>();
+            attachClient.MessageReceived += msg =>
+            {
+                if (msg.Type == IpcMessageType.AttachAccepted)
+                    tcs.TrySetResult(msg);
+            };
+
+            var timeoutTask = Task.Delay(5000);
+            var completed = await Task.WhenAny(tcs.Task, timeoutTask);
+
+            if (completed == tcs.Task)
+            {
+                var response = tcs.Task.Result;
+                attachClient.Dispose();
+
+                if (response.Data.TryGetValue("pipeName", out var newPipeName))
+                {
+                    // 새 TabId 가 왔으면 갱신
+                    if (!string.IsNullOrEmpty(response.TabId))
+                        _tabId = response.TabId;
+
+                    _lastHostPid = hostPid;
+                    await ConnectToHost(newPipeName);
+                }
+            }
+            else
+            {
+                attachClient.Dispose();
+                StatusText.Text = "Attach timeout - host did not respond";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Attach failed: {ex.Message}";
+        }
+    }
+
+    #endregion
+
+    #region IPC Message Handling
 
     private void OnHostMessage(IpcMessage msg)
     {
@@ -108,6 +205,11 @@ public partial class MainWindow : Window
                     break;
 
                 case IpcMessageType.RequestDetach:
+                    if (msg.Data.TryGetValue("hostPid", out var pidStr) &&
+                        int.TryParse(pidStr, out var hostPid))
+                    {
+                        _lastHostPid = hostPid;
+                    }
                     HandleDetach();
                     break;
 
@@ -130,30 +232,24 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            ConnectionStatus.Text = "Disconnected";
-            ConnectionStatus.Foreground = System.Windows.Media.Brushes.Orange;
             StatusText.Text = "Host disconnected - running standalone";
-
-            // 분리되어 독립 실행으로 전환
             HandleDetach();
         });
     }
 
     private void HandleDetach()
     {
-        // Win32 API로 윈도우 분리
+        _isEmbedded = false;
+
+        // Win32 API로 윈도우를 독립 윈도우로 전환
         Win32Api.DetachWindow(_hwnd);
 
-        // 윈도우를 마우스 커널 위치로 이동
+        // 마우스 커서 위치로 이동
         Win32Api.GetCursorPos(out var cursorPos);
         Left = cursorPos.X - 100;
         Top = cursorPos.Y - 20;
         Width = 900;
         Height = 600;
-
-        ConnectionStatus.Text = "Detached";
-        ConnectionStatus.Foreground = System.Windows.Media.Brushes.Yellow;
-        StatusText.Text = "Detached from host - running independently";
 
         // Host에 분리 완료 알림
         _ = _ipcClient?.SendAsync(new IpcMessage
@@ -165,7 +261,18 @@ public partial class MainWindow : Window
                 ["hwnd"] = _hwnd.ToString(),
             }
         });
+
+        // IPC 클라이언트 정리
+        _ipcClient?.Dispose();
+        _ipcClient = null;
+
+        ShowStandaloneUI();
+        UpdateProcessInfo();
     }
+
+    #endregion
+
+    #region Navigation
 
     private void NavigateTo(string url)
     {
@@ -173,7 +280,6 @@ public partial class MainWindow : Window
         AddressBar.Text = url;
         StatusText.Text = $"Loading {url}...";
 
-        // 간단한 페이지 시뮬레이션
         if (url.StartsWith("about:"))
         {
             PageTitle.Text = "New Tab";
@@ -196,17 +302,9 @@ public partial class MainWindow : Window
                                $"If one tab crashes, other tabs remain unaffected.";
         }
 
-        // 프로세스 정보 갱신
-        var process = Process.GetCurrentProcess();
-        ProcessInfo.Text = $"Process ID: {process.Id}\n" +
-                           $"Tab ID: {_tabId}\n" +
-                           $"Window Handle: 0x{_hwnd:X}\n" +
-                           $"URL: {_currentUrl}\n" +
-                           $"Working Set: {process.WorkingSet64 / 1024 / 1024} MB\n" +
-                           $"Hosted: {App.IsHosted}";
-
         StatusText.Text = $"Loaded: {url}";
         Title = PageTitle.Text;
+        UpdateProcessInfo();
 
         // Host에 제목 변경 알림
         _ = _ipcClient?.SendAsync(new IpcMessage
@@ -221,57 +319,62 @@ public partial class MainWindow : Window
         });
     }
 
+    #endregion
+
+    #region Event Handlers
+
     private void AddressBar_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
-        {
             NavigateTo(AddressBar.Text.Trim());
-        }
     }
 
-    private void GoButton_Click(object sender, RoutedEventArgs e)
-    {
+    private void GoButton_Click(object sender, RoutedEventArgs e) =>
         NavigateTo(AddressBar.Text.Trim());
-    }
 
-    private void BackButton_Click(object sender, RoutedEventArgs e)
-    {
+    private void BackButton_Click(object sender, RoutedEventArgs e) =>
         StatusText.Text = "Back navigation (simulated)";
-    }
 
-    private void ForwardButton_Click(object sender, RoutedEventArgs e)
-    {
+    private void ForwardButton_Click(object sender, RoutedEventArgs e) =>
         StatusText.Text = "Forward navigation (simulated)";
-    }
 
-    private void RefreshButton_Click(object sender, RoutedEventArgs e)
-    {
+    private void RefreshButton_Click(object sender, RoutedEventArgs e) =>
         NavigateTo(_currentUrl);
-    }
 
     private void QuickLink_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is string url)
-        {
             NavigateTo(url);
-        }
     }
 
-    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+    private async void AttachButton_Click(object sender, RoutedEventArgs e)
     {
-        // 크기 변경 시 프로세스 정보 갱신
+        if (int.TryParse(HostPidInput.Text.Trim(), out var hostPid))
+        {
+            await AttachToHostAsync(hostPid);
+        }
+        else
+        {
+            StatusText.Text = "Please enter a valid Host PID";
+        }
     }
 
     private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         if (_ipcClient != null)
         {
-            await _ipcClient.SendAsync(new IpcMessage
+            try
             {
-                Type = IpcMessageType.CloseRequested,
-                TabId = _tabId,
-            });
+                await _ipcClient.SendAsync(new IpcMessage
+                {
+                    Type = IpcMessageType.CloseRequested,
+                    TabId = _tabId,
+                });
+            }
+            catch { }
             _ipcClient.Dispose();
         }
     }
+
+    #endregion
 }

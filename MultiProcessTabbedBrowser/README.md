@@ -37,9 +37,28 @@
 ## 핵심 기능
 
 - **멀티프로세스 격리**: 각 탭이 독립 프로세스로 실행되어 하나가 크래시해도 다른 탭에 영향 없음
-- **탭 합치기/분리**: 독립 윈도우를 탭으로 합치거나, 탭을 드래그하여 독립 윈도우로 분리
-- **Named Pipe IPC**: Host-Child 간 비동기 메시지 통신
+- **탭 분리 (Detach)**: 탭을 드래그하여 윈도우 밖으로 끌면 독립 윈도우로 분리됨
+- **탭 합치기 (Attach)**: 분리된 독립 TabChild 윈도우에서 Host PID를 입력하면 다시 탭으로 합쳐짐
+- **Named Pipe IPC**: Host-Child 간 비동기 JSON 메시지 통신
 - **Win32 Window Embedding**: `SetParent` API로 자식 프로세스 윈도우를 호스트에 임베딩
+- **Attach Pipe Listener**: Host가 글로벌 파이프를 열어 외부 TabChild의 합류 요청을 수신
+
+## 탭 분리/합치기 흐름
+
+```
+[탭 드래그로 분리]
+  TabHost → RequestDetach → TabChild
+  TabChild: Win32 DetachWindow → 독립 윈도우로 전환
+  TabChild → DetachCompleted → TabHost
+  TabHost: 탭 목록에서 제거 (프로세스는 유지)
+
+[독립 윈도우에서 Host로 합치기]
+  TabChild → RequestAttach → TabHost (글로벌 Attach 파이프)
+  TabHost → AttachAccepted (새 전용 파이프 이름 전달) → TabChild
+  TabChild: 새 파이프로 재연결
+  TabChild → WindowHandleReady → TabHost
+  TabHost: Win32 EmbedWindow → 탭으로 임베딩
+```
 
 ## 키보드 단축키
 

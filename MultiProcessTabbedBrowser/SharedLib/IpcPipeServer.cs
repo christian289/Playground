@@ -55,6 +55,7 @@ public class IpcPipeServer : IDisposable
         {
             ClientDisconnected?.Invoke();
         }
+        catch (ObjectDisposedException) { }
     }
 
     private async Task ListenAsync(CancellationToken ct)
@@ -82,6 +83,7 @@ public class IpcPipeServer : IDisposable
         {
             ClientDisconnected?.Invoke();
         }
+        catch (ObjectDisposedException) { }
     }
 
     public void Dispose()
