@@ -1,83 +1,81 @@
 # Multi-Process Tabbed Browser (WPF)
 
-크로미움 스타일의 멀티프로세스 아키텍처를 WPF로 구현한 탭 브라우저입니다.
+P2P 방식의 멀티프로세스 탭 브라우저. 모든 윈도우가 대등한 피어로, 호스트이자 차일드가 될 수 있습니다.
 
 ## 아키텍처
 
 ```
-┌─────────────────────────────────────────────────┐
-│  TabHost (Host Process)                         │
-│  ┌─────────┬─────────┬─────────┬───┐            │
-│  │  Tab 1  │  Tab 2  │  Tab 3  │ + │  ← Tab Bar │
-│  └─────────┴─────────┴─────────┴───┘            │
-│  ┌─────────────────────────────────┐            │
-│  │                                 │            │
-│  │  Embedded Child Window          │            │
-│  │  (SetParent API)                │            │
-│  │                                 │            │
-│  └─────────────────────────────────┘            │
-└─────────────────────────────────────────────────┘
-         │              │              │
-    Named Pipe     Named Pipe     Named Pipe
-         │              │              │
-    ┌────┴────┐   ┌────┴────┐   ┌────┴────┐
-    │TabChild │   │TabChild │   │TabChild │
-    │ PID:101 │   │ PID:102 │   │ PID:103 │
-    └─────────┘   └─────────┘   └─────────┘
+┌── BrowserWindow (PID:100) ───────────┐
+│ [This Window] [PID:101] [PID:102] [+]│
+│ ┌──────────────────────────────────┐  │
+│ │  Embedded: PID:101 (as tab)     │  │     ┌── BrowserWindow (PID:103) ──┐
+│ └──────────────────────────────────┘  │     │ [This Window]  [+]          │
+└───────────────────────────────────────┘     │ ┌────────────────────────┐  │
+         │              │                     │ │  Local content         │  │
+    Named Pipe     Named Pipe                 │ └────────────────────────┘  │
+         │              │                     └─────────────────────────────┘
+   PID:101(embedded)  PID:102(embedded)            ↕ dock/undock 가능
+
+모든 윈도우는 동일한 실행파일 (BrowserWindow.exe)
+호스트 ↔ 차일드 역할이 동적으로 전환됨
 ```
+
+## 핵심 개념
+
+- **단일 실행파일**: `BrowserWindow.exe` 하나로 모든 윈도우가 동일
+- **대등한 피어**: 어떤 윈도우든 다른 윈도우를 탭으로 호스팅할 수 있고, 자신이 다른 윈도우의 탭이 될 수도 있음
+- **동적 역할 전환**: 호스트였던 윈도우가 분리되어 다른 윈도우에 dock되면 차일드가 됨
+- **자동 해제**: dock될 때 기존에 호스팅하던 탭들은 자동으로 독립 윈도우로 해제됨
 
 ## 프로젝트 구성
 
 | 프로젝트 | 역할 |
 |---------|------|
-| **TabHost** | 메인 호스트 프로세스. 탭 바 관리, 자식 프로세스 윈도우 임베딩 |
-| **TabChild** | 탭 컨텐츠 프로세스. 독립 실행 가능한 WPF 윈도우 |
+| **BrowserWindow** | 메인 실행파일. 호스트/차일드 역할을 모두 수행하는 통합 WPF 윈도우 |
 | **SharedLib** | IPC 메시지, Named Pipe 통신, Win32 API 래퍼 |
 
-## 핵심 기능
-
-- **멀티프로세스 격리**: 각 탭이 독립 프로세스로 실행되어 하나가 크래시해도 다른 탭에 영향 없음
-- **탭 분리 (Detach)**: 탭을 드래그하여 윈도우 밖으로 끌면 독립 윈도우로 분리됨
-- **탭 합치기 (Attach)**: 분리된 독립 TabChild 윈도우에서 Host PID를 입력하면 다시 탭으로 합쳐짐
-- **Named Pipe IPC**: Host-Child 간 비동기 JSON 메시지 통신
-- **Win32 Window Embedding**: `SetParent` API로 자식 프로세스 윈도우를 호스트에 임베딩
-- **Attach Pipe Listener**: Host가 글로벌 파이프를 열어 외부 TabChild의 합류 요청을 수신
-
-## 탭 분리/합치기 흐름
+## Dock / Undock 흐름
 
 ```
-[탭 드래그로 분리]
-  TabHost → RequestDetach → TabChild
-  TabChild: Win32 DetachWindow → 독립 윈도우로 전환
-  TabChild → DetachCompleted → TabHost
-  TabHost: 탭 목록에서 제거 (프로세스는 유지)
+[Window A를 Window B에 dock]
+  A → RequestAttach → B (B의 Attach 파이프)
+  B → AttachAccepted (전용 파이프 이름) → A
+  A: 전용 파이프로 재연결
+  A → WindowHandleReady → B
+  B: Win32 EmbedWindow → A를 탭으로 임베딩
+  A: 타이틀바/탭바 숨김, Embedded 모드 진입
 
-[독립 윈도우에서 Host로 합치기]
-  TabChild → RequestAttach → TabHost (글로벌 Attach 파이프)
-  TabHost → AttachAccepted (새 전용 파이프 이름 전달) → TabChild
-  TabChild: 새 파이프로 재연결
-  TabChild → WindowHandleReady → TabHost
-  TabHost: Win32 EmbedWindow → 탭으로 임베딩
+[탭을 분리 (undock)]
+  B → RequestDetach → A
+  A: Win32 DetachWindow → 독립 윈도우 복원
+  A → DetachCompleted → B
+  A: 타이틀바/탭바 다시 표시, Standalone 모드 복귀
+  A: 이제 다른 윈도우에 다시 dock 가능
 ```
 
 ## 키보드 단축키
 
 | 단축키 | 기능 |
 |-------|------|
-| `Ctrl+T` | 새 탭 |
-| `Ctrl+W` | 현재 탭 닫기 |
+| `Ctrl+N` | 새 윈도우 (현재 윈도우에 탭으로 추가) |
+| `Ctrl+W` | 현재 호스팅 탭 닫기 |
 | `Ctrl+Tab` | 다음 탭 |
 | `Ctrl+Shift+Tab` | 이전 탭 |
-| `Ctrl+D` | 현재 탭 분리 (독립 윈도우로) |
+| `Ctrl+D` | 현재 호스팅 탭 분리 (독립 윈도우로) |
 
 ## 빌드 및 실행
 
 ```bash
-# 솔루션 전체 빌드
+# 빌드
 dotnet build MultiProcessTabbedBrowser.sln
 
-# TabHost 실행 (TabChild는 자동으로 시작됨)
-dotnet run --project TabHost
+# 실행 (첫 번째 윈도우)
+dotnet run --project BrowserWindow
+
+# 두 번째 윈도우를 별도로 실행
+dotnet run --project BrowserWindow
+
+# 두 번째 윈도우에서 첫 번째 윈도우의 PID를 입력하고 Dock 버튼 클릭
 ```
 
 ## 요구사항

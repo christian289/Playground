@@ -5,25 +5,24 @@ namespace SharedLib;
 
 public enum IpcMessageType
 {
-    // Host -> Child
-    RequestEmbed,
-    RequestDetach,
-    SetTitle,
-    Navigate,
-    CloseTab,
-    Ping,
+    // Dock request (peer -> target's attach listener)
+    RequestAttach,
+    AttachAccepted,
 
-    // Child -> Host
+    // After dock established (embedded -> host)
     WindowHandleReady,
+    Ready,
     TitleChanged,
     DetachCompleted,
     CloseRequested,
-    Pong,
-    ChildReady,
 
-    // Child -> Host (re-attach)
-    RequestAttach,
-    AttachAccepted,
+    // Host -> embedded
+    RequestDetach,
+    CloseTab,
+    Ping,
+
+    // Embedded -> host
+    Pong,
 }
 
 public class IpcMessage
