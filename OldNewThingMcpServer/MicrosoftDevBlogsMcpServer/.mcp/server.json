@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "description": "Exposes Microsoft Developer Blogs (devblogs.microsoft.com) — team-authored posts from the .NET, Visual Studio, C++, TypeScript, PowerShell, Azure SDK, Old New Thing, and other team blogs — as MCP tools: list known blogs, fetch recent posts, search by keyword within the feed window, browse archives by year/month, batch fetch titles, and retrieve full article text.",
+  "name": "io.github.christian289/microsoft-devblogs-mcp-server",
+  "version": "0.2.0-beta",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "identifier": "christian289.MicrosoftDevBlogs.McpServer",
+      "version": "0.2.0-beta",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [],
+      "environmentVariables": []
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/christian289/microsoft-devblogs-mcp-server",
+    "source": "github"
+  }
+}

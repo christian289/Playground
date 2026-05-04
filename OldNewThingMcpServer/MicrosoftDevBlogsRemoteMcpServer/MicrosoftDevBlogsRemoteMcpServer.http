@@ -1,0 +1,48 @@
+# For more info on HTTP files go to https://aka.ms/vs/httpfile
+
+@HostAddress = http://localhost:6142
+
+### Initialize
+POST {{HostAddress}}/
+Accept: application/json, text/event-stream
+Content-Type: application/json
+MCP-Protocol-Version: 2025-11-25
+
+{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {},
+        "clientInfo": { "name": "http-probe", "version": "1.0" }
+    }
+}
+
+### List tools
+POST {{HostAddress}}/
+Accept: application/json, text/event-stream
+Content-Type: application/json
+MCP-Protocol-Version: 2025-11-25
+
+{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list"
+}
+
+### Call get_latest_posts
+POST {{HostAddress}}/
+Accept: application/json, text/event-stream
+Content-Type: application/json
+MCP-Protocol-Version: 2025-11-25
+
+{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tools/call",
+    "params": {
+        "name": "get_latest_posts",
+        "arguments": { "count": 3 }
+    }
+}
