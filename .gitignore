@@ -404,6 +404,9 @@ FodyWeavers.xsd
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 
+# Claude Code per-user settings (project-shared settings.json is committed)
+.claude/settings.local.json
+
 # Local History for Visual Studio Code
 .history/
 
