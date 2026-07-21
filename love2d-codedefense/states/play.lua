@@ -72,11 +72,15 @@ function play:update(dt)
         local want = math.min(math.floor(at.timer * 40), #at.target)
         if want > at.pos then
             self.editor:setText(at.target:sub(1, want))
+            self.editor.cr = #self.editor.lines
+            self.editor.cc = 1
             at.pos = want
         end
         if at.pos >= #at.target then
             self.autotype = nil
             self.editor:setText(at.target)
+            self.editor.cr = #self.editor.lines
+            self.editor.cc = 1
             self:save()
         end
     end
