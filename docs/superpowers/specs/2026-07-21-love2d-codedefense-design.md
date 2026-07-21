@@ -122,8 +122,8 @@ IT 용어·밈은 아이템/장비로 등장하며, 장착하면 **새 API가 �
 - 티어3 타워는 해당 계열 티어2 타워가 필드에 존재해야 건설 가능
 
 테크 타워 자체는 공격력이 없거나 약한 대신 전략적 가치를 가진다 — 지킬 가치가 있는 건물이
-생기면서 미로 설계와 타워 배치에 깊이가 생긴다. 정의는 데이터 파일의 `requires` 필드로
-선언한다 (예: `requires = { tower = "compiler" }`).
+생기면서 미로 설계와 타워 배치에 깊이가 생긴다. 정의는 `towers.csv`의 `requires` 열로
+선언한다 (예: `requires` 셀에 `compiler`).
 
 ## 5. 코딩 시스템
 
@@ -180,7 +180,7 @@ IT 용어·밈은 아이템/장비로 등장하며, 장착하면 **새 API가 �
 
 ### 6.1 아이템 = API 해금
 
-전부 데이터 파일(Lua 테이블) 정의 — 새 밈 추가 = 파일 하나 추가. 초기 풀:
+전부 CSV 데이터로 정의 — 새 밈 추가 = CSV 행 하나 추가 (7.2 참조). 초기 풀:
 
 | 아이템 | 실제 IT 의미 | 해금 API / 효과 |
 |--------|-------------|-----------------|
@@ -199,10 +199,30 @@ IT 용어·밈은 아이템/장비로 등장하며, 장착하면 **새 API가 �
 스파게티 코드(궤적 꼬임), 기술 부채(방치할수록 커지고 강해짐), DDoS 봇넷(대량 물량),
 좀비 프로세스(죽어도 부활), 힙 오버플로우(보스).
 
+**예외 몬스터 계열 (진영별 세트)**: 예외(Exception)는 언어마다 생김새가 달라서, 예외 몬스터는
+**언어 진영별 세트**로 등장한다. v1의 Lua 세트 — Lua에는 .NET 같은 타입화된 예외 계층이 없고
+런타임이 뱉는 정형화된 오류 메시지가 있을 뿐인데, 그 메시지가 그대로 몬스터 이름이 된다:
+
+| 몬스터 (실제 Lua 오류 메시지) | 의미 | 게임 컨셉 (예시) |
+|------|------|------|
+| `attempt to index a nil value` | nil의 필드에 접근 | 널 포인터의 Lua 사촌 — 맞은 타워의 다음 판단 1회를 nil로 만듦 |
+| `attempt to call a nil value` | 없는 함수를 호출 | 타워 하나의 `on_tick` 호출을 잠시 무효화 |
+| `attempt to perform arithmetic on a nil value` | nil과 산술 연산 | 접촉한 타워의 오버클럭 게이지를 0으로 |
+| `attempt to concatenate a nil value` | nil 문자열 연결 | 분열해서 여러 마리가 됨 (`..`처럼 이어붙음) |
+| `bad argument #1 to 'attack'` | 함수 인자 타입 오류 | 타워의 다음 공격이 빗나감 |
+| `stack overflow` | 재귀 폭주 | 죽을 때마다 한 단계 작은 자신을 남김 (재귀) |
+| `cannot resume dead coroutine` | 끝난 코루틴 재개 시도 | 좀비 프로세스의 강화판 — 부활하지만 점점 느려짐 |
+
+도감에는 각 몬스터가 "실제로 이 오류가 언제 나는지 + 어떻게 고치는지(pcall, nil 체크)"를
+기록한다. v2에서 진영이 추가되면 C# 세트(`NullReferenceException`, `InvalidOperationException`,
+`ArgumentNullException`…), Python 세트(`TypeError`, `KeyError`, `IndexError`…),
+JS 세트(`TypeError`, `ReferenceError`, `RangeError`…)가 같은 형식으로 들어온다 —
+플레이어는 몬스터를 잡으며 언어별 예외 체계의 차이를 자연스럽게 비교하게 된다.
+
 ### 6.3 밈 도감 (영구 수집)
 
 획득 용어마다 ① 실제 IT 의미, ② 게임 내 효과, ③ 활용 예제 코드 한 토막.
-"이 게임 하다가 용어 배웠다"는 리뷰가 목표. 신규 밈은 데이터 파일 추가로 계속 공급.
+"이 게임 하다가 용어 배웠다"는 리뷰가 목표. 신규 밈은 CSV 행 추가로 계속 공급.
 
 ### 6.4 커리큘럼-메커니즘 매핑 예시
 
@@ -223,35 +243,48 @@ love2d-codedefense/
 │  ├─ tower.lua / enemy.lua / projectile.lua
 │  ├─ grid.lua         ← 고정 크기 그리드 + 미로 벽 + 위→아래 경로 탐색
 │  ├─ waves.lua        ← 전투 타임라인 실행기 (일반: 5분+pause_at / 하드코어: 주기 강제 웨이브)
+│  ├─ csv.lua          ← 경량 CSV 파서 (따옴표 필드, 셀 내 리스트 `;` 구분 지원)
 │  └─ progress.lua     ← 저장/로드 (진행도, 도감, 라이브러리, 인벤토리, 퀵바, 특전, 기록)
 ├─ states/             ← title / stageselect / prep / battle / result / codex
 ├─ data/
-│  ├─ items/           ← 밈 아이템 1개 = 파일 1개
-│  ├─ enemies/         ← 밈 몬스터 정의
-│  ├─ stages/          ← 스테이지 1개 = 파일 1개 (300 + 50개로 확장)
-│  └─ curriculum/      ← 구간별 튜토리얼 텍스트, placeholder 템플릿, 퀵바 프리셋
+│  ├─ items.csv        ← 밈 아이템 (1행 = 아이템 1개)
+│  ├─ enemies.csv      ← 밈 몬스터 + 예외 몬스터 (1행 = 몬스터 1개)
+│  ├─ towers.csv       ← 타워 정의 (requires 열이 4.3 테크 의존성 선언)
+│  ├─ codex.csv        ← 도감 텍스트 (용어, 실제 IT 의미, 게임 효과, 예제 코드 파일 참조)
+│  ├─ stages.csv       ← 스테이지 메타 (1행 = 스테이지 1개, 300+50행으로 확장)
+│  ├─ timelines.csv    ← 적 출현 스케줄 (1행 = 스폰 이벤트 1개, stage_id로 연결)
+│  ├─ mazes/           ← 미로 배치 텍스트 파일 (12x16 문자 맵, 1스테이지 1파일)
+│  └─ curriculum/      ← 튜토리얼·placeholder 템플릿·정답 코드 (코드 조각이라 Lua 파일 유지)
 └─ lib/                ← classic, hump (기존 프로젝트와 동일 패턴)
 ```
 
-### 7.2 스테이지 데이터 스키마 (300개 확장의 핵심 — 스테이지는 코드가 아니라 데이터)
+### 7.2 게임 데이터는 전부 CSV로 관리한다 (300개 확장의 핵심 — 스테이지는 코드가 아니라 데이터)
 
-```lua
-return {
-  id = 42, mode = "normal",        -- "normal" | "hardcore"
-  concept = "for-loop",            -- 이 스테이지가 가르치는 개념
-  maze = { "W..W", "..." },        -- 고정 크기 그리드의 벽 배치 (문자열 맵)
-  timeline = {                     -- 결정론적 적 출현 스케줄 (랜덤 없음)
-    { at = 0,   spawn = "bug",      count = 10, interval = 1.5 },
-    { at = 60,  spawn = "null-ptr", count = 3,  interval = 5 },
-  },
-  pause_at = { 90, 180 },          -- 일반 모드: 타이머 정지 + 준비 단계 (하드코어: 없음)
-  wave_clock = nil,                -- 하드코어: N초마다 다음 웨이브 강제 투입
-  budget = 400,
-  languages = { "lua" },           -- 이 스테이지에서 선택 가능한 언어 진영 (일반 모드: 1개 이상 선택)
-  hints = "data/curriculum/42.lua",
-  solution = "data/stages/42_solution.lua",  -- 정답 코드 (회귀 테스트용, 필수)
-}
+표 형태 데이터는 전부 CSV다. 엑셀/구글시트에서 편집·밸런싱하고, 커뮤니티 밈 제안도 CSV 행
+하나로 받는다. 셀 안의 리스트는 `;` 구분, 다중 행 텍스트(미로 맵, 예제 코드, placeholder
+템플릿)는 CSV에 넣지 않고 **파일 경로를 참조**한다. 로드는 자체 `src/csv.lua` 파서.
+
+`stages.csv` — 1행 = 스테이지 1개:
+
+```csv
+id,mode,concept,maze_file,budget,languages,pause_at,wave_clock,hints_file,solution_file
+42,normal,for-loop,mazes/042.txt,400,lua,90;180,,curriculum/042_hints.lua,curriculum/042_solution.lua
+301,hardcore,event-driven,mazes/h01.txt,300,lua,,45,,curriculum/h01_solution.lua
 ```
+
+- `pause_at`: 일반 모드에서 타이머가 정지되고 준비 단계가 열리는 시점들 (하드코어는 빈 값)
+- `wave_clock`: 하드코어에서 N초마다 웨이브를 강제 투입하는 주기 (일반은 빈 값)
+- `solution_file`: 정답 코드 — 회귀 테스트용, 전 스테이지 필수
+
+`timelines.csv` — 1행 = 스폰 이벤트 1개, 결정론적 스케줄 (랜덤 없음):
+
+```csv
+stage_id,at,spawn,count,interval
+42,0,bug,10,1.5
+42,60,attempt-to-index-nil,3,5
+```
+
+`enemies.csv`, `items.csv`, `towers.csv`(테크 의존성 `requires` 열), `codex.csv`도 같은 방식.
 
 ### 7.3 저장
 
@@ -269,6 +302,10 @@ return {
    클리어 검증. 스테이지 300개가 쌓여도 자동 검증.
 3. **난이도 검증 규칙** — 각 스테이지의 정답 코드는 이전 구간 지식만으로 작성 가능해야 한다 (리뷰 규칙).
 4. **에디터 테스트** — 키 입력 시뮬레이션으로 커서/삽입/삭제/한글 주석/퀵바 삽입 검증.
+5. **CSV 데이터 무결성 검사** — 파서 단위 테스트 + 참조 검증: `timelines.csv`의 `spawn`이
+   `enemies.csv`에 존재하는지, `stages.csv`가 참조하는 미로/정답 파일이 실재하는지,
+   `towers.csv`의 `requires`가 유효한 타워 id인지. 데이터가 300스테이지로 불어나도
+   깨진 참조를 커밋 전에 잡는다.
 
 ## 9. v1 범위와 이후 로드맵
 
