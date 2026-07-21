@@ -20,11 +20,13 @@ function prep:enter(prev, d, stageId, p, resume)
         -- 전투 중 pause_at으로 돌아온 경우: battle 유지
         self.battle = resume.battle
         self.money = resume.money
+        self.placements = resume.placements or self.placements or {}
     else
         self.battle = nil
         self.money = self.stage.budget
         self.placements = {}
     end
+    self.startError = nil
     self.g = grid.load(d.root .. "/data/" .. self.stage.maze_file)
     self.cursorR, self.cursorC = 3, 3
     self.selTower = "printer"
@@ -107,6 +109,12 @@ function prep:draw()
     love.graphics.setColor(0.6, 0.65, 0.7)
     love.graphics.printf("화살표 배치커서 · B 건설(" .. self.selTower .. ") · T 타워종류 · Tab 에디터/그리드 · F5 전투 시작 · ESC 나가기",
         20, 600, 920, "left")
+
+    if self.startError then
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(1, 0.45, 0.4)
+        love.graphics.printf(self.startError, 20, 575, 920, "left")
+    end
 end
 
 function prep:keypressed(key)
@@ -160,10 +168,12 @@ function prep:tryBuild()
 end
 
 function prep:textinput(ch)
+    self.startError = nil
     if self.focus == "editor" then self.editor:textinput(ch) end
 end
 
 function prep:startBattle()
+    self.startError = nil
     local code = self:currentCode()
     if self.stage.ui ~= "button" then
         self.p.codes[self.stageId] = code
@@ -172,16 +182,26 @@ function prep:startBattle()
     for _, pl in ipairs(self.placements) do pl.code = code end
     if not self.battle then
         local ok, battleOrErr = pcall(Battle, self.d, self.stageId, self.placements)
-        if not ok then return end
+        if not ok then
+            local msg = tostring(battleOrErr):gsub("^.-:%d+:%s*", "")
+            self.startError = "시작 불가: " .. msg
+            return
+        end
         self.battle = battleOrErr
     end
     -- 문법 오류가 있는 타워가 있으면 시작 막기 (교육: 시작 전 진단)
     for _, tw in ipairs(self.battle.towers) do
-        if tw.lastError and tw.env == nil then return end
+        if tw.lastError and tw.env == nil then
+            local raw = tostring(tw.lastError)
+            local msg, n = raw:gsub("^%[string.-%]:", "줄 ")
+            if n == 0 then msg = raw end
+            self.startError = ("시작 불가 — %s 타워 코드 오류: %s"):format(tw.def.name, msg)
+            return
+        end
     end
     self.battle:start()
     Gamestate.switch(require("states.battle"), self.battle,
-        { d = self.d, stageId = self.stageId, p = self.p, prepState = self })
+        { d = self.d, stageId = self.stageId, p = self.p, placements = self.placements })
 end
 
 return prep

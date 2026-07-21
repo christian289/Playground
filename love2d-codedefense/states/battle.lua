@@ -14,7 +14,7 @@ function view:update(dt)
     self.b:update(dt * self.speed)
     if self.b.status == "prep" then
         Gamestate.switch(require("states.prep"), self.ctx.d, self.ctx.stageId, self.ctx.p,
-            { battle = self.b, money = 0 })
+            { battle = self.b, money = 0, placements = self.ctx.placements })
     elseif self.b.status == "clear" or self.b.status == "defeat" then
         Gamestate.switch(require("states.result"), self.b.status, self.ctx)
     end
