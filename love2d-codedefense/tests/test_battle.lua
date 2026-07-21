@@ -78,6 +78,25 @@ end
     b5:setScript('build("compiler", 3, 10, "c")\nbuild("sniper", 11, 3, "s")')
     t.eq(#b5.towers, 2, "컴파일러 후 스나이퍼 설치")
 
+    -- 샌드박스: env에 원시 Tower 객체가 노출되지 않는다 (env._tower 회귀 금지)
+    local bSbx = Battle(d, 1, {})
+    bSbx:setScript(ATK)
+    t.eq(bSbx.env._tower, nil, "원시 타워 미노출")
+
+    -- 샌드박스: env._tower가 없으므로 이를 통한 tower.def 변조 시도는 인덱싱 오류로 그 타워만 크래시
+    local SANDBOX_ESCAPE = [[
+build("printer", 3, 10, "a")
+function on_tick(self, world)
+  _tower.def.damage = 9999
+end
+]]
+    local bEsc = Battle(d, 1, {})
+    bEsc:setScript(SANDBOX_ESCAPE)
+    bEsc:start()
+    run(bEsc, 2)
+    t.ok(bEsc.towers[1].crashed > 0, "_tower 접근 시도는 nil 인덱싱으로 크래시")
+    t.eq(d.towers.printer.damage, 10, "printer 공유 정의(damage) 불변")
+
     -- 장애 격리: 이름 분기 오류는 그 타워만 크래시
     local b6 = Battle(d, 1, {})
     b6:setScript(ATK .. [[

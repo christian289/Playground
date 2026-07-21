@@ -41,12 +41,16 @@ end
 
 function Tutorial:advance() self.idx = self.idx + 1 end
 
+-- key를 소비(진행에 사용)했으면 true, 아니면 false를 반환한다. 호출자(states/play.lua)는
+-- true를 받으면 그 키를 여기서 멈춰야 한다 — 그렇지 않으면 예: 스테이지 3/4 설명 스텝에서
+-- Enter가 에디터까지 새어들어가 빈 줄이 삽입된다.
 function Tutorial:keypressed(key, ctrl)
-    if self:done() then return end
-    if ctrl and key == "x" then self.skipped = true return end
+    if self:done() then return false end
+    if ctrl and key == "x" then self.skipped = true return true end
     local adv = self:current().advance
-    if key == "return" and adv.on == "enter" then self:advance()
-    elseif adv.on == "key" and adv.key == key then self:advance() end
+    if key == "return" and adv.on == "enter" then self:advance() return true
+    elseif adv.on == "key" and adv.key == key then self:advance() return true end
+    return false
 end
 
 function Tutorial:notify(event)

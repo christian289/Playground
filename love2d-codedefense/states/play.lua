@@ -91,10 +91,6 @@ function play:update(dt)
     end
 
     self.battle:update(dt * self.speed)
-    -- 웨이브 틈 감지: 화면에 적이 없고 전투 중이면 gap 알림 (튜토리얼용, 1회성은 tutorial이 관리)
-    if self.tut and self.battle.clock > 0 and #self.battle.enemies == 0 then
-        self.tut:notify("gap")
-    end
     if self.tut and self.tut:done() and not self.tutSaved then
         self.tutSaved = true
         self.p.tutorial_done[self.stageId] = true
@@ -206,10 +202,11 @@ end
 
 function play:keypressed(key)
     local ctrl = love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")
-    -- Task 5 훅: 튜토리얼이 활성 상태면 허용된 키만 통과시킨다.
+    -- Task 5 훅: 튜토리얼이 활성 상태면 허용된 키만 통과시킨다. 튜토리얼이 키를 소비했으면
+    -- (Ctrl+X 스킵, Enter 진행, 스텝 지정 키 진행) 여기서 멈춰 에디터로 새어나가지 않게 한다.
     if self.tut and not self.tut:done() then
         if not self.tut:allows(key, ctrl) then return end
-        self.tut:keypressed(key, ctrl)
+        if self.tut:keypressed(key, ctrl) then return end
     end
     if key == "escape" then
         Gamestate.switch(require("states.stageselect"), self.d, self.p)

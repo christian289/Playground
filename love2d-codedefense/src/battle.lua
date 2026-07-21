@@ -32,6 +32,7 @@ function Battle:new(d, stageId, opts)
     self.towersByName = {}
     self.nextEnemyId = 1
     self.env = nil
+    self.setTower = nil
     self.script = nil
     self.scriptError = nil
 end
@@ -83,13 +84,13 @@ end
 -- 실시간 스크립트 저장: 새 env를 컴파일해서 성공 시에만 교체(build 재실행 포함).
 -- 실패 시 기존 env/script는 그대로 유지된다.
 function Battle:setScript(code)
-    local env = api.buildEnv(self)
+    local env, setTower = api.buildEnv(self)
     local compiled, err = sandbox.compile(code, env, "script")
     if not compiled then
         self.scriptError = tostring(err)
         return false, self.scriptError
     end
-    self.env = env
+    self.env, self.setTower = env, setTower
     self.script = code
     self.scriptError = nil
     for _, tw in ipairs(self.towers) do
@@ -121,6 +122,7 @@ end
 function Battle:runTick()
     for _, tw in ipairs(self.towers) do
         if self.env and self.env.on_tick and tw.crashed <= 0 and not tw.disabled then
+            self.setTower(tw)
             local selfApi, world = api.refresh(self.env, tw, self.enemies)
             tw.pendingTarget = nil
             local ok, err, used = sandbox.call(self.env.on_tick, BUDGET, selfApi, world)
