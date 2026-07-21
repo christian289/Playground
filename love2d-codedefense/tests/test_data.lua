@@ -1,0 +1,19 @@
+return function(t)
+    local db = require("src.db")
+    local d = db.load(PROJECT_ROOT)
+
+    t.ok(d.towers.printer, "towers.csv 로드")
+    t.eq(d.towers.printer.cost, 100, "타워 cost 숫자 변환")
+    t.eq(d.towers.sniper.requires, "compiler", "테크 의존성 파싱")
+    t.ok(d.enemies["null-ptr"], "enemies.csv 로드")
+    t.eq(d.stages[1].budget, 200, "stages.csv budget 숫자 변환")
+    t.eq(d.stages[1].pause_at[1], 60, "pause_at 리스트 숫자 변환")
+
+    local tl = d.timeline(1)
+    t.ok(#tl >= 4, "타임라인 이벤트 존재")
+    t.eq(tl[1].spawn, "bug", "타임라인 첫 이벤트")
+    t.ok(tl[1].at <= tl[#tl].at, "타임라인 시각 정렬")
+
+    local errs = d.validate()
+    t.eq(#errs, 0, "참조 무결성 (오류 0건): " .. table.concat(errs, " / "))
+end

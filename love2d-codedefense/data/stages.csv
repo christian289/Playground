@@ -1,0 +1,2 @@
+id,mode,concept,ui,maze_file,budget,languages,pause_at,wave_clock,hints_file,solution_file,reward_item
+1,normal,첫 타워,button,mazes/001.txt,200,lua,60;150,,,curriculum/001_solution.lua,

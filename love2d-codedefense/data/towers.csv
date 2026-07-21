@@ -1,0 +1,4 @@
+id,name,cost,damage,range,cooldown,bullet_speed,requires,color,desc
+printer,프린터,100,10,120,1.0,300,,0.3;0.8;0.4,기본 발사기. print()가 그렇듯 어디서나 쓴다
+compiler,컴파일러,150,0,0,0,0,,0.8;0.7;0.3,공격하지 않는 테크 타워. 고급 타워 건설을 해금한다
+sniper,스나이퍼,220,40,240,2.5,600,compiler,0.4;0.5;0.9,장거리 저격. 컴파일러가 필드에 있어야 건설 가능

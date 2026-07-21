@@ -1,0 +1,3 @@
+id,name,api,desc
+cache,캐시,cache,cache.get(k)/cache.set(k*v) 사용 가능. 계산 결과를 저장해 재사용한다
+webhook,웹훅,on_spawn,on_spawn(fn) 사용 가능. 적이 등장하는 순간 fn(enemy)가 호출된다
