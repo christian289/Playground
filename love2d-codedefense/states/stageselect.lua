@@ -47,7 +47,7 @@ function sel:keypressed(key)
     elseif key == "return" then
         local id = self.ids[self.cursor]
         if self:unlocked(id) then
-            Gamestate.switch(require("states.prep"), self.d, id, self.p)
+            Gamestate.switch(require("states.play"), self.d, id, self.p)
         end
     elseif key == "escape" then
         Gamestate.switch(require("states.title"), self.d, self.p)
