@@ -22,9 +22,9 @@ end
 function Tutorial:current() return self.steps[self.idx] end
 function Tutorial:done() return self.skipped or self.idx > #self.steps end
 
-function Tutorial:allows(key)
+function Tutorial:allows(key, ctrl)
     if self:done() then return true end
-    if key == "return" or key == "x" or key == "escape" then return true end
+    if key == "return" or key == "escape" or (ctrl and key == "x") then return true end
     local step = self:current()
     if not step.allow then return true end
     for _, k in ipairs(step.allow) do if k == key then return true end end
@@ -41,9 +41,9 @@ end
 
 function Tutorial:advance() self.idx = self.idx + 1 end
 
-function Tutorial:keypressed(key)
+function Tutorial:keypressed(key, ctrl)
     if self:done() then return end
-    if key == "x" then self.skipped = true return end
+    if ctrl and key == "x" then self.skipped = true return end
     local adv = self:current().advance
     if key == "return" and adv.on == "enter" then self:advance()
     elseif adv.on == "key" and adv.key == key then self:advance() end
@@ -98,7 +98,7 @@ function Tutorial:draw(fonts, gx, gy)
     love.graphics.printf(step.text, BOX_X + 12, BOX_Y + 7, BOX_W - 24, "left")
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.6, 0.65, 0.7)
-    local guide = step.advance.on == "enter" and "Enter 다음 · X 건너뛰기" or "X 건너뛰기"
+    local guide = step.advance.on == "enter" and "Enter 다음 · Ctrl+X 건너뛰기" or "Ctrl+X 건너뛰기"
     love.graphics.printf(guide, BOX_X + 12, BOX_Y + BOX_H - 20, BOX_W - 24, "right")
 end
 

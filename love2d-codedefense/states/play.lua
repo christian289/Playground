@@ -192,27 +192,29 @@ function play:draw()
         love.graphics.setColor(1, 0.45, 0.4)
         love.graphics.printf("저장 실패 — " .. b.scriptError, 400, 545, 552, "left")
     end
-    -- 힌트바
-    love.graphics.setColor(0.6, 0.65, 0.7)
-    local hint = self:isButtonStage()
-        and "숫자키 버튼 실행 · Ctrl+1/2/4 배속 · ESC 나가기"
-        or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+1/2/4 배속 · ESC 나가기"
-    love.graphics.printf(hint, 0, 620, 960, "center")
+    -- 힌트바 (튜토리얼 말풍선이 대신 안내하는 동안은 겹치지 않도록 숨긴다)
+    if not (self.tut and not self.tut:done()) then
+        love.graphics.setColor(0.6, 0.65, 0.7)
+        local hint = self:isButtonStage()
+            and "숫자키 버튼 실행 · Ctrl+1/2/4 배속 · ESC 나가기"
+            or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+1/2/4 배속 · ESC 나가기"
+        love.graphics.printf(hint, 0, 620, 960, "center")
+    end
 
     if self.tut then self.tut:draw(fonts, GRID_X, GRID_Y) end
 end
 
 function play:keypressed(key)
+    local ctrl = love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")
     -- Task 5 훅: 튜토리얼이 활성 상태면 허용된 키만 통과시킨다.
     if self.tut and not self.tut:done() then
-        if not self.tut:allows(key) then return end
-        self.tut:keypressed(key)
+        if not self.tut:allows(key, ctrl) then return end
+        self.tut:keypressed(key, ctrl)
     end
     if key == "escape" then
         Gamestate.switch(require("states.stageselect"), self.d, self.p)
         return
     end
-    local ctrl = love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")
     if ctrl and (key == "1" or key == "2" or key == "4") then
         self.speed = tonumber(key)
         if self.tut then self.tut:notify("speed_changed") end

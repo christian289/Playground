@@ -43,25 +43,28 @@
 
 ### 스테이지 3 — 코딩 입문 (직접 타이핑)
 
-1. (자유 진행) "이제 진짜 코드를 만나요! 이번엔 버튼 없이 직접 칩니다."
-2. (에디터 입력 허용, 자유 진행) "world는 전장 전체, self는 이 타워예요.
+1. (설명, 타이핑 잠금 — `allow = {}`) "이제 진짜 코드를 만나요! 이번엔 버튼 없이 직접 칩니다."
+2. (설명, 타이핑 잠금 — `allow = {}`) "world는 전장 전체, self는 이 타워예요.
    위 주석의 코드를 그대로 따라 치면 됩니다 — build로 설치, on_tick으로 조종."
-3. (자유 진행) "틀려도 괜찮아요 — 저장할 때 문법 오류면 기존 코드가 계속 돌고,
+3. (설명, 타이핑 잠금 — `allow = {}`) "틀려도 괜찮아요 — 저장할 때 문법 오류면 기존 코드가 계속 돌고,
    실행 중 오류는 그 타워만 잠깐 멈출 뿐이에요."
-4. (F5 유도, `battle_start`가 아닌 `saved` 이벤트로 진행) "다 쳤으면 F5로 저장 —
-   저장하는 순간 전장에 반영돼요!"
+4. (타이핑 허용, `saved` 이벤트로 진행) "다 쳤으면 F5로 저장 — 저장하는 순간 전장에 반영돼요!"
 
 ### 스테이지 4 — 빈칸과 퀵바
 
-1. (자유 진행) "빈칸(______)만 채우면 돼요"
-2. (자유 진행) "F1~F4 퀵바로 코드 조각을 빠르게 넣을 수 있어요"
+1. (설명, 타이핑 잠금 — `allow = {}`) "빈칸(______)만 채우면 돼요"
+2. (타이핑 허용, `saved` 이벤트로 진행) "F1~F4 퀵바로 코드 조각을 빠르게 넣을 수 있어요"
 
 ### 공통 규칙
 
-- **Enter**: 자유 진행 스텝에서 다음으로. **X**: 이 스테이지 튜토리얼 전체 스킵.
+- **Enter**: 자유 진행 스텝에서 다음으로. **Ctrl+X**: 이 스테이지 튜토리얼 전체 스킵
+  (일반 "x" 키는 코드 입력 중 흔히 쓰이므로 스킵 트리거에서 제외한다).
+- 설명 스텝은 `allow = {}`로 타이핑을 잠가 Enter 진행과 코드 입력이 충돌하지 않게 한다.
+  타이핑 스텝은 `saved` 등 이벤트로 진행한다.
 - 완료/스킵 시 `progress.tutorial_done[stageId] = true` 저장 → 재방문 시 미표시.
 - 리셋 수단은 이번 범위에서 제공하지 않음 (저장 파일 삭제로만 가능).
-- 상시 힌트바: play 화면 하단 조작 요약 한 줄 (에디터 키·F5 저장·배속·ESC).
+- 상시 힌트바: play 화면 하단 조작 요약 한 줄 (에디터 키·F5 저장·배속·ESC). 단, 튜토리얼이
+  진행 중일 때는 말풍선이 대신 안내하므로 힌트바를 숨긴다.
 - 튜토리얼 안내가 떠 있어도 게임 시간은 흐른다 (실시간 원칙 유지) — 단, 스테이지 1~2의
   타임라인은 안내를 읽을 여유가 있도록 첫 웨이브를 늦게 설계한다.
 
@@ -77,8 +80,9 @@
   anchor = { type = "cell", r = 3, c = 10 } -- 하이라이트 대상 (선택)
          | { type = "ui", id = "editor" }   -- ui id: "editor"|"quickbar"|"serverline"|"budget"|"button"
          | nil,
-  allow = { "f5" },                          -- 허용 키 목록 (nil = 전부 허용; 에디터 문자 입력은
-                                             --   allow에 "textinput" 토큰이 있으면 통과)
+  allow = { "f5" },                          -- 허용 키 목록 (nil = 전부 허용; {} = always-pass
+                                             --   (Enter/ESC/Ctrl+X) 외 전부 차단; 에디터 문자
+                                             --   입력은 allow에 "textinput" 토큰이 있으면 통과)
   advance = { on = "key",   key = "f5" }     -- 진행 조건 셋 중 하나:
           | { on = "enter" }                 --   Enter로 넘김
           | { on = "event", event = "built" } -- 게임 이벤트로 넘김
@@ -87,9 +91,13 @@
 
 메서드:
 
-- `:allows(key) → bool` — 현재 스텝의 allow 검사 (X·Enter·ESC는 항상 통과)
-- `:allowsText() → bool` — 에디터 문자 입력 허용 여부 ("textinput" 토큰)
-- `:keypressed(key)` — Enter 진행, X 스킵, advance.on=="key" 판정
+- `:allows(key, ctrl) → bool` — 현재 스텝의 allow 검사 (Enter·ESC·Ctrl+X는 항상 통과;
+  일반 "x"는 특별 취급하지 않고 allow 목록 게이팅을 그대로 받는다)
+- `:allowsText() → bool` — 에디터 문자 입력 허용 여부 ("textinput" 토큰; `allow = {}`이면
+  항상 false)
+- `:keypressed(key, ctrl)` — Enter 진행, Ctrl+X 스킵, advance.on=="key" 판정. `ctrl`은
+  호출부(states/play.lua)가 `love.keyboard.isDown`으로 계산해 전달한다 — tutorial.lua는
+  헤드리스 테스트 가능성을 위해 love.keyboard를 직접 호출하지 않는다.
 - `:notify(event)` — advance.on=="event" 판정. 이벤트 어휘: `built`(build 성공),
   `saved`(F5 저장 성공), `speed_changed`(배속 변경), `gap`(웨이브 틈 진입)
 - `:draw(fonts, gridX, gridY)` — 말풍선(화면 하단 고정 박스) + 앵커 하이라이트
@@ -120,12 +128,13 @@
 - 스텝 파일 로드 실패 시 튜토리얼 없이 진행 + 콘솔 경고 — 튜토리얼 데이터가
   게임을 막아서는 안 된다.
 - allow 게이팅은 ESC를 막지 않는다.
-- X 스킵 즉시 저장.
+- Ctrl+X 스킵 즉시 저장.
 
 ## 6. 테스트
 
 - `tests/test_tutorial.lua` (신규, suites 등록): allows/allowsText 게이팅,
-  key/enter/event 진행, X 스킵 → done, 전 스텝 소진 → done, 깨진 스텝 파일 안전성.
+  key/enter/event 진행, Ctrl+X 스킵 → done(일반 "x"는 스킵하지 않음 확인 포함),
+  `allow = {}` 잠금 스텝의 always-pass 확인, 전 스텝 소진 → done, 깨진 스텝 파일 안전성.
 - `db.validate()`에 `tutorial_file` 실재 검사 추가.
 - 실시간 개편 쪽 테스트(멱등 build, 저장-재실행, 돈 누적)는 본편 개편 계획에서 다룬다.
 - 수동 검증: 새 저장 파일로 스테이지 1~4 실제 플레이.
