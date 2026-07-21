@@ -3,7 +3,7 @@ local ROOT = love.filesystem.getSource():gsub("[/\\]tests$", "")
 package.path = ROOT .. "/?.lua;" .. ROOT .. "/?/init.lua;" .. package.path
 _G.PROJECT_ROOT = ROOT   -- 데이터 파일 io 접근용
 
-local suites = { "test_csv", "test_grid", "test_sandbox", "test_battle", "test_data", "test_editor" }
+local suites = { "test_csv", "test_grid", "test_sandbox", "test_battle", "test_data", "test_editor", "test_progress" }
 local pass, fail = 0, 0
 
 local t = {}
