@@ -69,20 +69,28 @@ return function(t)
     for _ = 1, 30 do b5:update(1 / 60) end
     t.ok(b5.towers[1].crashed > 0, "cache 미장착 시 크래시")
 
-    -- 전 스테이지 정답 코드 회귀: 4타워 표준 배치로 클리어 가능해야 한다
+    -- 전 스테이지 정답 코드 회귀: 실제 예산 제약(printer 수 = floor(budget/100), 아이템 없음)
+    -- 아래 배치는 예산 제약 하에 클리어 가능한 것으로 브루트포스로 확인한 좌표다.
+    -- (배치 탐색 하네스: 8개 건설칸의 모든 k개 조합을 정답 코드로 시뮬레이션)
+    local PLACEMENTS = {   -- 예산 제약 검증 배치 (브루트포스로 확인)
+        [1] = { { 3, 10 }, { 11, 3 } },              -- budget 200 → 2기, 서버HP 10 잔존
+        [2] = { { 3, 3 }, { 7, 3 } },                -- budget 200 → 2기, 서버HP 10 잔존
+        [3] = { { 3, 3 }, { 7, 3 } },                -- budget 220 → 2기, 서버HP 10 잔존
+        [4] = { { 7, 3 }, { 11, 3 } },               -- budget 220 → 2기, 서버HP 10 잔존
+        [5] = { { 3, 3 }, { 7, 3 } },                -- budget 240 → 2기, 서버HP 10 잔존
+        [6] = { { 3, 3 }, { 7, 3 } },                -- budget 260 → 2기, 서버HP 10 잔존
+        [7] = { { 7, 10 }, { 15, 3 } },              -- budget 280 → 2기, 서버HP 8 잔존
+        [8] = { { 3, 3 }, { 7, 3 }, { 11, 3 } },     -- budget 300 → 3기, 서버HP 10 잔존
+    }
     for stageId = 1, 8 do
         local s = d.stages[stageId]
         local sol = readSolution(stageId)
-        local g = require("src.grid").load(PROJECT_ROOT .. "/data/" .. s.maze_file)
-        local spots = {}
-        for r = 1, 16 do
-            for c = 1, 12 do
-                if g.build[r][c] and #spots < 6 then spots[#spots + 1] = { r = r, c = c } end
-            end
-        end
+        local expected = math.floor(s.budget / 100)
+        local coords = PLACEMENTS[stageId]
+        t.eq(#coords, expected, ("스테이지 %d 예산 내 타워 수(%d)"):format(stageId, expected))
         local placements = {}
-        for i = 1, math.min(4, #spots) do
-            placements[i] = { r = spots[i].r, c = spots[i].c, tower = "printer", code = sol, items = { "cache", "webhook" } }
+        for i, rc in ipairs(coords) do
+            placements[i] = { r = rc[1], c = rc[2], tower = "printer", code = sol, items = {} }
         end
         local b = Battle(d, stageId, placements)
         b:start()
@@ -92,6 +100,48 @@ return function(t)
             if b.status ~= "running" and b.status ~= "prep" then break end
             b:update(dt)
         end
-        t.eq(b.status, "clear", ("스테이지 %d 정답 클리어"):format(stageId))
+        t.eq(b.status, "clear", ("스테이지 %d 예산 제약 배치로 클리어"):format(stageId))
+    end
+
+    -- Fix1: 일시정지 재개 시 recompileTowers로 수정 코드가 실제 반영되어야 한다
+    do
+        local noop = "function on_tick(self, world) end"
+        local atk = "function on_tick(self, world)\n  self:attack(world.nearest())\nend"
+        local rb = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = noop, items = {} } })
+        rb:start()
+        for _ = 1, 9 * 60 do rb:update(1 / 60) end   -- 적 등장(5초~) 후에도 무동작 코드는 발사 없음
+        t.eq(#rb.projectiles, 0, "재컴파일 전(무동작 코드) 발사 없음")
+        t.ok(#rb.enemies > 0, "재컴파일 시점에 적 생존")
+        rb:recompileTowers(atk)
+        t.eq(rb.towers[1].lastError, nil, "재컴파일 성공 시 오류 없음")
+        local fired = false
+        for _ = 1, 5 * 60 do
+            rb:update(1 / 60)
+            if #rb.projectiles > 0 then fired = true; break end
+        end
+        t.ok(fired, "재컴파일 후 실제 발사 발생")
+    end
+
+    -- Fix3: webhook on_spawn — 적 등장 즉시 반응 사격(핸들러 첫 인자가 등장한 적)
+    do
+        local whCode = "on_spawn(function(e, self) self:attack(e) end)"
+        local wb = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = whCode, items = { "webhook" } } })
+        wb:start()
+        t.eq(wb.towers[1].crashed, 0, "webhook 장착 시 on_spawn 컴파일 성공")
+        local fired = false
+        for _ = 1, 6 * 60 do   -- 첫 스폰 5초 직후 쿨다운 없이 즉시 발사되어야 한다
+            wb:update(1 / 60)
+            if #wb.projectiles > 0 then fired = true; break end
+        end
+        t.ok(fired, "on_spawn 반응 사격 발생")
+        -- 대조군: on_tick 없이 webhook도 없으면 발사 자체가 없다
+        local ctrl = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = "function on_tick(self, world) end", items = {} } })
+        ctrl:start()
+        local ctrlFired = false
+        for _ = 1, 6 * 60 do
+            ctrl:update(1 / 60)
+            if #ctrl.projectiles > 0 then ctrlFired = true; break end
+        end
+        t.ok(not ctrlFired, "on_spawn 없는 대조군은 발사 없음")
     end
 end
