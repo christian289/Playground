@@ -5,7 +5,7 @@ local function index(recs, numfields)
     local out = {}
     for _, r in ipairs(recs) do
         for _, f in ipairs(numfields) do
-            r[f] = (r[f] ~= "" and tonumber(r[f])) or (r[f] == "" and nil or r[f])
+            if r[f] == "" then r[f] = nil else r[f] = tonumber(r[f]) or r[f] end
         end
         local id = tonumber(r.id) or r.id
         r.id = id

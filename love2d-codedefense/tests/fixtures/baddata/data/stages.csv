@@ -1,0 +1,2 @@
+id,mode,concept,ui,maze_file,budget,languages,pause_at,wave_clock,hints_file,solution_file,reward_item
+1,normal,테스트,button,mazes/none.txt,200,lua,,,,,

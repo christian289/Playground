@@ -1,0 +1,2 @@
+id,name,cost,damage,range,cooldown,bullet_speed,requires,color,desc
+t1,테스트타워,100,10,120,1.0,300,nonexistent-tower,0.3;0.8;0.4,깨진 데이터 테스트용 타워
