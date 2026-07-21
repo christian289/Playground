@@ -1,0 +1,4 @@
+-- 아래 코드를 그대로 타이핑하세요:
+-- function on_tick(self, world)
+--   self:attack(world.nearest())
+-- end

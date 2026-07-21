@@ -68,4 +68,30 @@ return function(t)
     b5:start()
     for _ = 1, 30 do b5:update(1 / 60) end
     t.ok(b5.towers[1].crashed > 0, "cache 미장착 시 크래시")
+
+    -- 전 스테이지 정답 코드 회귀: 4타워 표준 배치로 클리어 가능해야 한다
+    for stageId = 1, 8 do
+        local s = d.stages[stageId]
+        local sol = readSolution(stageId)
+        local g = require("src.grid").load(PROJECT_ROOT .. "/data/" .. s.maze_file)
+        local spots = {}
+        for r = 1, 16 do
+            for c = 1, 12 do
+                if g.build[r][c] and #spots < 6 then spots[#spots + 1] = { r = r, c = c } end
+            end
+        end
+        local placements = {}
+        for i = 1, math.min(4, #spots) do
+            placements[i] = { r = spots[i].r, c = spots[i].c, tower = "printer", code = sol, items = { "cache", "webhook" } }
+        end
+        local b = Battle(d, stageId, placements)
+        b:start()
+        local dt = 1 / 30
+        for _ = 1, math.floor(400 / dt) do
+            if b.status == "prep" then b:start() end
+            if b.status ~= "running" and b.status ~= "prep" then break end
+            b:update(dt)
+        end
+        t.eq(b.status, "clear", ("스테이지 %d 정답 클리어"):format(stageId))
+    end
 end
