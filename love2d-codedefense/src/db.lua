@@ -49,6 +49,20 @@ function db.load(root)
             if f then f:close(); return true end
             return false
         end
+        local mazeRow1Cache = {}
+        local function mazeRow1(mazeFile)
+            if mazeRow1Cache[mazeFile] == nil then
+                local f = io.open(root .. "/data/" .. mazeFile, "rb")
+                if f then
+                    local line = f:read("*l") or ""
+                    f:close()
+                    mazeRow1Cache[mazeFile] = line
+                else
+                    mazeRow1Cache[mazeFile] = false
+                end
+            end
+            return mazeRow1Cache[mazeFile] or nil
+        end
         for _, e in ipairs(events) do
             if not d.enemies[e.spawn] then
                 errs[#errs + 1] = ("timelines: 스테이지 %s의 spawn '%s'가 enemies.csv에 없음")
@@ -56,6 +70,15 @@ function db.load(root)
             end
             if not d.stages[e.stage_id] then
                 errs[#errs + 1] = "timelines: 없는 스테이지 " .. tostring(e.stage_id)
+            else
+                local stage = d.stages[e.stage_id]
+                local line = mazeRow1(stage.maze_file)
+                if line then
+                    if line:sub(e.col, e.col) ~= "." then
+                        errs[#errs + 1] = ("timelines: 스테이지 %s의 스폰 열 %d는 1행 통로가 아님")
+                            :format(tostring(e.stage_id), e.col)
+                    end
+                end
             end
         end
         for id, s in pairs(d.stages) do

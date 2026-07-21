@@ -1,5 +1,5 @@
 stage_id,at,spawn,count,interval,col
-1,5,bug,5,3,6
-1,70,bug,8,2.5,6
+1,5,bug,5,3,4
+1,70,bug,8,2.5,9
 1,160,bug,10,2,4
-1,240,bug,12,1.5,8
+1,240,bug,12,1.5,9

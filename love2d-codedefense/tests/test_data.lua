@@ -22,4 +22,5 @@ return function(t)
     local bad = db.load(PROJECT_ROOT .. "/tests/fixtures/baddata")
     local baderrs = bad.validate()
     t.ok(#baderrs >= 3, "깨진 데이터에서 오류 감지 (spawn/미로/requires): " .. #baderrs .. "건")
+    t.ok(table.concat(baderrs, " / "):find("스폰 열"), "벽에 스폰하는 타임라인 열 감지")
 end
