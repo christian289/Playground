@@ -193,7 +193,7 @@ function prep:startBattle()
     for _, tw in ipairs(self.battle.towers) do
         if tw.lastError and tw.env == nil then
             local raw = tostring(tw.lastError)
-            local msg, n = raw:gsub("^%[string.-%]:", "줄 ")
+            local msg, n = raw:gsub("^%S+:(%d+):%s*", "줄 %1: ")
             if n == 0 then msg = raw end
             self.startError = ("시작 불가 — %s 타워 코드 오류: %s"):format(tw.def.name, msg)
             return
