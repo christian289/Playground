@@ -1,62 +1,56 @@
--- 타워 스크립트 env에 self/world/아이템 API를 구성한다
+-- 전투 스크립트 env에 self/world/build/아이템 API를 구성한다
 local sandbox = require("src.sandbox")
 
 local api = {}
 
 local function snapshot(e, tower)
     local dx, dy = e.x - tower.x, e.y - tower.y
-    return {
-        id = e.id, hp = e.hp, max_hp = e.max_hp, x = e.x, y = e.y,
-        speed = e.def.speed, type = e.def.id,
-        dist = math.sqrt(dx * dx + dy * dy),
-    }
+    return { id = e.id, hp = e.hp, max_hp = e.max_hp, x = e.x, y = e.y,
+        speed = e.def.speed, type = e.def.id, dist = math.sqrt(dx * dx + dy * dy) }
 end
 
--- battle이 on_spawn 핸들러에 넘길 단일 적 스냅샷을 만든다 (틱 world와 동일 형식)
-function api.snapshot(e, tower)
-    return snapshot(e, tower)
+-- on_spawn 핸들러에 넘길 dist 없는 단일 적 스냅샷
+function api.plainSnapshot(e)
+    return { id = e.id, hp = e.hp, max_hp = e.max_hp, x = e.x, y = e.y,
+        speed = e.def.speed, type = e.def.id }
 end
 
--- battle이 틱마다 호출: env에 최신 world/self를 주입
-function api.buildEnv(tower, itemsById)
+-- 전투당 하나의 스크립트 env. build/아이템 API 노출
+function api.buildEnv(battle)
     local env = sandbox.baseEnv()
-
-    -- 읽기 전용 self + attack 명령 (실제 발사는 battle이 검증 후 수행)
-    local selfApi = {}
-    function selfApi.attack(_, target)
-        if type(target) == "table" and target.id then
-            tower.pendingTarget = target.id
-        end
+    env.build = function(typeId, r, c, name)
+        local ok, err = battle:buildTower(typeId, r, c, name)
+        if not ok then battle:say("[설치 실패] " .. tostring(err)) end
+        return ok
     end
-    env._selfApi = selfApi
-
-    -- 아이템 해금 API
-    for _, itemId in ipairs(tower.items) do
-        if itemId == "cache" then
+    for _, it in ipairs(battle.items) do
+        if it == "cache" then
             local store = {}
-            env.cache = {
-                get = function(k) return store[k] end,
-                set = function(k, v) store[k] = v end,
-            }
-        elseif itemId == "webhook" then
+            env.cache = { get = function(k) return store[k] end,
+                          set = function(k, v) store[k] = v end }
+        elseif it == "webhook" then
             env.on_spawn = function(fn)
-                if type(fn) == "function" then tower.spawnHandler = fn end
+                if type(fn) == "function" then env._spawnFn = fn end
             end
         end
     end
+    local selfApi = {}
+    function selfApi.attack(s, target)
+        if type(target) == "table" and target.id and env._tower then
+            env._tower.pendingTarget = target.id
+        end
+    end
+    env._selfApi = selfApi
     return env
 end
 
--- 틱 직전 world 스냅샷 갱신 (env 재사용, 상태 유지)
+-- 틱 직전: env.self/world를 현재 타워 기준으로 갱신
 function api.refresh(env, tower, enemies)
     local snaps = {}
     for _, e in ipairs(enemies) do
-        if not e.dead and not e.reached then
-            snaps[#snaps + 1] = snapshot(e, tower)
-        end
+        if not e.dead and not e.reached then snaps[#snaps + 1] = snapshot(e, tower) end
     end
     table.sort(snaps, function(a, b) return a.dist < b.dist end)
-
     local world = {}
     function world.enemies() return snaps end
     function world.nearest() return snaps[1] end
@@ -71,14 +65,15 @@ function api.refresh(env, tower, enemies)
         return best
     end
     env.world = world
-
+    env._tower = tower
     local selfApi = env._selfApi
+    selfApi.name = tower.name
     selfApi.x, selfApi.y = tower.x, tower.y
     selfApi.range, selfApi.damage = tower.def.range, tower.def.damage
     selfApi.charge, selfApi.overclock = tower.charge, tower.overclock
     selfApi.ready = tower.cd <= 0
     env.self = selfApi
-    return env.self, world
+    return selfApi, world
 end
 
 return api

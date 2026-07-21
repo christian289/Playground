@@ -8,78 +8,94 @@ local Projectile = require("src.projectile")
 
 local TICK = 0.1            -- 10Hz 의사결정
 local BUDGET = 3000         -- 틱당 명령 예산
-local TOTAL = 300           -- 일반 모드 전투 총 시간(초)
+local TOTAL = 300           -- 일반 모드 전투 총 시간(초, clock 기준)
 local WATCHDOG = 3          -- 크래시 후 재시작(초)
 local CHARGE_MAX = 3
 
 local Battle = Object:extend()
 
-function Battle:new(d, stageId, placements)
+function Battle:new(d, stageId, opts)
+    opts = opts or {}
     self.d = d
     self.stage = assert(d.stages[stageId], "없는 스테이지: " .. tostring(stageId))
     self.grid = grid.load(d.root .. "/data/" .. self.stage.maze_file)
     self.timeline = d.timeline(stageId)
     self.spawned = {}          -- timeline 이벤트별 스폰한 수
-    self.clock, self.tickAcc = 0, 0
+    self.countdown = self.stage.countdown or 15
+    self.clock = -self.countdown
+    self.tickAcc = 0
     self.serverHP = 10
-    self.status = "prep"
-    self.pauseIdx = 1          -- 다음 pause_at 인덱스
+    self.money = self.stage.budget
+    self.items = opts.items or {}
+    self.status = "prep"       -- start() 전 상태 (테스트 호환)
     self.enemies, self.towers, self.projectiles, self.log = {}, {}, {}, {}
+    self.towersByName = {}
     self.nextEnemyId = 1
-
-    -- 배치 (테크 의존성 검증 포함)
-    local placed = {}
-    for _, p in ipairs(placements) do placed[p.tower] = true end
-    for _, p in ipairs(placements) do
-        local def = assert(d.towers[p.tower], "없는 타워: " .. tostring(p.tower))
-        if def.requires and def.requires ~= "" then
-            assert(placed[def.requires],
-                ("'%s' 건설에는 '%s' 타워가 필요합니다"):format(def.name, def.requires))
-        end
-        assert(self.grid.build[p.r] and self.grid.build[p.r][p.c],
-            ("(%d,%d)는 건설칸이 아닙니다"):format(p.r, p.c))
-        local tw = Tower(def, p.r, p.c, p.items)
-        if p.code and p.code ~= "" and def.damage > 0 then
-            local env = api.buildEnv(tw, d.items)
-            local ok, err = sandbox.compile(p.code, env, def.id)
-            if ok then tw.env = env
-            else tw.crashed = WATCHDOG; tw.lastError = err end
-        end
-        self.towers[#self.towers + 1] = tw
-    end
+    self.env = nil
+    self.script = nil
+    self.scriptError = nil
 end
 
 function Battle:start()
     if self.status == "prep" then self.status = "running" end
 end
 
--- pause_at 재개: 준비 화면에서 수정한 코드를 실제 타워 env에 다시 컴파일한다.
--- 공격 타워(damage > 0)만 대상. 성공 시 크래시/비활성/에러 상태를 초기화한다.
-function Battle:recompileTowers(code)
-    if not code or code == "" then return end
-    for _, tw in ipairs(self.towers) do
-        if tw.def.damage > 0 then
-            tw.spawnHandler = nil    -- 핸들러는 컴파일 시 재등록된다
-            local env = api.buildEnv(tw, self.d.items)
-            local ok, err = sandbox.compile(code, env, tw.def.id)
-            if ok then
-                tw.env = env
-                tw.crashed = 0
-                tw.disabled = nil
-                tw.recovering = nil
-                tw.lastError = nil
-            else
-                tw.env = nil
-                tw.lastError = err
-                tw.crashed = WATCHDOG
-            end
-        end
-    end
-end
-
 function Battle:say(msg)
     self.log[#self.log + 1] = msg
     if #self.log > 8 then table.remove(self.log, 1) end
+end
+
+-- 실시간 스크립트로 타워를 짓는다. 멱등: 같은 이름이 이미 있으면 성공(no-op).
+function Battle:buildTower(typeId, r, c, name)
+    if type(name) ~= "string" or name == "" then return false, "타워 이름(4번째 인자)이 필요합니다" end
+    if self.towersByName[name] then return true end          -- 멱등
+    local def = self.d.towers[typeId]
+    if not def then return false, ("없는 타워 종류: %s"):format(tostring(typeId)) end
+    if def.requires and def.requires ~= "" then
+        local has = false
+        for _, tw in ipairs(self.towers) do
+            if tw.def.id == def.requires then has = true end
+        end
+        if not has then
+            return false, ("'%s' 건설에는 '%s' 타워가 먼저 필요합니다")
+                :format(def.name, self.d.towers[def.requires].name)
+        end
+    end
+    r, c = tonumber(r), tonumber(c)
+    if not (r and c and self.grid.build[r] and self.grid.build[r][c]) then
+        return false, ("(%s,%s)는 건설칸이 아닙니다"):format(tostring(r), tostring(c))
+    end
+    for _, tw in ipairs(self.towers) do
+        if tw.r == r and tw.c == c then return false, ("(%d,%d)에는 이미 타워가 있습니다"):format(r, c) end
+    end
+    if self.money < def.cost then
+        return false, ("예산 부족: %s는 %d 필요 (잔액 %d)"):format(def.name, def.cost, self.money)
+    end
+    self.money = self.money - def.cost
+    local tw = Tower(def, r, c, {})
+    tw.name = name
+    self.towersByName[name] = tw
+    self.towers[#self.towers + 1] = tw
+    self:say(("[설치] %s → \"%s\" (%d,%d)"):format(def.name, name, r, c))
+    return true
+end
+
+-- 실시간 스크립트 저장: 새 env를 컴파일해서 성공 시에만 교체(build 재실행 포함).
+-- 실패 시 기존 env/script는 그대로 유지된다.
+function Battle:setScript(code)
+    local env = api.buildEnv(self)
+    local compiled, err = sandbox.compile(code, env, "script")
+    if not compiled then
+        self.scriptError = tostring(err)
+        return false, self.scriptError
+    end
+    self.env = env
+    self.script = code
+    self.scriptError = nil
+    for _, tw in ipairs(self.towers) do
+        tw.crashed, tw.disabled, tw.recovering, tw.lastError = 0, nil, nil, nil
+    end
+    return true
 end
 
 function Battle:spawnFromTimeline()
@@ -92,25 +108,10 @@ function Battle:spawnFromTimeline()
             self.nextEnemyId = self.nextEnemyId + 1
             self.enemies[#self.enemies + 1] = e
             n = n + 1
-            -- 웹훅(on_spawn) 아이템: 등장 즉시 핸들러 호출
-            for _, tw in ipairs(self.towers) do
-                if tw.spawnHandler and tw.crashed <= 0 and not tw.disabled and tw.env then
-                    local selfApi, world = api.refresh(tw.env, tw, self.enemies)
-                    local snap = api.snapshot(e, tw)
-                    tw.pendingTarget = nil
-                    local handler = tw.spawnHandler
-                    local ok, err = sandbox.call(function()
-                        handler(snap, selfApi, world)
-                    end, BUDGET)
-                    if not ok then
-                        tw.crashed = WATCHDOG
-                        tw.lastError = tostring(err)
-                        self:say(("[크래시] %s: %s"):format(tw.def.name, tostring(err)))
-                    elseif tw.pendingTarget and tw.cd <= 0 then
-                        -- 웹훅 반응 사격: 등장 즉시 발사가 실제로 이뤄지도록
-                        self:resolveAttack(tw)
-                    end
-                end
+            if self.env and self.env._spawnFn then
+                local snap = api.plainSnapshot(e)
+                local ok, herr = sandbox.call(function() self.env._spawnFn(snap) end, BUDGET)
+                if not ok then self:say("[웹훅 오류] " .. tostring(herr)) end
             end
         end
         self.spawned[i] = n
@@ -119,10 +120,10 @@ end
 
 function Battle:runTick()
     for _, tw in ipairs(self.towers) do
-        if tw.env and tw.crashed <= 0 and not tw.disabled and tw.env.on_tick then
-            local selfApi, world = api.refresh(tw.env, tw, self.enemies)
+        if self.env and self.env.on_tick and tw.crashed <= 0 and not tw.disabled then
+            local selfApi, world = api.refresh(self.env, tw, self.enemies)
             tw.pendingTarget = nil
-            local ok, err, used = sandbox.call(tw.env.on_tick, BUDGET, selfApi, world)
+            local ok, err, used = sandbox.call(self.env.on_tick, BUDGET, selfApi, world)
             if not ok then
                 if tw.recovering then
                     -- 워치독 복구 직후 곧바로 재발한 결함: 영구 결함으로 보고 재시작을 그만둔다
@@ -168,16 +169,8 @@ end
 function Battle:update(dt)
     if self.status ~= "running" then return end
 
-    -- pause_at 도달 → 준비 단계
-    local nextPause = self.stage.pause_at[self.pauseIdx]
-    if nextPause and self.clock >= nextPause then
-        self.pauseIdx = self.pauseIdx + 1
-        self.status = "prep"
-        return
-    end
-
     self.clock = self.clock + dt
-    self:spawnFromTimeline()
+    if self.clock >= 0 then self:spawnFromTimeline() end
 
     self.tickAcc = self.tickAcc + dt
     while self.tickAcc >= TICK do
@@ -208,6 +201,7 @@ function Battle:update(dt)
         local e = self.enemies[i]
         if e.hp <= 0 and not e.dead then
             e.dead = true
+            self.money = self.money + (e.def.reward or 0)
             -- split 능력: 죽으면 절반 체력 둘로
             if (e.def.abilities or ""):find("split") and not e.isSplit then
                 for k = -1, 1, 2 do

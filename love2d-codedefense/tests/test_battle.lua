@@ -3,145 +3,114 @@ return function(t)
     local Battle = require("src.battle")
     local d = db.load(PROJECT_ROOT)
 
-    local function readSolution(stageId)
-        local s = d.stages[stageId]
-        local f = assert(io.open(PROJECT_ROOT .. "/data/" .. s.solution_file, "rb"))
-        local code = f:read("*a"); f:close()
-        return code
-    end
+    local ATK = [[
+build("printer", 3, 10, "a")
+build("printer", 11, 3, "b")
+function on_tick(self, world)
+  self:attack(world.nearest())
+end
+]]
 
-    local function run(placements, code, seconds)
-        local b = Battle(d, 1, placements)
-        b:start()
-        local dt = 1 / 60
+    local function run(b, seconds)
+        local dt = 1 / 30
         for _ = 1, math.floor(seconds / dt) do
-            if b.status == "prep" then b:start() end     -- 준비 단계 자동 재개
-            if b.status == "clear" or b.status == "defeat" then break end
+            if b.status ~= "running" then break end
             b:update(dt)
         end
         return b
     end
 
-    -- 타워 없이 방치 → 서버 HP 깎여 패배
-    local b0 = run({}, nil, 300)
+    -- 스크립트 없이 방치 → 패배
+    local b0 = Battle(d, 1, {})
+    b0:start()
+    run(b0, 400)
     t.eq(b0.status, "defeat", "무방비 시 패배")
 
-    -- 정답 코드 배치 → 클리어
-    local code = readSolution(1)
-    local placements = {
-        { r = 3, c = 3, tower = "printer", code = code, items = {} },
-        { r = 3, c = 10, tower = "printer", code = code, items = {} },
-        { r = 7, c = 3, tower = "printer", code = code, items = {} },
-        { r = 7, c = 10, tower = "printer", code = code, items = {} },
-    }
-    local b1 = run(placements, code, 400)
-    t.eq(b1.status, "clear", "스테이지1 정답 코드 클리어")
-    t.ok(b1.serverHP > 0, "클리어 시 서버 생존")
+    -- 카운트다운: clock<0 동안 스폰 없음
+    local bc = Battle(d, 1, {})
+    bc:start()
+    t.ok(bc.clock < 0, "카운트다운 동안 clock 음수")
+    run(bc, d.stages[1].countdown - 2)
+    t.eq(#bc.enemies, 0, "카운트다운 동안 스폰 없음")
 
-    -- 오류 코드 → 타워 크래시 후 워치독 복구, 전투는 계속
-    local crashCode = "function on_tick(self, world)\n  local x = nil\n  return x.y\nend"
-    local b2 = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = crashCode, items = {} } })
-    b2:start()
-    for _ = 1, 60 do b2:update(1 / 60) end
-    t.ok(b2.towers[1].crashed > 0, "런타임 오류로 크래시 상태")
-    for _ = 1, 240 do b2:update(1 / 60) end
-    t.ok(b2.towers[1].crashed == 0, "워치독 3초 후 복구")
+    -- 정답 스크립트 → 클리어 (스테이지 1)
+    local b1 = Battle(d, 1, {})
+    t.ok(b1:setScript(ATK), "setScript 성공")
+    b1:start()
+    run(b1, 400)
+    t.eq(b1.status, "clear", "스테이지1 스크립트 클리어")
 
-    -- 무한 루프 코드 → 타임아웃 (크래시 취급), 게임은 멈추지 않음
-    local loopCode = "function on_tick(self, world)\n  while true do end\nend"
-    local b3 = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = loopCode, items = {} } })
-    b3:start()
-    for _ = 1, 30 do b3:update(1 / 60) end
-    t.ok(b3.towers[1].crashed > 0, "무한 루프 타임아웃 크래시")
+    -- build 멱등: 같은 스크립트 재저장해도 타워 수/돈 불변
+    local b2 = Battle(d, 1, {})
+    b2:setScript(ATK)
+    local n, m = #b2.towers, b2.money
+    t.ok(b2:setScript(ATK), "재저장 성공")
+    t.eq(#b2.towers, n, "멱등: 타워 수 불변")
+    t.eq(b2.money, m, "멱등: 돈 불변")
 
-    -- 테크 의존성: compiler 없이 sniper 배치 시도 → 오류
-    local ok = pcall(Battle, d, 1, { { r = 3, c = 3, tower = "sniper", code = code, items = {} } })
-    t.ok(not ok, "requires 미충족 배치는 오류")
+    -- 예산 부족: 3번째 설치 실패, 로그에 예산
+    local b3 = Battle(d, 1, {})
+    b3:setScript(ATK .. '\nbuild("printer", 7, 3, "c")')
+    t.eq(#b3.towers, 2, "예산 부족 설치 실패")
+    t.ok(table.concat(b3.log, "/"):find("예산"), "예산 부족 로그")
 
-    -- 아이템 해금: cache 장착 시에만 env에 cache 존재
-    local cacheCode = "function on_tick(self, world)\n  cache.set('n', (cache.get('n') or 0) + 1)\nend"
-    local b4 = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = cacheCode, items = { "cache" } } })
-    b4:start()
-    for _ = 1, 30 do b4:update(1 / 60) end
-    t.eq(b4.towers[1].crashed, 0, "cache 장착 시 사용 가능")
-    local b5 = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = cacheCode, items = {} } })
-    b5:start()
-    for _ = 1, 30 do b5:update(1 / 60) end
-    t.ok(b5.towers[1].crashed > 0, "cache 미장착 시 크래시")
+    -- 킬 보상: 클리어한 b1의 돈이 (시작예산-설치비)보다 큼
+    t.ok(b1.money > d.stages[1].budget - 200, "처치 보상 누적")
 
-    -- 전 스테이지 정답 코드 회귀: 실제 예산 제약(printer 수 = floor(budget/100), 아이템 없음)
-    -- 아래 배치는 예산 제약 하에 클리어 가능한 것으로 브루트포스로 확인한 좌표다.
-    -- (배치 탐색 하네스: 8개 건설칸의 모든 k개 조합을 정답 코드로 시뮬레이션)
-    local PLACEMENTS = {   -- 예산 제약 검증 배치 (브루트포스로 확인)
-        [1] = { { 3, 10 }, { 11, 3 } },              -- budget 200 → 2기, 서버HP 10 잔존
-        [2] = { { 3, 3 }, { 7, 3 } },                -- budget 200 → 2기, 서버HP 10 잔존
-        [3] = { { 3, 3 }, { 7, 3 } },                -- budget 220 → 2기, 서버HP 10 잔존
-        [4] = { { 7, 3 }, { 11, 3 } },               -- budget 220 → 2기, 서버HP 10 잔존
-        [5] = { { 3, 3 }, { 7, 3 } },                -- budget 240 → 2기, 서버HP 10 잔존
-        [6] = { { 3, 3 }, { 7, 3 } },                -- budget 260 → 2기, 서버HP 10 잔존
-        [7] = { { 7, 10 }, { 15, 3 } },              -- budget 280 → 2기, 서버HP 8 잔존
-        [8] = { { 3, 3 }, { 7, 3 }, { 11, 3 } },     -- budget 300 → 3기, 서버HP 10 잔존
-    }
-    for stageId = 1, 8 do
-        local s = d.stages[stageId]
-        local sol = readSolution(stageId)
-        local expected = math.floor(s.budget / 100)
-        local coords = PLACEMENTS[stageId]
-        t.eq(#coords, expected, ("스테이지 %d 예산 내 타워 수(%d)"):format(stageId, expected))
-        local placements = {}
-        for i, rc in ipairs(coords) do
-            placements[i] = { r = rc[1], c = rc[2], tower = "printer", code = sol, items = {} }
-        end
-        local b = Battle(d, stageId, placements)
-        b:start()
-        local dt = 1 / 30
-        for _ = 1, math.floor(400 / dt) do
-            if b.status == "prep" then b:start() end
-            if b.status ~= "running" and b.status ~= "prep" then break end
-            b:update(dt)
-        end
-        t.eq(b.status, "clear", ("스테이지 %d 예산 제약 배치로 클리어"):format(stageId))
-    end
+    -- 문법 오류 저장 → 기존 코드 유지
+    local b4 = Battle(d, 1, {})
+    b4:setScript(ATK)
+    local ok4, err4 = b4:setScript("function on_tick( broken")
+    t.ok(not ok4 and err4 ~= nil, "문법 오류 저장 거부")
+    t.ok(b4.env ~= nil and b4.env.on_tick ~= nil, "기존 on_tick 유지")
 
-    -- Fix1: 일시정지 재개 시 recompileTowers로 수정 코드가 실제 반영되어야 한다
-    do
-        local noop = "function on_tick(self, world) end"
-        local atk = "function on_tick(self, world)\n  self:attack(world.nearest())\nend"
-        local rb = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = noop, items = {} } })
-        rb:start()
-        for _ = 1, 9 * 60 do rb:update(1 / 60) end   -- 적 등장(5초~) 후에도 무동작 코드는 발사 없음
-        t.eq(#rb.projectiles, 0, "재컴파일 전(무동작 코드) 발사 없음")
-        t.ok(#rb.enemies > 0, "재컴파일 시점에 적 생존")
-        rb:recompileTowers(atk)
-        t.eq(rb.towers[1].lastError, nil, "재컴파일 성공 시 오류 없음")
-        local fired = false
-        for _ = 1, 5 * 60 do
-            rb:update(1 / 60)
-            if #rb.projectiles > 0 then fired = true; break end
-        end
-        t.ok(fired, "재컴파일 후 실제 발사 발생")
-    end
+    -- 테크 의존성: compiler 없이 sniper → 실패 로그, compiler 후 성공
+    local b5 = Battle(d, 1, {})
+    b5:setScript('build("sniper", 3, 10, "s")')
+    t.eq(#b5.towers, 0, "테크 미충족 설치 실패")
+    b5:setScript('build("compiler", 3, 10, "c")\nbuild("sniper", 11, 3, "s")')
+    t.eq(#b5.towers, 2, "컴파일러 후 스나이퍼 설치")
 
-    -- Fix3: webhook on_spawn — 적 등장 즉시 반응 사격(핸들러 첫 인자가 등장한 적)
-    do
-        local whCode = "on_spawn(function(e, self) self:attack(e) end)"
-        local wb = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = whCode, items = { "webhook" } } })
-        wb:start()
-        t.eq(wb.towers[1].crashed, 0, "webhook 장착 시 on_spawn 컴파일 성공")
-        local fired = false
-        for _ = 1, 6 * 60 do   -- 첫 스폰 5초 직후 쿨다운 없이 즉시 발사되어야 한다
-            wb:update(1 / 60)
-            if #wb.projectiles > 0 then fired = true; break end
-        end
-        t.ok(fired, "on_spawn 반응 사격 발생")
-        -- 대조군: on_tick 없이 webhook도 없으면 발사 자체가 없다
-        local ctrl = Battle(d, 1, { { r = 3, c = 3, tower = "printer", code = "function on_tick(self, world) end", items = {} } })
-        ctrl:start()
-        local ctrlFired = false
-        for _ = 1, 6 * 60 do
-            ctrl:update(1 / 60)
-            if #ctrl.projectiles > 0 then ctrlFired = true; break end
-        end
-        t.ok(not ctrlFired, "on_spawn 없는 대조군은 발사 없음")
-    end
+    -- 장애 격리: 이름 분기 오류는 그 타워만 크래시
+    local b6 = Battle(d, 1, {})
+    b6:setScript(ATK .. [[
+
+function on_tick(self, world)
+  if self.name == "a" then local x = nil; return x.y end
+  self:attack(world.nearest())
+end
+]])
+    b6:start()
+    run(b6, 2)
+    local a6 = nil
+    for _, tw in ipairs(b6.towers) do if tw.name == "a" then a6 = tw end end
+    t.ok(a6.crashed > 0 or a6.disabled, "a 타워만 크래시")
+
+    -- 아이템 게이팅: cache는 opts.items에 있을 때만
+    local CACHE = 'build("printer", 3, 10, "a")\nfunction on_tick(self, world)\n  cache.set("n", (cache.get("n") or 0) + 1)\nend'
+    local b7 = Battle(d, 1, { items = { "cache" } })
+    t.ok(b7:setScript(CACHE), "cache 장착 시 컴파일")
+    b7:start()
+    run(b7, 1)
+    local a7 = b7.towers[1]
+    t.eq(a7.crashed, 0, "cache 사용 정상")
+    local b8 = Battle(d, 1, {})
+    b8:setScript(CACHE)
+    b8:start()
+    run(b8, 1)
+    t.ok(b8.towers[1].crashed > 0, "cache 미보유 시 크래시")
+
+    -- on_spawn: fn(enemy) 계약, cache에 기록
+    local HOOK = [[
+build("printer", 3, 10, "a")
+on_spawn(function(e)
+  cache.set("last", e.type)
+end)
+function on_tick(self, world) self:attack(world.nearest()) end
+]]
+    local b9 = Battle(d, 1, { items = { "cache", "webhook" } })
+    t.ok(b9:setScript(HOOK), "webhook 스크립트 컴파일")
+    b9:start()
+    run(b9, d.stages[1].countdown + 10)
+    t.eq(b9.env.cache.get("last"), "bug", "on_spawn이 적 스냅샷 수신")
 end
