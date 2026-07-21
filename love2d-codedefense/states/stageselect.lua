@@ -14,7 +14,11 @@ function sel:enter(_, d, p)
 end
 
 function sel:unlocked(id)
-    return id == self.ids[1] or self.p.cleared[id - 1]
+    if id == self.ids[1] then return true end
+    for i, sid in ipairs(self.ids) do
+        if sid == id then return self.p.cleared[self.ids[i - 1]] end
+    end
+    return false
 end
 
 function sel:draw()
