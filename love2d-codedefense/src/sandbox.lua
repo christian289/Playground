@@ -1,5 +1,6 @@
 local sandbox = {}
 sandbox.QUANTUM = 50  -- 훅 1회 = 50 명령
+sandbox.COMPILE_BUDGET = 20000  -- 정의부(최상위) 실행 예산
 
 local function copyTable(t)
     local o = {}
@@ -22,7 +23,7 @@ function sandbox.compile(source, env, name)
     if not chunk then return nil, err end
     if jit then jit.off(chunk, true) end  -- count 훅이 JIT 코드에서 무시되는 것 방지
     setfenv(chunk, env)
-    local ok, rerr = pcall(chunk)
+    local ok, rerr = sandbox.call(chunk, sandbox.COMPILE_BUDGET)
     if not ok then return nil, rerr end
     return env
 end

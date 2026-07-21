@@ -37,4 +37,8 @@ return function(t)
     sb.compile("function on_tick() local x = nil; return x.y end", errEnv, "t5")
     local ok4, err4 = sb.call(errEnv.on_tick, 5000)
     t.ok(not ok4 and err4 ~= nil, "런타임 오류 격리")
+
+    -- 정의부 무한 루프도 예산으로 차단
+    local topLoop, terr = sb.compile("while true do end", sb.baseEnv(), "t6")
+    t.ok(topLoop == nil and tostring(terr):find("예산"), "정의부 무한 루프 차단")
 end
