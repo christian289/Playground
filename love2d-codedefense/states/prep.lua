@@ -62,6 +62,17 @@ function prep:draw()
     love.graphics.setColor(0.9, 0.92, 0.95)
     love.graphics.print(("스테이지 %d — %s   예산 %d"):format(self.stageId, self.stage.concept, self.money), 20, 16)
 
+    -- 보유 아이템은 건설되는 모든 타워에 자동 장착됨을 안내
+    if #self.p.items > 0 then
+        local names = {}
+        for _, id in ipairs(self.p.items) do
+            names[#names + 1] = (self.d.items[id] and self.d.items[id].name) or id
+        end
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(0.55, 0.8, 0.65)
+        love.graphics.print("보유 아이템 자동 장착: " .. table.concat(names, ", "), 20, 40)
+    end
+
     -- 그리드
     for r = 1, grid.ROWS do
         for c = 1, grid.COLS do
@@ -163,8 +174,11 @@ function prep:tryBuild()
         if not has then return end
     end
     self.money = self.money - def.cost
+    -- 획득 아이템 자동 장착: 배치되는 모든 타워에 보유 아이템 전체를 복사한다 (0.1 규칙)
+    local items = {}
+    for i, it in ipairs(self.p.items) do items[i] = it end
     self.placements[#self.placements + 1] =
-        { r = self.cursorR, c = self.cursorC, tower = self.selTower, items = {} }
+        { r = self.cursorR, c = self.cursorC, tower = self.selTower, items = items }
 end
 
 function prep:textinput(ch)
@@ -188,6 +202,9 @@ function prep:startBattle()
             return
         end
         self.battle = battleOrErr
+    else
+        -- 일시정지 재개: 준비 화면에서 수정한 코드를 실제 타워 env에 다시 컴파일
+        self.battle:recompileTowers(code)
     end
     -- 문법 오류가 있는 타워가 있으면 시작 막기 (교육: 시작 전 진단)
     for _, tw in ipairs(self.battle.towers) do

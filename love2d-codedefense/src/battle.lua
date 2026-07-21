@@ -53,6 +53,30 @@ function Battle:start()
     if self.status == "prep" then self.status = "running" end
 end
 
+-- pause_at 재개: 준비 화면에서 수정한 코드를 실제 타워 env에 다시 컴파일한다.
+-- 공격 타워(damage > 0)만 대상. 성공 시 크래시/비활성/에러 상태를 초기화한다.
+function Battle:recompileTowers(code)
+    if not code or code == "" then return end
+    for _, tw in ipairs(self.towers) do
+        if tw.def.damage > 0 then
+            tw.spawnHandler = nil    -- 핸들러는 컴파일 시 재등록된다
+            local env = api.buildEnv(tw, self.d.items)
+            local ok, err = sandbox.compile(code, env, tw.def.id)
+            if ok then
+                tw.env = env
+                tw.crashed = 0
+                tw.disabled = nil
+                tw.recovering = nil
+                tw.lastError = nil
+            else
+                tw.env = nil
+                tw.lastError = err
+                tw.crashed = WATCHDOG
+            end
+        end
+    end
+end
+
 function Battle:say(msg)
     self.log[#self.log + 1] = msg
     if #self.log > 8 then table.remove(self.log, 1) end
@@ -70,9 +94,22 @@ function Battle:spawnFromTimeline()
             n = n + 1
             -- 웹훅(on_spawn) 아이템: 등장 즉시 핸들러 호출
             for _, tw in ipairs(self.towers) do
-                if tw.spawnHandler and tw.crashed <= 0 and tw.env then
-                    local selfApi = select(1, api.refresh(tw.env, tw, self.enemies))
-                    sandbox.call(function() tw.spawnHandler(selfApi) end, BUDGET)
+                if tw.spawnHandler and tw.crashed <= 0 and not tw.disabled and tw.env then
+                    local selfApi, world = api.refresh(tw.env, tw, self.enemies)
+                    local snap = api.snapshot(e, tw)
+                    tw.pendingTarget = nil
+                    local handler = tw.spawnHandler
+                    local ok, err = sandbox.call(function()
+                        handler(snap, selfApi, world)
+                    end, BUDGET)
+                    if not ok then
+                        tw.crashed = WATCHDOG
+                        tw.lastError = tostring(err)
+                        self:say(("[크래시] %s: %s"):format(tw.def.name, tostring(err)))
+                    elseif tw.pendingTarget and tw.cd <= 0 then
+                        -- 웹훅 반응 사격: 등장 즉시 발사가 실제로 이뤄지도록
+                        self:resolveAttack(tw)
+                    end
                 end
             end
         end

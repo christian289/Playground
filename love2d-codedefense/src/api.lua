@@ -12,6 +12,11 @@ local function snapshot(e, tower)
     }
 end
 
+-- battle이 on_spawn 핸들러에 넘길 단일 적 스냅샷을 만든다 (틱 world와 동일 형식)
+function api.snapshot(e, tower)
+    return snapshot(e, tower)
+end
+
 -- battle이 틱마다 호출: env에 최신 world/self를 주입
 function api.buildEnv(tower, itemsById)
     local env = sandbox.baseEnv()
