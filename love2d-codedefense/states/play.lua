@@ -20,7 +20,8 @@ function play:enter(_, d, stageId, p)
     self.stage = d.stages[stageId]
     self.battle = Battle(d, stageId, { items = p.items })
     self.speed = 1
-    self.tut = nil                      -- Task 5에서 튜토리얼 주입
+    self.tut = nil
+    self.tutSaved = false
     self.autotype = nil                 -- {target=문자열, pos=글자수, timer}
     self.buttons = {}
     if self.stage.buttons_file ~= "" then
@@ -40,6 +41,10 @@ function play:enter(_, d, stageId, p)
         self.editor:setText(loadText(d.root, self.stage.hints_file) or "")
     end
     self.battle:start()                 -- 카운트다운부터 실시간 진행
+
+    if self.stage.tutorial_file ~= "" and not p.tutorial_done[stageId] then
+        self.tut = require("src.tutorial").load(d.root .. "/data/" .. self.stage.tutorial_file)
+    end
 end
 
 function play:isButtonStage() return self.stage.ui == "button" end
@@ -89,6 +94,11 @@ function play:update(dt)
     -- 웨이브 틈 감지: 화면에 적이 없고 전투 중이면 gap 알림 (튜토리얼용, 1회성은 tutorial이 관리)
     if self.tut and self.battle.clock > 0 and #self.battle.enemies == 0 then
         self.tut:notify("gap")
+    end
+    if self.tut and self.tut:done() and not self.tutSaved then
+        self.tutSaved = true
+        self.p.tutorial_done[self.stageId] = true
+        progress.save(self.p)
     end
 
     if self.battle.status == "clear" or self.battle.status == "defeat" then
@@ -153,14 +163,19 @@ function play:draw()
 
     -- 에디터 또는 버튼 패널
     if self:isButtonStage() then
+        -- 버튼 스테이지에서는 퀵바 단축키가 애초에 눌리지 않으므로(keypressed 상단에서 분기)
+        -- 편집기 자체 퀵바 줄을 그리지 않는다 — 버튼 목록/튜토리얼 말풍선과의 시각적 겹침을 줄인다.
+        local qb = self.editor.quickbar
+        self.editor.quickbar = {}
         self.editor:draw(fonts, false)
-        love.graphics.setFont(fonts.ui)
-        love.graphics.setColor(0.95, 0.85, 0.4)
-        love.graphics.print("버튼을 누르면 코드가 자동으로 입력·실행됩니다:", 400, 530)
+        self.editor.quickbar = qb
+        -- Task 5: 튜토리얼 말풍선(y>=580)과 겹치지 않도록 버튼 패널을 에디터 바로 아래로 당김
         love.graphics.setFont(fonts.small)
+        love.graphics.setColor(0.95, 0.85, 0.4)
+        love.graphics.print("버튼 → 코드 자동 입력·저장:", 400, 520)
         for i, btn in ipairs(self.buttons) do
             love.graphics.setColor(0.85, 0.88, 0.92)
-            love.graphics.print(("[%d] %s"):format(i, btn.label), 400, 550 + (i - 1) * 20)
+            love.graphics.print(("[%d] %s"):format(i, btn.label), 400, 534 + (i - 1) * 13)
         end
     else
         self.editor:draw(fonts, true)

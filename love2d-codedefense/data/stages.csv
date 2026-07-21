@@ -1,8 +1,8 @@
 id,mode,concept,ui,maze_file,budget,languages,countdown,wave_clock,hints_file,solution_file,reward_item,tutorial_file,buttons_file
-1,normal,첫 타워,button,mazes/001.txt,200,lua,20,,,curriculum/001_solution.lua,,,curriculum/buttons_1.lua
-2,normal,전략 바꾸기,button,mazes/002.txt,200,lua,15,,,curriculum/002_solution.lua,,,curriculum/buttons_2.lua
-3,normal,따라 치기,hint,mazes/003.txt,220,lua,25,,curriculum/003_hints.lua,curriculum/003_solution.lua,,,
-4,normal,빈칸 채우기,hint,mazes/004.txt,220,lua,25,,curriculum/004_hints.lua,curriculum/004_solution.lua,cache,,
+1,normal,첫 타워,button,mazes/001.txt,200,lua,20,,,curriculum/001_solution.lua,,curriculum/tutorial_1.lua,curriculum/buttons_1.lua
+2,normal,전략 바꾸기,button,mazes/002.txt,200,lua,15,,,curriculum/002_solution.lua,,curriculum/tutorial_2.lua,curriculum/buttons_2.lua
+3,normal,따라 치기,hint,mazes/003.txt,220,lua,25,,curriculum/003_hints.lua,curriculum/003_solution.lua,,curriculum/tutorial_3.lua,
+4,normal,빈칸 채우기,hint,mazes/004.txt,220,lua,25,,curriculum/004_hints.lua,curriculum/004_solution.lua,cache,curriculum/tutorial_4.lua,
 5,normal,변수,free,mazes/005.txt,240,lua,25,,curriculum/005_hints.lua,curriculum/005_solution.lua,,,
 6,normal,조건문,free,mazes/006.txt,260,lua,25,,curriculum/006_hints.lua,curriculum/006_solution.lua,webhook,,
 7,normal,반복문,free,mazes/007.txt,280,lua,25,,curriculum/007_hints.lua,curriculum/007_solution.lua,,,

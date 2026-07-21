@@ -9,4 +9,5 @@ return function(t)
     t.ok(q.codes[1]:find("on_tick"), "코드 저장/복원")
     local empty = progress.load("없는파일.lua")
     t.ok(type(empty.cleared) == "table" and next(empty.cleared) == nil, "빈 진행도 기본값")
+    t.ok(type(empty.tutorial_done) == "table" and next(empty.tutorial_done) == nil, "tutorial_done 기본값")
 end

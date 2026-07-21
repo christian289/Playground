@@ -35,11 +35,12 @@ function progress.load(file)
                 p.cleared = p.cleared or {}
                 p.items = p.items or {}
                 p.codes = p.codes or {}
+                p.tutorial_done = p.tutorial_done or {}
                 return p
             end
         end
     end
-    return { cleared = {}, items = {}, codes = {} }
+    return { cleared = {}, items = {}, codes = {}, tutorial_done = {} }
 end
 
 return progress
