@@ -1,3 +1,4 @@
+-- 타겟 선택 로직을 함수로 분리하면 on_tick이 읽기 쉬워집니다
 local function pick(world)
   local best = nil
   for _, e in ipairs(world.enemies()) do

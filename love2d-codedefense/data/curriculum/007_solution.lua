@@ -1,3 +1,4 @@
+-- for로 모든 적을 순회하며 조건에 맞는 타겟을 고릅니다
 function on_tick(self, world)
     local target = nil
     for _, e in ipairs(world.enemies()) do
