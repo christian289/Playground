@@ -329,14 +329,14 @@ function play:draw()
     -- 사이드 패널
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.8, 0.8, 0.9)
-    love.graphics.print("HOLD", PANEL_X, 40)
+    love.graphics.print("홀드", PANEL_X, 40)
     love.graphics.rectangle("line", PANEL_X, 58, 88, 56)
     if self.hold then
         drawMini(self.hold, PANEL_X + 8, 70, 18)
     end
 
     love.graphics.setColor(0.8, 0.8, 0.9)
-    love.graphics.print("NEXT", PANEL_X, 136)
+    love.graphics.print("다음", PANEL_X, 136)
     for i = 1, 4 do
         if self.queue[i] then
             drawMini(self.queue[i], PANEL_X + 8, 158 + (i - 1) * 56, 16)
@@ -345,21 +345,21 @@ function play:draw()
 
     love.graphics.setFont(fonts.normal)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print("SCORE", PANEL_X, 410)
+    love.graphics.print("점수", PANEL_X, 410)
     love.graphics.print(tostring(self.score), PANEL_X, 434)
-    love.graphics.print("LEVEL " .. self.level, PANEL_X, 486)
-    love.graphics.print("LINES " .. self.lines, PANEL_X, 514)
+    love.graphics.print("레벨 " .. self.level, PANEL_X, 486)
+    love.graphics.print("줄 " .. self.lines, PANEL_X, 514)
 
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.55, 0.55, 0.65)
-    love.graphics.print("P PAUSE\nESC TITLE", PANEL_X, 580)
+    love.graphics.print("P 일시정지\nESC 타이틀", PANEL_X, 580)
 
     if self.paused then
         love.graphics.setColor(0, 0, 0, 0.6)
         love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
         love.graphics.setFont(fonts.big)
         love.graphics.setColor(1, 1, 1)
-        love.graphics.printf("PAUSED", 0, 280, love.graphics.getWidth(), "center")
+        love.graphics.printf("일시정지", 0, 280, love.graphics.getWidth(), "center")
     end
 end
 

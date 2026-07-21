@@ -20,7 +20,7 @@ love2d-tetris/
 ├─ src/
 │  ├─ tetromino.lua   ← 7종 모양(SRS)·색·회전 생성·월킥 테이블
 │  ├─ board.lua       ← 10x20 그리드, fits/place/clearLines (classic 클래스)
-│  └─ fonts.lua       ← 공용 폰트 (기본 폰트는 한글 미지원 → 게임 내 텍스트는 영문)
+│  └─ fonts.lua       ← 나눔고딕(OFL, assets/fonts) 로드 — 게임 내 텍스트 한글 지원
 ├─ states/
 │  ├─ title.lua       ← 타이틀/조작법
 │  ├─ play.lua        ← 핵심 게임 로직 (중력, DAS, 잠금 지연, 홀드, 고스트, 점수)

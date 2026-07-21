@@ -5,6 +5,7 @@ local Level = require("src.level")
 local Player = require("src.player")
 local Enemy = require("src.enemy")
 local fonts = require("src.fonts")
+local sprites = require("src.sprites")
 
 local play = {}
 
@@ -26,6 +27,7 @@ function play:enter(previous, carry)
         table.insert(self.enemies, Enemy(self.world, e.x, e.y))
     end
     self.cam = Camera(400, self.level.heightPx - 300)
+    self.coinAnim = sprites.newCoinAnim()
     self.paused = false
     self.pendingDeath = false
 end
@@ -54,6 +56,9 @@ function play:update(dt)
     if self.paused then return end
     dt = math.min(dt, 1 / 30)
 
+    self.level.map:update(dt)
+    self.coinAnim:update(dt)
+
     local dir = 0
     if love.keyboard.isDown("left") or love.keyboard.isDown("a") then dir = dir - 1 end
     if love.keyboard.isDown("right") or love.keyboard.isDown("d") then dir = dir + 1 end
@@ -76,15 +81,15 @@ function play:update(dt)
     end
 
     for _, e in ipairs(self.enemies) do
-        if not e.dead then
-            if not e.active and math.abs(e.x - self.player.x) < ENEMY_WAKE_DISTANCE then
+        if not e.gone then
+            if not e.dead and not e.active and math.abs(e.x - self.player.x) < ENEMY_WAKE_DISTANCE then
                 e.active = true
             end
-            if e.active then
+            if e.active or e.dead then
                 if e:update(dt) then
                     self:resolveEnemyContact(e)
                 end
-                if e.y > self.level.heightPx + 100 then
+                if not e.dead and e.y > self.level.heightPx + 100 then
                     e:die()
                 end
             end
@@ -126,9 +131,8 @@ function play:keyreleased(key)
 end
 
 function play:draw()
+    -- 구름 (고정 장식) — 지형보다 뒤에
     self.cam:attach()
-
-    -- 구름 (고정 장식)
     love.graphics.setColor(1, 1, 1, 0.85)
     for i = 0, 12 do
         local cx = i * 320 + 80
@@ -136,13 +140,19 @@ function play:draw()
         love.graphics.ellipse("fill", cx, cy, 46, 16)
         love.graphics.ellipse("fill", cx + 28, cy + 8, 34, 13)
     end
+    self.cam:detach()
 
-    Level.draw(self.level)
+    -- STI 지형: 자체 캔버스에 그리므로 카메라 오프셋을 직접 넘긴다
+    love.graphics.setColor(1, 1, 1)
+    self.level.map:draw(math.floor(400 - self.cam.x), math.floor(300 - self.cam.y))
+
+    -- 엔티티는 카메라 변환 안에서 그린다
+    self.cam:attach()
+    Level.drawEntities(self.level, sprites, self.coinAnim)
     for _, e in ipairs(self.enemies) do
-        if not e.dead then e:draw() end
+        if not e.gone then e:draw() end
     end
     self.player:draw()
-
     self.cam:detach()
 
     -- HUD
@@ -151,19 +161,19 @@ function play:draw()
     love.graphics.rectangle("fill", 0, 0, w, 34)
     love.graphics.setFont(fonts.normal)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print(string.format("SCORE %06d", self.score), 16, 6)
-    love.graphics.print("COINS " .. self.coinsCount, 280, 6)
-    love.graphics.print("LIVES " .. self.lives, 440, 6)
+    love.graphics.print(string.format("점수 %06d", self.score), 16, 5)
+    love.graphics.print("코인 " .. self.coinsCount, 280, 5)
+    love.graphics.print("목숨 " .. self.lives, 440, 5)
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(1, 1, 1, 0.7)
-    love.graphics.print("P PAUSE  ESC TITLE", 630, 9)
+    love.graphics.print("P 일시정지  ESC 타이틀", 620, 8)
 
     if self.paused then
         love.graphics.setColor(0, 0, 0, 0.55)
         love.graphics.rectangle("fill", 0, 0, w, love.graphics.getHeight())
         love.graphics.setFont(fonts.big)
         love.graphics.setColor(1, 1, 1)
-        love.graphics.printf("PAUSED", 0, 260, w, "center")
+        love.graphics.printf("일시정지", 0, 260, w, "center")
     end
 end
 

@@ -25,10 +25,11 @@ cd love2d-mario
 
 ## 구현된 기능
 
-bump.lua 기반 플랫포머 물리(가변 점프, 가속/마찰), 문자열로 정의한 1개 레벨(120x18 타일),
-적 밟기(스톰프)/접촉 사망, 코인, 깃발 클리어, 라이프 3개와 레벨 재시작, hump 카메라 추적, HUD.
+bump.lua 기반 플랫포머 물리(가변 점프, 가속/마찰), STI로 로드하는 Tiled 형식 레벨(120x18 타일),
+anim8 스프라이트 애니메이션(걷기/점프, 적 밟힘 연출, 코인 회전), 적 밟기(스톰프)/접촉 사망,
+코인, 깃발 클리어, 라이프 3개와 레벨 재시작, hump 카메라 추적, 한글 UI(HUD/메뉴).
 
-그래픽은 현재 도형 렌더링입니다. 다음 단계: Tiled 맵(STI)과 스프라이트 애니메이션(anim8) 적용.
+스프라이트는 실행 시점에 코드로 생성한 픽셀아트입니다. 레벨 수정은 `tools/genmap` 참고 (CLAUDE.md).
 
 ## 사용 라이브러리
 
@@ -39,6 +40,11 @@ bump.lua 기반 플랫포머 물리(가변 점프, 가속/마찰), 문자열로 
 | [classic](https://github.com/rxi/classic) | 경량 OOP 클래스 | MIT |
 | [STI](https://github.com/karai17/Simple-Tiled-Implementation) | Tiled 맵 로드/렌더링 | MIT |
 | [hump](https://github.com/vrld/hump) | gamestate, camera, timer 유틸 | MIT |
+
+## 폰트
+
+한글 표시를 위해 [나눔고딕](https://hangeul.naver.com/font)(SIL Open Font License)을 `assets/fonts/`에 번들합니다.
+LÖVE 기본 폰트는 한글 글리프가 없으므로 `love.graphics.newFont("assets/fonts/NanumGothic-Regular.ttf", size)`로 로드합니다.
 
 ## 에셋
 

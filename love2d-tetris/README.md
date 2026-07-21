@@ -37,3 +37,8 @@ SRS 회전 + 월킥, 7-bag 랜덤, NEXT 4개 미리보기, 홀드, 고스트 피
 |-----------|------|---------|
 | [classic](https://github.com/rxi/classic) | 경량 OOP 클래스 | MIT |
 | [hump](https://github.com/vrld/hump) | gamestate, timer, vector 유틸 | MIT |
+
+## 폰트
+
+한글 표시를 위해 [나눔고딕](https://hangeul.naver.com/font)(SIL Open Font License)을 `assets/fonts/`에 번들합니다.
+LÖVE 기본 폰트는 한글 글리프가 없으므로 `love.graphics.newFont("assets/fonts/NanumGothic-Regular.ttf", size)`로 로드합니다.

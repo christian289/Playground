@@ -15,28 +15,44 @@ LÖVE (Love2D) 11.5 기반 슈퍼마리오 스타일 횡스크롤 플랫포머. 
 
 ```
 love2d-mario/
-├─ main.lua           ← 엔트리 포인트: 폰트 로드 후 title 상태로 전환
+├─ main.lua           ← 엔트리 포인트: 폰트/스프라이트 로드 후 title 상태로 전환
 ├─ conf.lua           ← 창 크기(800x600), 타이틀 등 설정
 ├─ src/
-│  ├─ level.lua       ← 문자열 기반 레벨 정의 + bump 월드 구축 + 타일/코인/깃발 렌더
-│  ├─ player.lua      ← 플레이어 (가속/마찰, 가변 점프, bump slide 충돌)
-│  ├─ enemy.lua       ← 굼바형 적 (순찰, 벽에서 반전, 근접 시 활성화)
-│  └─ fonts.lua       ← 공용 폰트 (기본 폰트는 한글 미지원 → 게임 내 텍스트는 영문)
+│  ├─ level.lua       ← STI 맵 로드 + bump_init + 엔티티 파싱(objectgroup) + 코인/깃발 렌더
+│  ├─ sprites.lua     ← 런타임 캔버스로 스프라이트시트 생성 + anim8 그리드/애니메이션
+│  ├─ player.lua      ← 플레이어 (가속/마찰, 가변 점프, bump slide 충돌, 걷기/점프 애니)
+│  ├─ enemy.lua       ← 굼바형 적 (순찰, 벽 반전, 근접 활성화, 밟히면 납작 연출)
+│  └─ fonts.lua       ← 나눔고딕(OFL) 로드 — 게임 내 텍스트 한글 지원
 ├─ states/
 │  ├─ title.lua       ← 타이틀/조작법
 │  ├─ play.lua        ← 핵심 루프 (충돌 이벤트 처리, 스톰프/사망, 카메라, HUD)
 │  ├─ gameover.lua    ← 게임오버
 │  └─ clear.lua       ← 코스 클리어
+├─ tools/
+│  └─ genmap/         ← 레벨 문자열 → Tiled Lua 맵 + 타일셋 PNG 생성기
 ├─ assets/
-│  ├─ images/         ← 스프라이트시트, 타일셋 이미지 (아직 미사용 — 도형 렌더링 중)
-│  └─ maps/           ← Tiled(.lua로 export한) 맵 파일 (아직 미사용)
+│  ├─ fonts/          ← NanumGothic-Regular.ttf (OFL 라이선스)
+│  ├─ images/         ← tileset.png (genmap이 생성)
+│  └─ maps/           ← level1.lua (genmap이 생성한 Tiled Lua 형식)
 └─ lib/               ← 외부 라이브러리 (직접 수정 금지)
-   ├─ bump.lua        ← kikito/bump: AABB 충돌 감지·해결 (사용 중)
-   ├─ anim8.lua       ← kikito/anim8: 스프라이트시트 애니메이션 (다음 단계)
-   ├─ classic.lua     ← rxi/classic: 경량 OOP (사용 중)
-   ├─ sti/            ← Simple Tiled Implementation: Tiled 맵 로드/렌더 (다음 단계)
-   └─ hump/           ← vrld/hump: gamestate, camera 등 (사용 중)
+   ├─ bump.lua        ← kikito/bump: AABB 충돌 감지·해결
+   ├─ anim8.lua       ← kikito/anim8: 스프라이트시트 애니메이션
+   ├─ classic.lua     ← rxi/classic: 경량 OOP
+   ├─ sti/            ← Simple Tiled Implementation: Tiled 맵 로드/렌더
+   └─ hump/           ← vrld/hump: gamestate, camera 등
 ```
+
+## 레벨 수정 방법
+
+`tools/genmap/main.lua`의 MAP 문자열을 고친 뒤 프로젝트 루트에서:
+
+```powershell
+& "C:\Program Files\LOVE\lovec.exe" tools/genmap
+```
+
+`assets/maps/level1.lua`와 `assets/images/tileset.png`가 재생성된다. 생성된 맵 파일은 직접 수정하지 말 것.
+Tiled 에디터로 만든 맵을 쓰려면 Lua로 export해서 `assets/maps/`에 두고 `src/level.lua`의 경로만 바꾸면 된다
+(terrain 레이어에 `collidable=true` 속성, entities objectgroup에 coin/enemy/spawn/flag 타입 오브젝트 필요).
 
 ## 코딩 규칙
 
@@ -55,14 +71,15 @@ love2d-mario/
 - 적: 왼쪽으로 순찰, 벽(normal.x ≠ 0)에서 반전, 플레이어가 520px 이내로 오면 활성화. 낙하 중 위에서 접촉(플레이어 바닥과 적 상단 차 < 16px)이면 스톰프 +200, 아니면 사망
 - 사망: 라이프 차감 후 레벨 재시작(점수/코인 유지, `play:enter`의 carry 파라미터), 라이프 소진 시 게임오버. 낙사(y > 레벨높이+60) 동일
 - 상태 전환은 update 루프 도중이 아니라 `pendingDeath` 플래그로 모아 프레임 끝에서 처리 (루프 중 world 재구축 방지)
-- 레벨: `src/level.lua`의 MAP 문자열 배열 (기호: # 지면, B 벽돌, = 발판, o 코인, E 적, P 스폰, F 깃발). 120x18 타일, 타일 32px
+- 레벨: STI가 `assets/maps/level1.lua`(Tiled Lua 형식, 120x18 타일)를 로드. 지형 충돌은 `map:bump_init(world)`가 등록 — STI가 넣는 타일 아이템은 `kind`가 없어서 필터의 기본값 "slide"에 걸린다
+- STI 렌더는 자체 캔버스를 쓰므로 hump 카메라 attach 안에서 그리지 않고 `map:draw(400 - cam.x, 300 - cam.y)`로 오프셋을 직접 넘긴다. 엔티티/플레이어는 attach 안에서 그린다
+- 스프라이트: `src/sprites.lua`가 실행 시점에 캔버스로 픽셀아트 시트를 만들고 anim8로 애니메이션. anim8 애니메이션 객체는 프레임 상태를 가지므로 엔티티마다 `sprites.newXxxAnims()`로 새로 생성
 - 카메라: hump Camera, x는 플레이어 추적(레벨 경계 클램프), y는 고정
 
 ## 다음 단계 (바이브코딩 가이드)
 
-- ② Tiled로 맵 제작 → Lua export → STI 로드(`sti("assets/maps/level1.lua", {"bump"})`)로 level.lua 교체
-- ④ Kenney 등 CC0 스프라이트 + anim8 애니메이션으로 도형 렌더링 교체 (원작 마리오 에셋은 저작권 문제로 사용 금지)
-- 추가 아이디어: ?블록/버섯, 사운드(love.audio), 멀티 레벨, 타임 리밋
+- Kenney (kenney.nl) 등 CC0 PNG 에셋으로 교체: 이미지 로드 후 sprites.lua의 그리드만 맞추면 됨 (원작 마리오 에셋은 저작권 문제로 사용 금지)
+- 추가 아이디어: ?블록/버섯, 사운드(love.audio), 멀티 레벨, 타임 리밋, 배경 패럴랙스
 
 ## 테스트
 

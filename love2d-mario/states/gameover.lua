@@ -15,14 +15,14 @@ function gameover:draw()
 
     love.graphics.setFont(fonts.big)
     love.graphics.setColor(0.95, 0.30, 0.25)
-    love.graphics.printf("GAME OVER", 0, 200, w, "center")
+    love.graphics.printf("게임 오버", 0, 200, w, "center")
 
     love.graphics.setFont(fonts.normal)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("SCORE  " .. self.score, 0, 300, w, "center")
+    love.graphics.printf("점수  " .. self.score, 0, 300, w, "center")
 
     love.graphics.setFont(fonts.small)
-    love.graphics.printf("ENTER  RETRY        ESC  TITLE", 0, 380, w, "center")
+    love.graphics.printf("Enter  다시 시작        ESC  타이틀", 0, 380, w, "center")
 end
 
 function gameover:keypressed(key)

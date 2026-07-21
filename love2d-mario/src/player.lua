@@ -1,4 +1,5 @@
 local Object = require("lib.classic")
+local sprites = require("src.sprites")
 
 local Player = Object:extend()
 
@@ -20,6 +21,8 @@ function Player:new(world, x, y)
     self.vx, self.vy = 0, 0
     self.onGround = false
     self.facing = 1
+    self.anims = sprites.newPlayerAnims()
+    self.anim = self.anims.idle
     world:add(self, x, y, self.w, self.h)
 end
 
@@ -71,6 +74,22 @@ function Player:update(dt, dir)
             end
         end
     end
+
+    -- 상태에 맞는 애니메이션 선택
+    local target
+    if not self.onGround then
+        target = self.anims.jump
+    elseif math.abs(self.vx) > 20 then
+        target = self.anims.walk
+    else
+        target = self.anims.idle
+    end
+    if target ~= self.anim then
+        self.anim = target
+        self.anim:gotoFrame(1)
+    end
+    self.anim:update(dt)
+
     return events
 end
 
@@ -88,13 +107,8 @@ function Player:cutJump()
 end
 
 function Player:draw()
-    love.graphics.setColor(0.85, 0.20, 0.20)
-    love.graphics.rectangle("fill", self.x, self.y, self.w, self.h, 4, 4)
-    love.graphics.setColor(0.25, 0.30, 0.80)
-    love.graphics.rectangle("fill", self.x, self.y + self.h * 0.55, self.w, self.h * 0.45, 3, 3)
     love.graphics.setColor(1, 1, 1)
-    local ex = self.facing == 1 and (self.x + self.w - 9) or (self.x + 3)
-    love.graphics.rectangle("fill", ex, self.y + 5, 6, 6)
+    self.anim:draw(sprites.playerImg, self.x + self.w / 2, self.y + self.h / 2, 0, self.facing, 1, 16, 15)
 end
 
 return Player

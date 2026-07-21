@@ -14,14 +14,14 @@ function clear:draw()
 
     love.graphics.setFont(fonts.big)
     love.graphics.setColor(0.25, 0.85, 0.35)
-    love.graphics.printf("COURSE CLEAR!", 0, 190, w, "center")
+    love.graphics.printf("코스 클리어!", 0, 190, w, "center")
 
     love.graphics.setFont(fonts.normal)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("SCORE  " .. self.score .. "      COINS  " .. self.coins, 0, 290, w, "center")
+    love.graphics.printf("점수  " .. self.score .. "      코인  " .. self.coins, 0, 290, w, "center")
 
     love.graphics.setFont(fonts.small)
-    love.graphics.printf("ENTER  PLAY AGAIN        ESC  TITLE", 0, 370, w, "center")
+    love.graphics.printf("Enter  한 번 더        ESC  타이틀", 0, 370, w, "center")
 end
 
 function clear:keypressed(key)

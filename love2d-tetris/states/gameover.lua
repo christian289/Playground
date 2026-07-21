@@ -13,16 +13,16 @@ function gameover:draw()
     local w = love.graphics.getWidth()
     love.graphics.setFont(fonts.big)
     love.graphics.setColor(0.9, 0.3, 0.3)
-    love.graphics.printf("GAME OVER", 0, 160, w, "center")
+    love.graphics.printf("게임 오버", 0, 160, w, "center")
 
     love.graphics.setFont(fonts.normal)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("SCORE  " .. self.score, 0, 280, w, "center")
-    love.graphics.printf("LINES  " .. self.lines .. "    LEVEL  " .. self.level, 0, 310, w, "center")
+    love.graphics.printf("점수  " .. self.score, 0, 280, w, "center")
+    love.graphics.printf("줄  " .. self.lines .. "      레벨  " .. self.level, 0, 310, w, "center")
 
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.7, 0.7, 0.8)
-    love.graphics.printf("ENTER  RETRY        ESC  TITLE", 0, 420, w, "center")
+    love.graphics.printf("Enter  다시 시작        ESC  타이틀", 0, 420, w, "center")
 end
 
 function gameover:keypressed(key)
