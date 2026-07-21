@@ -3,6 +3,13 @@ return function(t)
     local Battle = require("src.battle")
     local d = db.load(PROJECT_ROOT)
 
+    local function readSolution(stageId)
+        local s = d.stages[stageId]
+        local f = assert(io.open(PROJECT_ROOT .. "/data/" .. s.solution_file, "rb"))
+        local code = f:read("*a"); f:close()
+        return code
+    end
+
     local ATK = [[
 build("printer", 3, 10, "a")
 build("printer", 11, 3, "b")
@@ -113,4 +120,31 @@ function on_tick(self, world) self:attack(world.nearest()) end
     b9:start()
     run(b9, d.stages[1].countdown + 10)
     t.eq(b9.env.cache.get("last"), "bug", "on_spawn이 적 스냅샷 수신")
+
+    -- 전 스테이지 정답 회귀 (그 시점 보유 아이템으로)
+    local owned = {}
+    for stageId = 1, 8 do
+        local sol = readSolution(stageId)
+        local b = Battle(d, stageId, { items = owned })
+        t.ok(b:setScript(sol), ("스테이지 %d 정답 컴파일"):format(stageId))
+        b:start()
+        run(b, 420)
+        t.eq(b.status, "clear", ("스테이지 %d 정답 클리어"):format(stageId))
+        local reward = d.stages[stageId].reward_item
+        if reward ~= "" then owned[#owned + 1] = reward end
+    end
+
+    -- 버튼 스테이지 2: buttons_2의 마지막 버튼 스크립트(전략: 약한 적 우선)로 클리어
+    do
+        local f = assert(io.open(PROJECT_ROOT .. "/data/curriculum/buttons_2.lua", "rb"))
+        local src = f:read("*a"); f:close()
+        local chunk = assert(loadstring(src))
+        local buttons = chunk()
+        local script = buttons[#buttons].script
+        local bb = Battle(d, 2, {})
+        t.ok(bb:setScript(script), "buttons_2 마지막 버튼 스크립트 컴파일")
+        bb:start()
+        run(bb, 420)
+        t.eq(bb.status, "clear", "buttons_2 마지막 버튼 스크립트로 스테이지2 클리어")
+    end
 end

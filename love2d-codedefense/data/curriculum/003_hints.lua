@@ -1,4 +1,7 @@
 -- 아래 코드를 그대로 타이핑하세요:
+-- build("printer", 3, 3, "a")
+-- build("printer", 7, 3, "b")
+--
 -- function on_tick(self, world)
 --   self:attack(world.nearest())
 -- end
