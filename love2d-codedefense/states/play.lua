@@ -187,21 +187,23 @@ function play:update(dt)
     fx.prevServerHP = b.serverHP
     -- 설치 감지 (+ 구구 클래스 등장 frame-diff → 소환 연출, 스펙 §6.6)
     if #b.towers > fx.prevTowerCount then
-        local tw = b.towers[#b.towers]
-        particles.spawn("flash", tw.x, tw.y, { color = art.pal.cyan })
-        if tw.def.id == "gugu-class" then
-            fx.guguFx = 1.2
-            fx.guguSeen = true
-            fx.shake = 0.4
-            -- 구구단 파티클 6개: 타워 위치가 아니라 전장 여러 x,y에 흩뿌린다(3열×2행) —
-            -- 타워가 우상단(적 구성 패널 부근)에 세워져도 패널 텍스트와 겹치지 않도록.
-            for i = 1, 6 do
-                local col = (i - 1) % 3
-                local row = math.floor((i - 1) / 3)
-                local px = FIELD_W * (col + 0.5) / 3
-                local py = FIELD_H * 0.32 + row * FIELD_H * 0.34
-                particles.spawn("float", px, py,
-                    { text = ("2 × %d = %d"):format(i, 2 * i), color = art.pal.orange, ttl = 1.4 })
+        for i = fx.prevTowerCount + 1, #b.towers do
+            local tw = b.towers[i]
+            particles.spawn("flash", tw.x, tw.y, { color = art.pal.cyan })
+            if tw.def.id == "gugu-class" then
+                fx.guguFx = 1.2
+                fx.guguSeen = true
+                fx.shake = 0.4
+                -- 구구단 파티클 6개: 타워 위치가 아니라 전장 여러 x,y에 흩뿌린다(3열×2행) —
+                -- 타워가 우상단(적 구성 패널 부근)에 세워져도 패널 텍스트와 겹치지 않도록.
+                for j = 1, 6 do
+                    local col = (j - 1) % 3
+                    local row = math.floor((j - 1) / 3)
+                    local px = FIELD_W * (col + 0.5) / 3
+                    local py = FIELD_H * 0.32 + row * FIELD_H * 0.34
+                    particles.spawn("float", px, py,
+                        { text = ("2 × %d = %d"):format(j, 2 * j), color = art.pal.orange, ttl = 1.4 })
+                end
             end
         end
     end
