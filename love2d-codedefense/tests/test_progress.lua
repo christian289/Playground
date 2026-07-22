@@ -21,4 +21,10 @@ return function(t)
     local qr = progress.load()
     t.eq(qr.records[3].bestHP, 9, "records 왕복")
     t.ok(qr.records[3].gugu, "gugu 기록 왕복")
+
+    local pf = progress.load()
+    pf.funcbook = { on_tick = { first = 3, count = 5 } }
+    progress.save(pf)
+    t.eq(progress.load().funcbook.on_tick.count, 5, "funcbook 왕복")
+    t.ok(type(progress.load().funcbook) == "table", "funcbook 기본값 보강")
 end

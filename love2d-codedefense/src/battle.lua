@@ -36,6 +36,7 @@ function Battle:new(d, stageId, opts)
     self.setTower = nil
     self.script = nil
     self.scriptError = nil
+    self.userFuncs = {}
 end
 
 function Battle:start()
@@ -97,6 +98,8 @@ end
 -- 실패 시 기존 env/script는 그대로 유지된다.
 function Battle:setScript(code)
     local env, setTower = api.buildEnv(self)
+    local known = {}
+    for k in pairs(env) do known[k] = true end
     local compiled, err = sandbox.compile(code, env, "script")
     if not compiled then
         self.scriptError = tostring(err)
@@ -105,6 +108,12 @@ function Battle:setScript(code)
     self.env, self.setTower = env, setTower
     self.script = code
     self.scriptError = nil
+    local funcs = {}
+    for k, v in pairs(env) do
+        if not known[k] and type(v) == "function" then funcs[#funcs + 1] = k end
+    end
+    table.sort(funcs)
+    self.userFuncs = funcs
     for _, tw in ipairs(self.towers) do
         tw.crashed, tw.disabled, tw.recovering, tw.lastError = 0, nil, nil, nil
     end

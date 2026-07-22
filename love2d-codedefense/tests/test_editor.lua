@@ -33,4 +33,13 @@ return function(t)
     t.ok(ed:quickbarPressed("f1"), "퀵바 f1 처리")
     t.eq(ed:getText(), "self:attack(world.nearest())", "퀵바 삽입")
     t.ok(not ed:quickbarPressed("f9"), "빈 슬롯은 false")
+
+    local mono = function(s) local n = 0; for _ in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do n = n + 1 end return n * 10 end
+    local ed2 = Editor(0, 0, 400, 300)
+    ed2:setText("build(1)\nlocal x = helper(w)")
+    local ln, ci = ed2:charAt(40 + 25, 5, 18, mono)   -- 40px 여백 + 2.5글자 → 3번째 글자
+    t.eq(ln, 1, "charAt 줄"); t.eq(ci, 3, "charAt 글자")
+    t.eq(Editor.tokenAt("build(1)", 3), "build", "tokenAt 식별자")
+    t.eq(Editor.tokenAt("local x = helper(w)", 12), "helper", "tokenAt 중간 위치")
+    t.eq(Editor.tokenAt("build(1)", 6), nil, "괄호 위치는 nil")
 end

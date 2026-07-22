@@ -212,4 +212,14 @@ function on_tick(self, world) self:attack(world.nearest()) end
     end
     t.ok(firstProjDamage ~= nil, "구구 클래스 첫 발사")
     t.eq(firstProjDamage, 30, "발사 데미지 = damage(6) * dan(2) * 차지배율(2.5)")
+
+    -- userFuncs: setScript 성공 후 새로 정의된 함수 이름을 정렬 수집, 실패 시 기존 유지
+    local FN = 'build("printer", 3, 10, "a")\nfunction helper(w) return w.nearest() end\nfunction on_tick(self, world)\n  self:attack(helper(world))\nend'
+    local bf = Battle(d, 1, {})
+    t.ok(bf:setScript(FN), "userFuncs 스크립트 컴파일")
+    t.eq(#bf.userFuncs, 2, "새 함수 2개 수집")
+    t.eq(bf.userFuncs[1], "helper", "정렬 첫 항목")
+    t.eq(bf.userFuncs[2], "on_tick", "정렬 둘째 항목")
+    bf:setScript("function on_tick( broken")
+    t.eq(#bf.userFuncs, 2, "실패 저장 시 기존 목록 유지")
 end

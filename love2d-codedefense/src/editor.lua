@@ -117,6 +117,35 @@ function Editor:keypressed(key)
     end
 end
 
+-- 에디터 내부 좌표(px, py는 에디터 원점 기준)를 (줄, 글자 인덱스)로 변환한다.
+-- lineH는 draw()가 쓰는 lineHeight를 그대로 주입받고, measure(str)는 픽셀 폭을 반환하는 함수다.
+-- 줄 번호 여백(40px) 안쪽을 클릭하거나 존재하지 않는 줄이면 nil.
+function Editor:charAt(px, py, lineH, measure)
+    local li = math.floor(py / lineH) + 1 + self.scroll
+    local line = self.lines[li]
+    if not line then return nil end
+    local x = px - 40
+    if x < 0 then return nil end
+    local cs = chars(line)
+    local acc = 0
+    for i = 1, #cs do
+        local w = measure(cs[i])
+        if x < acc + w then return li, i end
+        acc = acc + w
+    end
+    return li, #cs + 1
+end
+
+-- lineText에서 charIdx(1-based) 위치를 포함하는 식별자 토큰([%a_][%w_]*)을 반환한다.
+-- 위치가 토큰 문자 위가 아니면(괄호 등 인접 문자 포함) nil.
+function Editor.tokenAt(lineText, charIdx)
+    if not charIdx then return nil end
+    for s, tok, e in lineText:gmatch("()([%a_][%w_]*)()") do
+        if charIdx >= s and charIdx < e then return tok end
+    end
+    return nil
+end
+
 function Editor:setQuickbar(slots) self.quickbar = slots end
 
 function Editor:quickbarPressed(key)
