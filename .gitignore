@@ -419,3 +419,7 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# LÖVE 게임 배포 산출물 (tools/package.ps1)
+love2d-*/dist/
+*.love

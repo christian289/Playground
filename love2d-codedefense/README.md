@@ -147,3 +147,13 @@ cd love2d-codedefense
 한글 표시를 위해 [나눔고딕](https://hangeul.naver.com/font)(SIL Open Font License)을
 `assets/fonts/`에 번들합니다. LÖVE 기본 폰트는 한글 글리프가 없으므로
 `love.graphics.newFont("assets/fonts/NanumGothic-Regular.ttf", size)`로 로드합니다.
+
+## 배포 패키징 (실행 파일 만들기)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\package.ps1
+```
+
+`dist\CodeDefense\` 폴더가 생성됩니다 — `CodeDefense.exe` 더블클릭으로 실행되며, 폴더째
+복사하면 LÖVE가 설치되지 않은 PC에서도 동작합니다. 게임 데이터(`data\`)는 exe 옆에 폴더로
+동봉되므로, CSV·미로·커리큘럼 파일을 수정해 나만의 스테이지를 만들 수 있습니다.

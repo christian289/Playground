@@ -8,7 +8,12 @@ function love.load()
     love.keyboard.setKeyRepeat(true)
     fonts.load()
     require("src.art").load()
+    -- 개발 시(love .): 소스 폴더에서 io로 데이터를 읽는다.
+    -- 패키징(fuse) 시: 데이터는 zip 밖 exe 옆 data/ 폴더로 배포되므로 exe가 있는 폴더를 루트로 쓴다.
     local root = love.filesystem.getSource()
+    if love.filesystem.isFused() then
+        root = love.filesystem.getSourceBaseDirectory()
+    end
     local d = db.load(root)
     local errs = d.validate()
     if #errs > 0 then
