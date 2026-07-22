@@ -5,7 +5,10 @@ Lua 코드(`on_tick(self, world)`, `build(type, r, c, name)`)를 작성해 타�
 내려오는 밈 몬스터(버그/널 포인터/concat-nil)를 막습니다. 설계서:
 `docs/superpowers/specs/2026-07-21-love2d-codedefense-design.md` (레포 루트 기준, 4.1/5.1절이
 이번 실시간 개편 반영), 튜토리얼 설계서:
-`docs/superpowers/specs/2026-07-21-codedefense-tutorial-design.md`.
+`docs/superpowers/specs/2026-07-21-codedefense-tutorial-design.md`, 스테이지 경험 개선 설계서:
+`docs/superpowers/specs/2026-07-22-codedefense-stage-experience-design.md`(적 구성 패널·진행
+바·문제 브리핑·메모리 테마 미로·히든 타워·도감·퍼즐·배포 로그), 비주얼·세계관 설계서:
+`docs/superpowers/specs/2026-07-22-codedefense-visual-lore-design.md`.
 
 ## 실행 방법
 
@@ -40,18 +43,28 @@ love2d-codedefense/
 │  ├─ art.lua               ← 코드 생성 픽셀아트 — 팔레트(`art.pal`), 캔버스 시트(몬스터/타워/개발자),
 │  │                            전장 타일, 로고, 인트로 일러스트 4종. 외부 이미지 에셋 없음
 │  ├─ particles.lua         ← 뷰 전용 파티클 풀(상한 400) — spark/burst/float/smoke/flash
-│  └─ cutscene.lua          ← 컷신(인트로) 진행 순수 로직 — 장면 전환, 초당 30자 타이프라이터
+│  ├─ cutscene.lua          ← 컷신(인트로) 진행 순수 로직 — 장면 전환, 초당 30자 타이프라이터
+│  └─ stageinfo.lua         ← 적 구성 패널·문제 카드용 순수 집계(전체 수/종류별 수/마지막 스폰
+│                               종료 시각/처리 수) — battle의 timeline/spawned/enemies를 읽기만
+│                               한다. 뷰 비의존, 헤드리스 테스트 가능(`tests/test_stageinfo.lua`)
 ├─ states/                ← hump Gamestate 화면들 (뷰 전담, 로직은 src/battle.lua·src/tutorial.lua에 위임)
 │  ├─ intro.lua             ← 인트로 컷신 4장면 (첫 실행 1회 자동 재생, 타이틀 "세계관" 메뉴로 재생)
-│  ├─ title.lua
-│  ├─ stageselect.lua
-│  ├─ play.lua              ← 그리드 + 코드 에디터 + 실시간 전투를 한 화면에서 진행 (구 prep/battle 통합)
-│  └─ result.lua
+│  ├─ title.lua             ← 타이틀 메뉴 4항목: 게임 시작 / 세계관 / 도감 / 종료
+│  ├─ stageselect.lua       ← 스테이지 목록 + 배포 기록 표기(`[클리어 · HP n · 구]`/`[시도 n]`)
+│  ├─ play.lua              ← 그리드 + 코드 에디터 + 실시간 전투 + 적 구성 패널·진행 바·문제
+│  │                            카드·구구 클래스 소환 연출을 한 화면에서 진행 (구 prep/battle 통합)
+│  ├─ result.lua            ← 클리어/패배 결과 + 배포 로그 한 줄(§6.7) + 여운 문구
+│  └─ codex.lua             ← 도감: 타워/몬스터 탭, 히든 타워 ??? 카드 (뷰 전용, `progress.gugu_found`
+│                               로 공개 여부 판정)
 ├─ data/
 │  ├─ towers.csv, enemies.csv, items.csv, stages.csv, timelines.csv
-│  ├─ mazes/                ← 스테이지별 미로 텍스트(#=벽, .=통로, B=건설칸)
-│  └─ curriculum/            ← 스테이지별 solution(정답)·hints(따라치기/빈칸)·tutorial(가이드)·buttons(생성기) Lua 파일
-├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (156개)
+│  ├─ mazes/                ← 스테이지별 미로 텍스트(#=벽, .=통로, B=건설칸), 12개(001~012),
+│  │                            12×16 규격, 테마별 형태(§ "메모리 테마 미로" 참고)
+│  └─ curriculum/            ← 스테이지별 solution(정답)·hints(따라치기/빈칸)·tutorial(가이드)·
+│                               buttons(생성기)·naive(퍼즐 스테이지 순진 배치, 반드시 패배해야 함) Lua 파일
+├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (194개, 11개 스위트:
+│                               csv/grid/sandbox/battle/data/editor/progress/tutorial/particles/
+│                               cutscene/stageinfo)
 ├─ lib/                    ← 외부 라이브러리 (직접 수정 금지)
 │  ├─ classic.lua           ← rxi/classic: 경량 OOP
 │  └─ hump/                  ← vrld/hump: gamestate, timer, vector, signal, camera
@@ -64,7 +77,8 @@ love2d-codedefense/
 (`progress.intro_seen`이 없으면) `main.lua`가 `title` 대신 `intro`로 곧장 진입해 4장면을 자동
 재생하고, 끝나면 `intro_seen`을 저장한 뒤 `title`로 넘어갑니다. 이후에는 타이틀 메뉴의 "세계관"
 항목으로 언제든 다시 볼 수 있습니다(이때는 `intro_seen`을 다시 쓰지 않고 재생 후 `title`로만
-복귀).
+복귀). 타이틀 메뉴는 4항목(게임 시작/세계관/도감/종료)이며, "도감"을 고르면 `codex` 상태로
+전환됩니다(ESC로 다시 `title`로).
 
 ## 코딩 규칙
 
@@ -73,7 +87,7 @@ love2d-codedefense/
   넣지 않는다. 튜토리얼 진행 로직(스텝 전환, 허용 키 판정)도 마찬가지로 `src/tutorial.lua`에
   두고 `states/play.lua`는 그리기와 키 라우팅만 한다.
 - `lib/` 아래 파일은 수정하지 않는다 (업스트림 원본 유지).
-- 화면 전환은 hump의 `Gamestate` 사용 (intro / title / stageselect / play / result).
+- 화면 전환은 hump의 `Gamestate` 사용 (intro / title / stageselect / play / result / codex).
 - 스테이지 추가는 코드가 아니라 **데이터로만** 한다 — `data/stages.csv`(+ 필요 시
   `timelines.csv`)에 행을 추가하고, `data/mazes/<n>.txt` 미로와
   `data/curriculum/<n>_solution.lua`(필수)·`<n>_hints.lua`(hint 모드일 때)를 함께 둔다.
@@ -83,14 +97,33 @@ love2d-codedefense/
   지정해야 한다. `solution_file`은 필수 — 회귀 테스트(`tests/test_battle.lua`)가 각 스테이지의
   정답 코드로 실제 클리어가 되는지 자동 검증하므로, 정답 없이 스테이지를 추가하면 테스트가
   실패한다.
+  - **문제 브리핑 열**: `theme`(메모리 영역명 — "코드 영역"/"데이터 영역"/"스택"/"힙" 등, 문제
+    카드에 "메모리 영역: X"로 표기)과 `problem`(한 줄 문제 서술, 코딩테스트 문제지 톤)도 모든
+    스테이지에 채운다. 미로 형태는 테마와 어울리게 짓는다 — 코드 영역=정연한 가로 행 /
+    데이터 영역=블록 격자 / 스택=위에서 쌓이는 지그재그 / 힙=단편화 조각(12×16 규격, 건설칸
+    ≥6). 같은 테마의 3개 스테이지는 같은 문법 개념의 난이도 변주로 설계한다.
+  - **퍼즐 열**: 해당 스테이지를 "정답 배치가 사실상 강제되는" 퍼즐로 만들고 싶으면
+    `puzzle`에 `1`을 넣고(빈 값=자유 배치), `naive_file`에 "순진하게(단순 사거리 배치 등)
+    지었을 때 반드시 패배하는" 스크립트 경로(`data/curriculum/<n>_naive.lua`)를 채운다.
+    회귀 테스트가 `solution_file`은 클리어, `naive_file`은 반드시 defeat임을 자동
+    증명하므로(데이터 주도 음성 회귀), 순진 배치가 실제로 이기면 테스트가 실패한다. 코드
+    판정 철학(§0, 결과만 봄)은 불변 — 좁아지는 것은 미로·예산이 강제하는 전술 해공간이지
+    코드 형태가 아니다.
+  - **타임라인 규칙(`d.validate()`가 기계 검증)**: `mode=normal`인 스테이지는 (1) 마지막 스폰
+    이벤트 종료 시각(`at + (count-1)*interval`)이 240초 이상이어야 하고, (2) 인접한 두 스폰
+    이벤트 사이의 공백이 40초를 넘으면 안 된다. 300초 전투 시간을 스폰으로 고르게 채우기
+    위한 규칙이며, 위반하면 부팅 시 `main.lua`가 즉시 에러로 중단한다.
 - **결정론 원칙**: 게임 로직에 랜덤을 쓰지 않는다. 같은 배치·같은 코드는 항상 같은 결과가
   나와야 회귀 테스트와 하드코어 스피드런 기록이 의미를 가진다.
 - 스폰 열은 미로 1행의 통로(`.`)와 일치해야 한다 — `src/db.lua`의 `d.validate()`가 이를
   기계 검증하며, `main.lua`가 부팅 시 항상 이 검증을 돌려 오류가 있으면 즉시 에러로 중단시킨다.
-- CSV 빈 셀 처리에 주의: 숫자 필드(`cost`, `hp`, `budget`, `countdown` 등)의 빈 셀은 `nil`로
-  변환되지만, 텍스트 필드(`requires`, `abilities`, `reward_item`, `tutorial_file`, `buttons_file`
-  등)의 빈 셀은 `""`(빈 문자열)로 남는다. `nil` 체크가 아니라 `x ~= ""` 형태로 비교해야 한다
-  (`src/db.lua`의 `index()` 참고).
+- CSV 빈 셀 처리에 주의: 숫자 필드(`cost`, `hp`, `budget`, `countdown`, `puzzle`, `limit`,
+  `hidden` 등, `src/db.lua`의 `index()` 두 번째 인자 목록)의 빈 셀은 `nil`로 변환되지만,
+  텍스트 필드(`requires`, `abilities`, `reward_item`, `tutorial_file`, `buttons_file`, `theme`,
+  `problem`, `naive_file`, `ability` 등)의 빈 셀은 `""`(빈 문자열)로 남는다. `nil` 체크가 아니라
+  `x ~= ""` 형태로 비교해야 한다(`src/db.lua`의 `index()` 참고). 단, `naive_file`처럼 옛 CSV(열
+  자체가 없던 시절 저장된 진행 파일 등)와의 호환을 위해 `s.naive_file and s.naive_file ~= ""`처럼
+  존재 여부까지 함께 체크하는 코드도 있다(`d.validate()` 참고).
 
 ## 아트 규칙
 
@@ -139,12 +172,23 @@ love2d-codedefense/
   타워 간에 값을 주고받는 공유 저장소로 쓸 수 있다. `on_spawn(fn)`으로 등록한 콜백은 적이
   스폰될 때 `fn(enemy)` 형태로 호출되며, 이때 넘어오는 스냅샷에는 타워 기준 `dist`가 없다
   (`api.plainSnapshot`) — `world.enemies()` 등이 주는 스냅샷과 다른 축약형이다.
-- **조작**: F5(저장·반영), F1~F4(코드 스니펫 퀵바), Ctrl+1/2/4(배속 x1/x2/x4), ESC(스테이지
-  선택으로 나가기)가 기본이다. 버튼 모드 스테이지(1~2)는 숫자키로 버튼을 누른다. 구 조작이던
-  Tab(포커스 전환)/B(건설)/T(타워 순환)/Space(전략 순환)는 통합 스크립트 도입과 함께
-  삭제되었다 — 건설은 코드의 `build()` 호출로만 한다. 타이틀 화면은 ↑↓로 메뉴(게임 시작/
-  세계관/종료) 이동, Enter로 확정한다. 인트로 컷신은 Enter(타이핑 중이면 즉시 완성, 완성 후엔
-  다음 장면)로 진행하고 ESC로 전체 스킵한다.
+- **조작**: F5(저장·반영), F1~F4(코드 스니펫 퀵바), Ctrl+1/2/4(배속 x1/x2/x4), Ctrl+I(문제
+  브리핑 카드 토글 — 아래 참고), ESC(스테이지 선택으로 나가기)가 기본이다. 버튼 모드
+  스테이지(1~2)는 숫자키로 버튼을 누른다. 구 조작이던 Tab(포커스 전환)/B(건설)/T(타워
+  순환)/Space(전략 순환)는 통합 스크립트 도입과 함께 삭제되었다 — 건설은 코드의 `build()`
+  호출로만 한다. 타이틀 화면은 ↑↓로 메뉴(게임 시작/세계관/도감/종료, 4항목) 이동, Enter로
+  확정한다. "도감"을 고르면 `codex` 상태로 들어간다 — ←/→로 탭(타워/몬스터) 전환, ↑↓로 목록
+  이동, ESC로 타이틀 복귀. 인트로 컷신은 Enter(타이핑 중이면 즉시 완성, 완성 후엔 다음
+  장면)로 진행하고 ESC로 전체 스킵한다.
+- **적 구성 패널·진행 바·문제 브리핑 카드** (`states/play.lua`, 뷰 전용 — `src/stageinfo.lua`가
+  battle의 timeline/spawned/enemies를 읽기만 해서 집계): 전장 우상단에 이 스테이지에 등장하는
+  적 종류별 미니 스프라이트 + "처리 n / 전체 N"을 보여주는 적 구성 패널이 있고(모든 스폰이
+  끝나면 "잔여 소탕 · 생존!" 한 줄이 더 붙는다), 상단 HUD 바로 아래에 300초 대비 현재 진행률과
+  스폰 이벤트 시점 눈금을 그리는 얇은(4px) 진행 바가 있다. 스테이지 진입(카운트다운 중)에는
+  전장 중앙에 문제 카드가 자동으로 뜬다 — `[문제 N] concept`, `메모리 영역: theme`,
+  `problem` 한 줄 서술, `예산 X · 유입 예정 N기`, 제출/채점 안내를 보여주며 Enter로 닫고
+  전투 중 언제든 Ctrl+I로 다시 연다. 튜토리얼 말풍선이 활성 상태면 문제 카드보다 z순서상
+  위에 그려져 튜토리얼이 우선한다.
 - **세계관·비주얼**: `states/intro.lua`가 첫 실행 시 자동으로(또는 타이틀 "세계관" 메뉴로 언제든)
   4장면 컷신을 보여준다 — 지상의 화려한 서비스 → 새벽 서버실의 개발자 → 버그로 인한 장애 발생 →
   코드로 맞서는 결의. 장면마다 `src/art.lua`의 코드 생성 일러스트와 `src/cutscene.lua`의 초당
@@ -180,11 +224,55 @@ love2d-codedefense/
   `split`(concat-nil — 사망 시 체력 절반씩 둘로 분열). CSV의 `abilities` 필드로 조합 가능.
 - **타워 종류**: `printer`(기본 발사기, cost 100), `compiler`(공격하지 않는 테크 타워, cost 50,
   고급 타워 건설을 해금), `sniper`(장거리 저격, cost 150, `requires=compiler` — 필드에 컴파일러가
-  있어야 건설 가능)(`data/towers.csv`).
+  있어야 건설 가능), `gugu-class`(히든 — 아래 별도 절 참고)(`data/towers.csv`). `towers.csv`에는
+  `limit`(스테이지당 최대 설치 수, 빈 값=무제한), `hidden`(1=도감에서 발견 전 "???"로 표시),
+  `ability`(엔진이 인식하는 특수 능력 키워드 — 현재 `gugu` 하나뿐, `battle.lua`가 이 키워드로
+  분기)의 3개 열이 추가돼 있다.
+- **퍼즐 스테이지 (6·9·12)**: `stages.csv`의 `puzzle=1`인 스테이지는 미로·예산·적 구성이 특정
+  배치를 사실상 강제하도록 설계됐다 — 6(건설칸이 전부 프린터 사거리 밖 가장자리라 컴파일러+
+  스나이퍼 조합 필수), 9(사거리가 닿는 건설칸이 극소수), 12(독립된 3차선이라 분할 지점마다
+  타워가 필요). 판정 철학은 그대로다(§0 무변경, 코드 형태가 아니라 결과만 봄) — 좁아지는 것은
+  전술 해공간이지 정답 코드 강제가 아니다. `naive_file`(예: `curriculum/006_naive.lua`)에 "사거리
+  등을 고려 안 하고 단순하게 지으면" 나오는 스크립트를 등록해 두면, 회귀 테스트가 그 배치는
+  반드시 defeat임을(= "브루트포스는 시간초과") 결정론으로 증명한다.
+- **히든 타워 "구구 클래스"** (한국 코딩 밈 오마주 — **스포일러이므로 이 항목은 CLAUDE.md에만
+  전체 기록하고 README.md에는 절대 옮기지 않는다**):
+  - 소환: 코드에서 `build("gugu-class", r, c, name)` 또는 한글 별칭 `build("구구클래스", r, c, name)`
+    (둘 다 인정 — `Battle:buildTower`가 별칭을 `gugu-class`로 정규화). `requires` 없음, `limit=1`
+    (스테이지당 1개, 초과 시 "구구 클래스는 스테이지당 1개뿐입니다").
+  - 스탯(`data/towers.csv`): cost 120, damage 6(기본), range 150, cooldown 1.0, bullet_speed 420,
+    color `0.95;0.75;0.2`(금색), desc "위기의 순간 소환되는 전설의 클래스. 시간이 지날수록 단이
+    오른다 (2단→9단, 데미지 ×단)".
+  - **단(段) 성장** (`ability=gugu`, `Battle:update`): 설치 시 `tw.dan = 2`로 시작, 전투 중
+    (`clock >= 0`) 30초마다 `dan`이 1씩 올라 최대 9단까지 성장한다(`tw.danTimer` 누적).
+    실효 데미지는 `Battle:resolveAttack`에서 `tw.def.damage * (tw.dan or 1)`로 계산 —
+    2단=12, 9단=54. 단이 오를 때마다 전투 로그: `"[구구 클래스] N단 돌입! N × 1 = N..."`.
+  - **소환 연출** (`states/play.lua`, 뷰 전용 frame-diff): 새 타워 목록에서 `def.id == "gugu-class"`가
+    감지되면(`fx.guguFx = 1.2`) 1.2초짜리 전체 화면 연출이 재생된다 — 처음 0.3초는 흰 화면
+    플래시(`fx.guguFx > 0.9`), 이어서 금색 테두리 펄스 + 전장 셰이크(`fx.shake = 0.4`) + 중앙
+    배너 "전설의 클래스, 소환." + 전장 6곳(3열×2행)에 구구단 텍스트 파티클("2 × 1 = 2" ~
+    "2 × 6 = 12", 1.4초 생존)이 떠오른다. `src/battle.lua` 코어에는 이펙트 코드가 없다.
+  - **스프라이트**: `src/art.lua`의 `drawGuguFrame`이 김이 나는 커피잔(자바 밈 — 받침(소서) +
+    머그컵 + 손잡이 + 김) 4프레임 시트를 `tower_gugu-class`로 빌드한다.
+  - **도감 공개**: `states/codex.lua`가 `def.hidden == 1 and not p.gugu_found`이면 타워 목록에
+    "???"로만 표시하고, 카드도 이름/설명/스탯을 전부 "???"·"?"로 가리며 수수께끼 힌트만 보여준다
+    — "장애가 터지면 회의실 화면 앞에서 실시간으로 코딩을 시작한다는 전설의 클래스. Java로 짠
+    그것의 이름을 아는 자만이 소환할 수 있다." 전투 중 최초로 필드에 등장하면(`states/play.lua`
+    의 `update`) `progress.gugu_found = true`가 영구 저장되어 이후 도감에 실제 이름·스탯·예시
+    코드가 공개된다.
+- **배포 로그** (개발자 친숙한 "배포 이력" 콘셉트, `src/progress.lua` + `states/result.lua` +
+  `states/stageselect.lua`): 스테이지마다 `progress.records[stageId] = { tries, clears, bestHP,
+  lastResult, gugu }`를 저장한다(`gugu`는 한 번이라도 구구 클래스를 투입하면 영구 `true`).
+  결과 화면은 이번 판 로그 한 줄을 보여준다 — 성공 `"배포 #N 성공 · 서버 HP h 잔존 · 타워
+  t기[ · 구구 클래스 투입 ✓]"`, 실패 `"배포 #N 롤백 · ..."`. `result:enter`는
+  `self.recordedCtx ~= ctx` 가드로 같은 전투 결과를 두 번 기록하지 않는다. 스테이지 선택
+  화면은 항목 옆에 기록을 붙인다 — 클리어면 `[클리어 · HP n · 구]`(구구 사용 시), 미클리어면
+  `[시도 n]`, 기록이 아예 없으면 미표기. ("九"는 나눔고딕에 글리프가 없어 "구"로 표기한다.)
 - **진행도**: 클리어 여부, 획득 아이템(`cache`/`webhook`), 스테이지별 저장 코드, 튜토리얼 완료
-  여부를 `love.filesystem` 유저 폴더에 저장(`src/progress.lua`). 아이템은 `data/items.csv`의
-  `api` 필드로 타워 env에 어떤 함수를 추가로 열어줄지 결정한다 (`cache.get/set`, `on_spawn`).
-  아이템은 획득 시 배치되는 모든 타워에 자동 장착된다 (0.1 규칙; 타워별 개별 장착 UI는 0.2).
+  여부, 배포 기록(`records`), 구구 클래스 발견 플래그(`gugu_found`)를 `love.filesystem` 유저
+  폴더에 저장(`src/progress.lua`). 아이템은 `data/items.csv`의 `api` 필드로 타워 env에 어떤
+  함수를 추가로 열어줄지 결정한다 (`cache.get/set`, `on_spawn`). 아이템은 획득 시 배치되는
+  모든 타워에 자동 장착된다 (0.1 규칙; 타워별 개별 장착 UI는 0.2).
 
 ## 알려진 한계
 
@@ -204,17 +292,22 @@ love2d-codedefense/
 ## 다음 단계 (0.2+)
 
 v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스·에디터·통합 스크립트(`build`)·
-아이템 해금·테크 의존성·코드 크래프트(오버클럭)·튜토리얼·CSV 데이터 기반 스테이지 8종까지의
-범위다. 설계서(`docs/superpowers/specs/2026-07-21-love2d-codedefense-design.md`) 9장 기준으로
-다음이 남아 있다.
+아이템 해금·테크 의존성·코드 크래프트(오버클럭)·튜토리얼·CSV 데이터 기반 스테이지 12종(테마당
+3개)·적 구성 패널·진행 바·문제 브리핑·히든 타워·도감·배포 로그까지의 범위다. 설계서
+(`docs/superpowers/specs/2026-07-21-love2d-codedefense-design.md` 9장,
+`docs/superpowers/specs/2026-07-22-codedefense-stage-experience-design.md`) 기준으로 다음이
+남아 있다.
 
 - **하드코어 모드**: 50단계, 클리어 타임 계측
 - **클리어 타임 인증·공유**: 인증 카드 PNG 자동 생성 + 해시태그 공유 텍스트 클립보드 복사
-- **밈 도감 UI**: 몬스터별 "실제 오류가 언제 나는지 + 어떻게 고치는지" 텍스트 영구 수집
+- **밈 도감 심화**: 몬스터별 "실제 오류가 언제 나는지 + 어떻게 고치는지" 텍스트 영구 수집
+  (현재 도감은 스탯·능력 카드까지만 — 실제 오류 텍스트 확장은 이연)
 - **아이템 확장**: CPU 코어 증설(명령 예산 증가), 공용 라이브러리 탭 등 인벤토리 심화
 - **언어 진영 시스템**: 진영 선택 UI·보너스 데이터·언어별 랭킹 분리는 v1 프레임워크로 넣되,
   실행 가능한 진영은 Lua 하나로 시작 (Python/JS/C#은 외부 프로세스 어댑터로 v2 확장)
 - **타워 매도(sell)**, 진행도 리셋 메뉴: 스펙에서 명시적으로 이연됨
+- **타워 업그레이드 시스템**, 스테이지별 타일 틴트 변주, 도감 코드 예제 실행: 이번 웨이브
+  범위 제외로 명문화됨(§8)
 
 ## 테스트
 
@@ -223,12 +316,18 @@ v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스
 ```
 
 `tests/main.lua`가 `tests/test_*.lua` 스위트를 전부 실행하고 `RESULT pass=N fail=N`을 출력한다
-(현재 156개, 전부 PASS — `test_particles.lua`·`test_cutscene.lua`가 뷰 전용 이펙트/컷신 로직을
-다룬다). 실패가 있으면 콘솔 종료 코드도 0이 아니게 된다.
+(현재 194개, 전부 PASS — 11개 스위트: `test_csv`·`test_grid`·`test_sandbox`·`test_battle`·
+`test_data`·`test_editor`·`test_progress`·`test_tutorial`·`test_particles`·`test_cutscene`·
+`test_stageinfo`. `test_particles.lua`·`test_cutscene.lua`가 뷰 전용 이펙트/컷신 로직을,
+`test_stageinfo.lua`가 적 구성 패널 집계 유틸을 다룬다). 실패가 있으면 콘솔 종료 코드도 0이
+아니게 된다.
 
 스테이지를 추가할 때는 `data/curriculum/<n>_solution.lua`를 **반드시** 함께 추가해야 한다 —
 `tests/test_battle.lua`가 CSV에 등록된 모든 스테이지를 순회하며 `solution_file`의 코드로 실제
 전투를 실행해 클리어(300초 서버 생존)까지 확인하는 회귀 테스트이므로, 정답 코드가 없거나
 틀리면 테스트가 실패해 스테이지 추가가 자동으로 검증된다. 회귀 테스트는 `Battle:setScript`로
 정답 스크립트를 주입하는 방식이며, 스크립트 안의 `build()` 좌표는 반드시 스테이지 예산
-(`budget`) 안에서 지을 수 있는 조합이어야 한다.
+(`budget`) 안에서 지을 수 있는 조합이어야 한다. 스테이지에 `naive_file`이 등록돼 있으면
+(퍼즐 스테이지 6·9·12) 같은 회귀 루프가 그 스크립트로도 전투를 돌려 **반드시 defeat**임을
+함께 증명한다 — 순진 배치가 실제로 클리어해 버리면 테스트가 실패해 퍼즐 설계가 깨졌음을
+알려준다.
