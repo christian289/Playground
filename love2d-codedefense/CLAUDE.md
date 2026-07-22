@@ -20,7 +20,8 @@ Lua 코드(`on_tick(self, world)`, `build(type, r, c, name)`)를 작성해 타�
 
 ```
 love2d-codedefense/
-├─ main.lua              ← 엔트리 포인트: 폰트 로드 → db.load → 데이터 무결성 검증 → title 상태
+├─ main.lua              ← 엔트리 포인트: 폰트·아트 로드 → db.load → 데이터 무결성 검증 →
+│                            intro_seen 여부로 intro 또는 title 상태로 진입
 ├─ conf.lua               ← 창 크기(960x640), 타이틀 등 설정
 ├─ src/
 │  ├─ csv.lua             ← 따옴표/이스케이프 지원 CSV 파서, 레코드 로더
@@ -35,8 +36,13 @@ love2d-codedefense/
 │  ├─ editor.lua            ← 코드 에디터 위젯(커서, UTF-8 입력, 퀵바, 문법 강조)
 │  ├─ tutorial.lua          ← 튜토리얼 스텝 진행/허용 키 필터/말풍선 렌더 — 뷰 비의존
 │  ├─ fonts.lua             ← 나눔고딕(OFL) 로드
-│  └─ progress.lua          ← 진행도(클리어, 아이템, 저장 코드, 튜토리얼 완료) 저장/로드
+│  ├─ progress.lua          ← 진행도(클리어, 아이템, 저장 코드, 튜토리얼 완료, 인트로 시청) 저장/로드
+│  ├─ art.lua               ← 코드 생성 픽셀아트 — 팔레트(`art.pal`), 캔버스 시트(몬스터/타워/개발자),
+│  │                            전장 타일, 로고, 인트로 일러스트 4종. 외부 이미지 에셋 없음
+│  ├─ particles.lua         ← 뷰 전용 파티클 풀(상한 400) — spark/burst/float/smoke/flash
+│  └─ cutscene.lua          ← 컷신(인트로) 진행 순수 로직 — 장면 전환, 초당 30자 타이프라이터
 ├─ states/                ← hump Gamestate 화면들 (뷰 전담, 로직은 src/battle.lua·src/tutorial.lua에 위임)
+│  ├─ intro.lua             ← 인트로 컷신 4장면 (첫 실행 1회 자동 재생, 타이틀 "세계관" 메뉴로 재생)
 │  ├─ title.lua
 │  ├─ stageselect.lua
 │  ├─ play.lua              ← 그리드 + 코드 에디터 + 실시간 전투를 한 화면에서 진행 (구 prep/battle 통합)
@@ -45,16 +51,20 @@ love2d-codedefense/
 │  ├─ towers.csv, enemies.csv, items.csv, stages.csv, timelines.csv
 │  ├─ mazes/                ← 스테이지별 미로 텍스트(#=벽, .=통로, B=건설칸)
 │  └─ curriculum/            ← 스테이지별 solution(정답)·hints(따라치기/빈칸)·tutorial(가이드)·buttons(생성기) Lua 파일
-├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (130개)
+├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (156개)
 ├─ lib/                    ← 외부 라이브러리 (직접 수정 금지)
 │  ├─ classic.lua           ← rxi/classic: 경량 OOP
 │  └─ hump/                  ← vrld/hump: gamestate, timer, vector, signal, camera
 └─ assets/fonts/            ← 나눔고딕(OFL)
 ```
 
-상태 흐름은 `title → stageselect → play → result` 네 가지뿐입니다. 구 `prep`/`battle` 상태는
-`play` 하나로 통합되어 삭제되었습니다 — 준비 단계가 없어졌고, 배치와 코딩과 전투가 같은 화면에서
-동시에 진행됩니다.
+상태 흐름은 기본적으로 `title → stageselect → play → result` 네 가지입니다. 구 `prep`/`battle`
+상태는 `play` 하나로 통합되어 삭제되었습니다 — 준비 단계가 없어졌고, 배치와 코딩과 전투가 같은
+화면에서 동시에 진행됩니다. 여기에 세계관 도입부인 `intro` 상태가 더해졌습니다: 첫 실행 시
+(`progress.intro_seen`이 없으면) `main.lua`가 `title` 대신 `intro`로 곧장 진입해 4장면을 자동
+재생하고, 끝나면 `intro_seen`을 저장한 뒤 `title`로 넘어갑니다. 이후에는 타이틀 메뉴의 "세계관"
+항목으로 언제든 다시 볼 수 있습니다(이때는 `intro_seen`을 다시 쓰지 않고 재생 후 `title`로만
+복귀).
 
 ## 코딩 규칙
 
@@ -63,7 +73,7 @@ love2d-codedefense/
   넣지 않는다. 튜토리얼 진행 로직(스텝 전환, 허용 키 판정)도 마찬가지로 `src/tutorial.lua`에
   두고 `states/play.lua`는 그리기와 키 라우팅만 한다.
 - `lib/` 아래 파일은 수정하지 않는다 (업스트림 원본 유지).
-- 화면 전환은 hump의 `Gamestate` 사용 (title / stageselect / play / result).
+- 화면 전환은 hump의 `Gamestate` 사용 (intro / title / stageselect / play / result).
 - 스테이지 추가는 코드가 아니라 **데이터로만** 한다 — `data/stages.csv`(+ 필요 시
   `timelines.csv`)에 행을 추가하고, `data/mazes/<n>.txt` 미로와
   `data/curriculum/<n>_solution.lua`(필수)·`<n>_hints.lua`(hint 모드일 때)를 함께 둔다.
@@ -81,6 +91,34 @@ love2d-codedefense/
   변환되지만, 텍스트 필드(`requires`, `abilities`, `reward_item`, `tutorial_file`, `buttons_file`
   등)의 빈 셀은 `""`(빈 문자열)로 남는다. `nil` 체크가 아니라 `x ~= ""` 형태로 비교해야 한다
   (`src/db.lua`의 `index()` 참고).
+
+## 아트 규칙
+
+- **외부 이미지 에셋 없음 — 전부 코드 생성**. 모든 그래픽(전장 타일, 타워, 몬스터, 개발자
+  캐릭터, 로고, 인트로 일러스트)은 `src/art.lua`가 `love.graphics.rectangle`/`circle` 등으로
+  직접 그린다. 유일한 외부 바이너리 에셋은 폰트(나눔고딕, `assets/fonts/`)뿐이다. 몬스터/타워/
+  개발자처럼 반복 사용되는 스프라이트는 `love.graphics.newCanvas`에 16x16 논리 도트를 `px=2`로
+  한 번 찍어 시트 이미지를 만든 뒤(`art.load()`, 부팅 시 1회) `Quad`로 잘라 매 프레임 그린다 —
+  매 프레임 도트를 다시 찍지 않는다.
+- **팔레트 통일**: 모든 색상은 `art.pal`(네온 서버실 팔레트 — `bg/panel/green/cyan/magenta/red/
+  orange/purple/white` 등)의 상수를 쓴다. 새 에셋을 추가할 때 임의의 hex 색을 즉석에서 넣지
+  말고, 기존 톤과 맞는 `art.pal` 항목을 재사용하거나 필요하면 팔레트에 추가한다.
+- **draw 헬퍼는 끝에 `love.graphics.setColor(1, 1, 1)`로 색을 복원한다.** `art.lua`의 모든
+  `draw*` 함수(그리고 이를 호출하는 `states/*.lua`의 그리기 코드)는 자기 색을 스스로 관리하고
+  반환 전 흰색으로 되돌려, 다음에 그려지는 요소가 이전 색을 물려받지 않게 한다.
+- **`love.timer` 직접 호출 금지 — 시간은 `t` 인자로 받는다.** `src/art.lua`·`src/particles.lua`·
+  `src/cutscene.lua`는 `love.timer.getTime()`을 스스로 부르지 않는다. 애니메이션에 필요한 현재
+  시각은 호출부(`states/*.lua`)가 한 번만 `love.timer.getTime()`으로 읽어 `t` 인자로 넘긴다 —
+  테스트에서 순수 함수로 호출 가능하게 유지하기 위함이다.
+- **파티클은 뷰 전용, 상한 400개**. `src/particles.lua`의 파티클 풀은 전투 시뮬레이션 상태를
+  전혀 읽거나 쓰지 않는 순수 뷰 이펙트이며(`spark`/`burst`/`float`/`smoke`/`flash` 5종), 풀
+  크기가 `particles.MAX`(400)를 넘으면 가장 오래된 파티클부터 제거한다.
+- **이펙트는 프레임-diff 기반 뷰 전용이며 전투 코어는 불변이다.** `states/play.lua`는 매 프레임
+  `battle` 코어의 상태(적 생사, 타워 쿨다운/크래시, `serverHP`, 타워 수 등)를 이전 프레임 스냅샷과
+  비교해(`self.fx.prev*`) 처치 버스트+보상 float, 서버 피격 셰이크+빨간 테두리, 설치 플래시,
+  크래시 연기/스파크/개발자 아바타 놀람 포즈 같은 이펙트를 발동시킨다. `src/battle.lua`
+  자체에는 이펙트를 위한 코드를 추가하지 않는다 — 코어는 순수 시뮬레이션으로 남기고, 뷰가
+  코어 상태를 읽기만 해서 프레임 간 변화를 감지하는 방식을 유지한다.
 
 ## 구현된 규칙
 
@@ -104,7 +142,17 @@ love2d-codedefense/
 - **조작**: F5(저장·반영), F1~F4(코드 스니펫 퀵바), Ctrl+1/2/4(배속 x1/x2/x4), ESC(스테이지
   선택으로 나가기)가 기본이다. 버튼 모드 스테이지(1~2)는 숫자키로 버튼을 누른다. 구 조작이던
   Tab(포커스 전환)/B(건설)/T(타워 순환)/Space(전략 순환)는 통합 스크립트 도입과 함께
-  삭제되었다 — 건설은 코드의 `build()` 호출로만 한다.
+  삭제되었다 — 건설은 코드의 `build()` 호출로만 한다. 타이틀 화면은 ↑↓로 메뉴(게임 시작/
+  세계관/종료) 이동, Enter로 확정한다. 인트로 컷신은 Enter(타이핑 중이면 즉시 완성, 완성 후엔
+  다음 장면)로 진행하고 ESC로 전체 스킵한다.
+- **세계관·비주얼**: `states/intro.lua`가 첫 실행 시 자동으로(또는 타이틀 "세계관" 메뉴로 언제든)
+  4장면 컷신을 보여준다 — 지상의 화려한 서비스 → 새벽 서버실의 개발자 → 버그로 인한 장애 발생 →
+  코드로 맞서는 결의. 장면마다 `src/art.lua`의 코드 생성 일러스트와 `src/cutscene.lua`의 초당
+  30자 타이프라이터 텍스트가 함께 나온다. 타이틀 화면은 네온 서버실 배경에 로고와 책상 앞
+  개발자 뒷모습을 그린다. 전투 화면(`states/play.lua`)에는 코드 생성 픽셀아트 몬스터/타워,
+  `src/particles.lua` 이펙트, IDE 패널 옆 개발자 미니 아바타(저장 시 타이핑 포즈, 타워 크래시
+  시 놀람 포즈)가 있다. 결과 화면(`states/result.lua`)은 클리어/패배에 맞는 여운 문구를 덧붙인다
+  (예: 클리어 — "오늘도 서비스는 무사히 돌아간다. 아무 일 없었다는 듯이.").
 - **버튼 스테이지**: `ui=button` 스테이지(1~2)는 코드 에디터를 직접 노출하지 않는다. 숫자키를
   누르면 `stages.csv`의 `buttons_file`(`data/curriculum/buttons_1.lua`,`buttons_2.lua`)에 정의된
   버튼의 스크립트가 초당 40자 속도로 에디터에 자동 타이핑되고, 타이핑이 끝나면 자동으로
@@ -175,7 +223,8 @@ v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스
 ```
 
 `tests/main.lua`가 `tests/test_*.lua` 스위트를 전부 실행하고 `RESULT pass=N fail=N`을 출력한다
-(현재 130개, 전부 PASS). 실패가 있으면 콘솔 종료 코드도 0이 아니게 된다.
+(현재 156개, 전부 PASS — `test_particles.lua`·`test_cutscene.lua`가 뷰 전용 이펙트/컷신 로직을
+다룬다). 실패가 있으면 콘솔 종료 코드도 0이 아니게 된다.
 
 스테이지를 추가할 때는 `data/curriculum/<n>_solution.lua`를 **반드시** 함께 추가해야 한다 —
 `tests/test_battle.lua`가 CSV에 등록된 모든 스테이지를 순회하며 `solution_file`의 코드로 실제
