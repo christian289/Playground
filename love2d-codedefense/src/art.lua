@@ -227,6 +227,50 @@ local function drawSniperFrame(f)
     end
 end
 
+-- gugu-class 타워: 김이 나는 커피잔(자바 밈, 구구단 상징 "9" 도트). 받침(소서) + 머그컵 + 손잡이 +
+-- 컵 표면 주황 "9" + 김(스팀, 프레임별 위상 교차 유휴 애니). f>=3 → 김 위 흰/주황 플래시 오버레이
+local function drawGuguFrame(f)
+    local P = art.pal
+    local cream, creamLight, creamDark = c("#f0ece0"), c("#fbf8f0"), c("#c8c0a8")
+    local dgray, lgray, steamCol = c("#454c5c"), c("#6a7488"), c("#dfe4ee")
+    local anim = (f - 1) % 2 -- 0/1: 김 위상 교차
+    local firing = f >= 3
+    -- 받침(소서)
+    dot(dgray, 2, 14, 12, 2)
+    dot(lgray, 2, 14, 12, 1)
+    -- 머그컵 몸체
+    dot(cream, 4, 6, 7, 7)
+    dot(creamLight, 4, 6, 7, 1) -- 윗변 하이라이트
+    dot(creamDark, 4, 12, 7, 1) -- 아랫단 음영
+    -- 손잡이(오른쪽 고리)
+    dot(cream, 11, 8, 2, 1)
+    dot(cream, 12, 9, 1, 2)
+    dot(cream, 11, 11, 2, 1)
+    -- 컵 표면 "9" 도트 문양(구구단 상징, 주황)
+    dot(P.orange, 6, 7, 3, 1)
+    dot(P.orange, 6, 8, 1, 1); dot(P.orange, 8, 8, 1, 1)
+    dot(P.orange, 6, 9, 3, 1)
+    dot(P.orange, 8, 10, 1, 1)
+    -- 김(스팀) 2가닥, 프레임별 위상 교차
+    if anim == 0 then
+        dot(steamCol, 5, 3, 1, 3)
+        dot(steamCol, 4, 1, 1, 2)
+        dot(steamCol, 8, 2, 1, 3)
+        dot(steamCol, 9, 0, 1, 2)
+    else
+        dot(steamCol, 5, 2, 1, 3)
+        dot(steamCol, 6, 0, 1, 2)
+        dot(steamCol, 8, 3, 1, 3)
+        dot(steamCol, 7, 1, 1, 2)
+    end
+    -- 발사 시 김 위쪽 흰/주황 스파크 플래시(십자 버스트 — 뚜껑처럼 안 보이게 중앙만 밝힌다)
+    if firing then
+        dot(P.orange, 4, 1, 1, 1); dot(P.orange, 11, 1, 1, 1) -- 좌우 플레어
+        dot(P.white, 6, 0, 4, 2) -- 중앙 밝은 코어
+        dot(P.orange, 7, 0, 2, 1)
+    end
+end
+
 -- 개발자 캐릭터 (16x16, 안경 쓴 남성)
 local function drawDevFrame(pose, f)
     local P = art.pal
@@ -274,6 +318,7 @@ function art.load()
     buildSheet("tower_printer", 4, drawPrinterFrame)
     buildSheet("tower_compiler", 2, drawCompilerFrame)
     buildSheet("tower_sniper", 4, drawSniperFrame)
+    buildSheet("tower_gugu-class", 4, drawGuguFrame)
     -- 개발자
     buildSheet("dev_idle", 2, function(f) drawDevFrame("idle", f) end)
     buildSheet("dev_typing", 2, function(f) drawDevFrame("typing", f) end)

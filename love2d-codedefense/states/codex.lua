@@ -85,13 +85,14 @@ function codex:currentList()
     return self.lists[self.tab]
 end
 
--- 타워 시트가 로드돼 있는지(현재 gugu-class는 전용 스프라이트가 없음 — art.lua 코어 미수정 범위 밖).
+-- 타워 시트가 로드돼 있는지("art.load()"가 만든 art._img["tower_"..id])를 확인한다.
+-- 전용 스프라이트가 아직 없는 타워가 추가되더라도 자동으로 폴백 배지로 우아하게 대체된다.
 local function hasTowerSheet(id)
     return art._img ~= nil and art._img["tower_" .. id] ~= nil
 end
 
 -- 카드 스프라이트 영역: 컬러 배지 배경(팔레트) + 시트 스프라이트.
--- 전용 스프라이트가 없는 타워(gugu-class)는 배지를 진하게 칠하고 이름 첫 글자를 큼직하게 얹어
+-- 전용 스프라이트가 없는 타워는 배지를 진하게 칠하고 이름 첫 글자를 큼직하게 얹어
 -- 빈 카드로 보이지 않게 한다. 히든이면 검정 실루엣으로 완전히 덮는다.
 local function drawCardSprite(kind, def, cx, cy, s, t, hidden)
     local half = 16 * s
