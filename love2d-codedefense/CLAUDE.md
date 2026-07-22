@@ -264,7 +264,7 @@ love2d-codedefense/
   `states/stageselect.lua`): 스테이지마다 `progress.records[stageId] = { tries, clears, bestHP,
   lastResult, gugu }`를 저장한다(`gugu`는 한 번이라도 구구 클래스를 투입하면 영구 `true`).
   결과 화면은 이번 판 로그 한 줄을 보여준다 — 성공 `"배포 #N 성공 · 서버 HP h 잔존 · 타워
-  t기[ · 구구 클래스 투입 ✓]"`, 실패 `"배포 #N 롤백 · ..."`. `result:enter`는
+  t기[ · 구구 클래스 투입]"`, 실패 `"배포 #N 롤백 · ..."`. `result:enter`는
   `self.recordedCtx ~= ctx` 가드로 같은 전투 결과를 두 번 기록하지 않는다. 스테이지 선택
   화면은 항목 옆에 기록을 붙인다 — 클리어면 `[클리어 · HP n · 구]`(구구 사용 시), 미클리어면
   `[시도 n]`, 기록이 아예 없으면 미표기. ("九"는 나눔고딕에 글리프가 없어 "구"로 표기한다.)

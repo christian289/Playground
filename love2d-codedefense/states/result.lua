@@ -80,7 +80,7 @@ function result:draw()
         local deployLine = ("배포 #%d %s · 서버 HP %d 잔존 · 타워 %d기%s"):format(
             self.rec.tries, self.status == "clear" and "성공" or "롤백",
             self.ctx.serverHP or 0, self.ctx.towerCount or 0,
-            self.ctx.guguUsed and " · 구구 클래스 투입 ✓" or "")
+            self.ctx.guguUsed and " · 구구 클래스 투입" or "")
         love.graphics.printf(deployLine, 210, 370, 540, "center")
     end
 
