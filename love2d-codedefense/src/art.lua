@@ -261,6 +261,7 @@ end
 -- 시트 로드
 --------------------------------------------------------------------------------
 function art.load()
+    if art._loaded then return end
     local P = art.pal
     -- 몬스터 (정상 + 흰 실루엣)
     buildSheet("enemy_bug", 2, drawBugFrame)
@@ -277,6 +278,7 @@ function art.load()
     buildSheet("dev_idle", 2, function(f) drawDevFrame("idle", f) end)
     buildSheet("dev_typing", 2, function(f) drawDevFrame("typing", f) end)
     buildSheet("dev_alarm", 1, function(f) drawDevFrame("alarm", f) end)
+    art._loaded = true
 end
 
 --------------------------------------------------------------------------------
@@ -295,7 +297,7 @@ function art.drawFloor(x, y)
         love.graphics.rectangle("fill", x + i, y, 1, 32)
         love.graphics.rectangle("fill", x, y + i, 32, 1)
     end
-    setCol(P.white)
+    love.graphics.setColor(1, 1, 1)
 end
 
 function art.drawWall(x, y, t)
@@ -312,7 +314,7 @@ function art.drawWall(x, y, t)
     local blink = (math.floor(t * 2) % 2) == 0
     rect(P.green, x + 5, y + 26, 4, 3, blink and 1 or 0.25)
     rect(P.cyan, x + 23, y + 26, 4, 3, blink and 0.25 or 1)
-    setCol(P.white)
+    love.graphics.setColor(1, 1, 1)
 end
 
 function art.drawPad(x, y, t)
@@ -336,7 +338,7 @@ function art.drawPad(x, y, t)
     -- 우하
     love.graphics.rectangle("fill", x + 29 - b, y + 27, b, 2)
     love.graphics.rectangle("fill", x + 27, y + 29 - b, 2, b)
-    setCol(P.white)
+    love.graphics.setColor(1, 1, 1)
 end
 
 function art.drawServerline(x, y, w, t)
@@ -350,7 +352,7 @@ function art.drawServerline(x, y, w, t)
     for i = 0, w, 8 do
         love.graphics.rectangle("fill", x + i, y, 1, 6)
     end
-    setCol(P.white)
+    love.graphics.setColor(1, 1, 1)
 end
 
 --------------------------------------------------------------------------------
