@@ -136,7 +136,9 @@ gugu-class,구구 클래스,120,6,150,1.0,420,,0.95;0.75;0.2,"위기의 순간 �
 **Interfaces:**
 - Consumes: Global Constraints의 테마 표. validate(스폰 열·미로 파일 규격)와 회귀 테스트가 정합성 강제.
 
-- [ ] **Step 1: 미로 8종 재설계** — 테마별 형태 (12열×16행, `#`벽/`.`통로/`B`건설칸 ≥ 6, 1행 통로 = 스폰 열, 맨 아랫줄 통로 ≥ 1, 전 통로가 아랫줄 도달 가능):
+- [ ] **Step 0: 퍼즐 스키마** — stages.csv에 `puzzle`(4·6·8행 = 1), `naive_file` 열 추가 (4·6·8행: `curriculum/004_naive.lua` 등). db.lua numfields에 `puzzle` 추가, validate에 naive_file 실재 검사(빈 값 스킵). naive 파일 3종 작성 — "순진한 배치" 스크립트 (예: 앞쪽 건설칸부터 프린터 채우기 + nearest 공격). test_battle 회귀 루프를 데이터 주도로 확장: 모든 스테이지에 대해 solution은 clear, `naive_file ~= ""`이면 naive는 **defeat** 검증.
+
+- [ ] **Step 1: 미로 8종 재설계** — 테마별 형태 (12열×16행, `#`벽/`.`통로/`B`건설칸 ≥ 6, 1행 통로 = 스폰 열, 맨 아랫줄 통로 ≥ 1, 전 통로가 아랫줄 도달 가능). **4·6·8은 퍼즐 강제 구조** (스펙 §6.5: 4 = 유효 사거리 칸 2곳, 6 = 특정 위치 스나이퍼 필수 — timeline null-ptr 밀도와 연계 조정 허용, 8 = 분할 지점 3곳):
   - 001~002 코드 영역: 가로 행 통로가 명령어 줄처럼 규칙적으로 반복, 행 사이 벽 랙
   - 003~004 데이터 영역: 4×3 블록 벽들이 격자 배치, 블록 사이 십자 통로
   - 005~006 스택: 좌우 번갈아 뚫린 층계 지그재그, 아래로 갈수록 통로 폭 감소
@@ -181,6 +183,7 @@ end
   - **진행 바** (HUD 아래 y=34, 전장 폭): 배경 바 + 진행(clock/Battle.TOTAL, 카운트다운 중 0) + 이벤트 at 지점 눈금(1px cyan) + 모든 스폰 종료 후 우측에 "소탕 후 생존!" 텍스트. 좌표 라벨(y=32~46)과 겹치므로 열 라벨을 y=36→그리드 쪽으로 4px 내리거나 진행 바를 y=30 얇게(4px) — 구현 시 겹침 없게 조정하고 스크린샷으로 확인.
   - **문제 카드**: `self.showBrief = true`로 시작(카운트다운 중), 전장 중앙 카드(폭 ~360px, 반투명 panel): "[문제 N] 개념 · 메모리 영역: 테마" / problem 텍스트 wrap / "제한: 예산 B · 유입 예정 T기" / "제출: F5 · 채점: 300초 생존" / "Enter 닫기 · I 다시 보기". keypressed: Enter로 닫기(단, 튜토리얼 게이팅 통과 후·에디터 개행과 충돌 없게 — **카드가 열려 있는 동안만 Enter를 카드 닫기로 소비**), `i` 키 토글(버튼 스테이지 숫자 입력과 무충돌, 에디터 문자 입력과 충돌하므로 **Ctrl+I**로 결정 — 힌트바에 표기). 카운트다운 종료 시 자동 닫기 없음(카드는 열려 있어도 게임 진행 — 실시간 원칙). z순서: 튜토리얼 말풍선 아래.
   - gugu_found 훅: update에서 `if not p.gugu_found then for _, tw in ipairs(b.towers) do if tw.def.id == "gugu-class" then p.gugu_found = true; progress.save(p) end end end` (1회 가드).
+  - **구구 소환 연출** (스펙 §6.6): gugu-class 타워 등장 frame-diff 감지 → `fx.guguFx = 1.2` 타이머 — 흰 전체 플래시(알파 = fx.guguFx − 0.9 구간), 금색(art.pal.orange) 테두리 펄스, `fx.shake = 0.4`, 중앙 배너 "전설의 클래스, 소환." (fonts.big, 타이머 동안), 구구단 텍스트 파티클 6개(`particles.spawn("float", 전장 여러 x, y, { text = "2 × "..i.." = "..(2*i), color = art.pal.orange })`). 원시 dt 감쇠.
   - 힌트바 문구에 `Ctrl+I 문제` 추가.
 - [ ] **Step 4: 검증** — 전 스위트 + 부팅 스모크 + 스크린샷(카운트다운 문제 카드/전투 중 패널·진행 바) Read 확인.
 - [ ] **Step 5: Commit** `codedefense: 적 구성 패널·진행 바·문제 브리핑 카드`
@@ -205,7 +208,34 @@ end
 
 ---
 
-### Task 6: 문서 + 최종 검증
+### Task 6: 배포 로그 (스테이지 기록)
+
+**Files:**
+- Modify: `states/play.lua`(전투 중 gugu 사용 추적), `states/result.lua`(기록 갱신+로그 줄), `states/stageselect.lua`(기록 표기), `tests/test_progress.lua`(records 왕복)
+
+**Interfaces:**
+- Produces: `progress.records[stageId]` = `{ tries, clears, bestHP, lastResult("clear"|"defeat"), gugu(bool) }`. result가 기록 갱신 주체 (enter에서 1회): tries+1, clear면 clears+1·bestHP=max, lastResult, gugu = 기존 or 이번 판 사용. 이번 판 사용 여부는 play가 ctx에 `guguUsed`(bool)와 `towerCount`, `serverHP`를 담아 result로 전달.
+
+- [ ] **Step 1: 실패하는 테스트** — test_progress에 records 왕복 assert (중첩 테이블 직렬화는 기존 serialize가 지원 — bool/number/string):
+
+```lua
+    local pr = progress.load()
+    pr.records = { [3] = { tries = 2, clears = 1, bestHP = 9, lastResult = "clear", gugu = true } }
+    progress.save(pr)
+    local qr = progress.load()
+    t.eq(qr.records[3].bestHP, 9, "records 왕복")
+    t.ok(qr.records[3].gugu, "gugu 기록 왕복")
+```
+
+progress.load 기본값 보강에 `p.records = p.records or {}` 추가.
+- [ ] **Step 2: play → result 전달** — play:update의 결과 전환 ctx에 `guguUsed = self.fx.guguSeen or false`(구구 frame-diff 감지 시 true 유지), `towerCount = #self.battle.towers`, `serverHP = self.battle.serverHP` 추가.
+- [ ] **Step 3: result 기록 갱신 + 로그 줄** — enter에서 records[stageId] 갱신(위 계약, 1회 가드) 후 progress.save 통합(기존 클리어 저장과 함께). draw에 배포 로그 줄: `("배포 #%d %s · 서버 HP %d 잔존 · 타워 %d기%s"):format(rec.tries, 성공/롤백, ctx.serverHP, ctx.towerCount, ctx.guguUsed and " · 구구 클래스 투입 ✓" or "")` (fonts.small, 여운 문구 위).
+- [ ] **Step 4: stageselect 표기** — 각 항목 우측에 기록 있으면 `[클리어 · HP %d · 九]` 형식 (클리어 없으면 `[시도 %d]`, 九는 rec.gugu일 때만, fonts.small, 회색).
+- [ ] **Step 5: 검증** — 전 스위트 + 부팅 스모크 → **Step 6: Commit** `codedefense: 배포 로그 기록 (히든 투입 여부 포함)`
+
+---
+
+### Task 7: 문서 + 최종 검증
 
 **Files:**
 - Modify: `love2d-codedefense/CLAUDE.md`, `README.md`
