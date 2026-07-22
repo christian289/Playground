@@ -282,11 +282,23 @@ function play:draw()
         self.editor:draw(fonts, true)
     end
 
-    -- 전투 로그 (전장 아래)
-    love.graphics.setFont(fonts.small)
-    for i, msg in ipairs(b.log) do
-        love.graphics.setColor(0.8, 0.82, 0.86, 1 - (#b.log - i) * 0.1)
-        love.graphics.print(msg, 8, GRID_Y + grid.ROWS * grid.CELL + 12 + (i - 1) * 18)
+    -- 전투 로그 오버레이 (전장 내부, 상단 왼쪽 — 최근 3줄만 표시)
+    do
+        local logStartY = GRID_Y + shakeY + grid.ROWS * grid.CELL - 3 * 18 - 8
+        local logX = GRID_X + shakeX + 4
+        local logCount = math.min(3, #b.log)
+        if logCount > 0 then
+            -- 배경 반투명 박스
+            love.graphics.setColor(art.pal.bg[1], art.pal.bg[2], art.pal.bg[3], 0.7)
+            love.graphics.rectangle("fill", logX - 2, logStartY - 2, 200, logCount * 18 + 4)
+            -- 로그 텍스트 (가장 최근 3줄)
+            love.graphics.setFont(fonts.small)
+            for i = math.max(1, #b.log - 2), #b.log do
+                local idx = i - math.max(1, #b.log - 2) + 1
+                love.graphics.setColor(0.8, 0.82, 0.86, 1 - (logCount - idx) * 0.1)
+                love.graphics.print(b.log[i], logX, logStartY + (idx - 1) * 18)
+            end
+        end
     end
     -- 저장 오류
     if b.scriptError then
