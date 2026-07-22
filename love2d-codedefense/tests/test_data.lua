@@ -30,4 +30,6 @@ return function(t)
     t.ok(#baderrs >= 3, "깨진 데이터에서 오류 감지 (spawn/미로/requires): " .. #baderrs .. "건")
     t.ok(table.concat(baderrs, " / "):find("스폰 열"), "벽에 스폰하는 타임라인 열 감지")
     t.ok(table.concat(baderrs, "/"):find("튜토리얼"), "없는 tutorial_file 감지")
+    t.ok(table.concat(baderrs, " / "):find("240초"), "마지막 스폰 종료 240초 미만 감지")
+    t.ok(table.concat(baderrs, " / "):find("공백"), "스폰 공백 40초 초과 감지")
 end

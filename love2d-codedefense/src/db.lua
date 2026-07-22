@@ -77,6 +77,29 @@ function db.load(root)
             end
         end
         for id, s in pairs(d.stages) do
+            if s.mode == "normal" then
+                local tl = d.timeline(id)
+                if #tl > 0 then
+                    local prevEnd = nil
+                    for _, e in ipairs(tl) do
+                        local eEnd = e.at + (e.count - 1) * e.interval
+                        if prevEnd then
+                            local gap = e.at - prevEnd
+                            if gap > 40 then
+                                errs[#errs + 1] = ("timelines: 스테이지 %s 스폰 공백 %d초 > 40초 (at %d)")
+                                    :format(tostring(id), math.floor(gap + 0.5), math.floor(e.at + 0.5))
+                            end
+                        end
+                        prevEnd = eEnd
+                    end
+                    if prevEnd < 240 then
+                        errs[#errs + 1] = ("timelines: 스테이지 %s 마지막 스폰 종료 %d초 < 240초")
+                            :format(tostring(id), math.floor(prevEnd + 0.5))
+                    end
+                end
+            end
+        end
+        for id, s in pairs(d.stages) do
             if not fileExists(s.maze_file) then
                 errs[#errs + 1] = ("stages %s: 미로 파일 없음 %s"):format(id, s.maze_file)
             end

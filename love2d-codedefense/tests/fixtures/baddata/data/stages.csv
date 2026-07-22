@@ -1,3 +1,4 @@
 id,mode,concept,ui,maze_file,budget,languages,countdown,wave_clock,hints_file,solution_file,reward_item,tutorial_file,buttons_file
 1,normal,테스트,button,mazes/none.txt,200,lua,15,,,,,curriculum/none.lua,
 2,normal,테스트2,button,mazes/bad.txt,200,lua,15,,,,,,
+3,normal,테스트3,button,mazes/none3.txt,200,lua,15,,,,,,

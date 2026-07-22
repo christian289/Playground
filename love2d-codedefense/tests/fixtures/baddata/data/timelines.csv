@@ -1,3 +1,5 @@
 stage_id,at,spawn,count,interval,col
 1,5,ghost-enemy,3,2,4
 2,5,ghost-enemy,3,2,5
+3,5,ghost-enemy,3,2,4
+3,55,ghost-enemy,3,2.5,4
