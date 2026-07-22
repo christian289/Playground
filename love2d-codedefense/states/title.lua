@@ -4,7 +4,7 @@ local art = require("src.art")
 
 local title = {}
 
-local ITEMS = { "게임 시작", "세계관", "종료" }
+local ITEMS = { "게임 시작", "세계관", "도감", "종료" }
 
 function title:enter(_, d, p)
     self.d, self.p = d, p
@@ -79,7 +79,7 @@ function title:draw()
     love.graphics.setFont(fonts.big)
     local P = art.pal
     for i, item in ipairs(ITEMS) do
-        local y = 184 + (i - 1) * 52
+        local y = 172 + (i - 1) * 48
         if i == self.cursor then
             love.graphics.setColor(P.green[1], P.green[2], P.green[3])
             love.graphics.printf("> " .. item .. " <", 0, y, 960, "center")
@@ -91,7 +91,7 @@ function title:draw()
 
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.55, 0.6, 0.66)
-    love.graphics.printf("↑↓ 이동 · Enter 선택", 0, 350, 960, "center")
+    love.graphics.printf("↑↓ 이동 · Enter 선택", 0, 372, 960, "center")
     love.graphics.setColor(1, 1, 1)
 end
 
@@ -105,6 +105,8 @@ function title:keypressed(key)
             Gamestate.switch(require("states.stageselect"), self.d, self.p)
         elseif self.cursor == 2 then
             Gamestate.switch(require("states.intro"), self.d, self.p, "title")
+        elseif self.cursor == 3 then
+            Gamestate.switch(require("states.codex"), self.d, self.p)
         else
             love.event.quit()
         end
