@@ -43,7 +43,7 @@
 
 **Interfaces (이후 태스크가 그대로 사용):**
 - `battle.userFuncs` — setScript 성공 후 이름 정렬 배열(예: `{"helper", "on_tick"}`). 구현: setScript에서 compile 직전 `local known = {}; for k in pairs(env) do known[k] = true end`, 성공 후 `for k, v in pairs(env) do if not known[k] and type(v) == "function" then ... end` 수집·정렬. 실패 시 기존 userFuncs 유지
-- `Editor:charAt(px, py, measure) → line, charIdx | nil` — 에디터 내부 좌표(px, py는 에디터 원점 기준)를 (줄, 글자 인덱스)로. 줄 = `floor(py / lineHeight)+1+scroll` (lineHeight는 measure("높이기준")가 아니라 인자 `lineH`로 함께 주입: `charAt(px, py, lineH, measure)`), 글자 = 좌측부터 measure 누적으로 판정 (줄 번호 여백 40px 제외). 범위 밖 nil
+- `Editor:charAt(px, py, measure) → line, charIdx | nil` — 에디터 내부 좌표(px, py는 에디터 원점 기준)를 (줄, 글자 인덱스)로. 줄 = `floor(py / lineHeight)+1+scroll` (lineHeight는 인자 `lineH`로 주입: `charAt(px, py, lineH, measure)`), 글자 = 좌측부터 measure 누적으로 판정 (줄 번호 여백 40px 제외). 존재하지 않는 줄이면 nil; **줄 끝을 넘는 x는 (줄, 마지막글자+1) 반환** (표준 에디터 동작 — tokenAt과 결합 시 그 위치는 항상 nil 토큰이라 안전. 컨트롤러 판정으로 확정)
 - `Editor.tokenAt(lineText, charIdx) → tokenString | nil` — 해당 위치를 포함하는 식별자 `[%a_][%w_]*` (순수 static 함수)
 - `progress.load()`에 `p.funcbook = p.funcbook or {}` 보강. funcbook 갱신은 Task 3의 play가 수행
 
