@@ -4,6 +4,8 @@ local grid = require("src.grid")
 local Editor = require("src.editor")
 local Battle = require("src.battle")
 local progress = require("src.progress")
+local art = require("src.art")
+local particles = require("src.particles")
 
 local GRID_X, GRID_Y = 8, 48
 local play = {}
@@ -41,6 +43,13 @@ function play:enter(_, d, stageId, p)
         self.editor:setText(loadText(d.root, self.stage.hints_file) or "")
     end
     self.battle:start()                 -- 카운트다운부터 실시간 진행
+
+    particles.clear()
+    self.fx = {
+        prevEnemies = {}, prevTowerCount = #self.battle.towers, prevServerHP = self.battle.serverHP,
+        prevCrashed = {}, shake = 0, redFlash = 0, devAnim = { pose = "idle", timer = 0 },
+        prevCd = {}, firedTimer = {}, smokeAcc = {}, hitTimer = {},
+    }
 
     if self.stage.tutorial_file ~= "" and not p.tutorial_done[stageId] then
         self.tut = require("src.tutorial").load(d.root .. "/data/" .. self.stage.tutorial_file)
@@ -101,10 +110,80 @@ function play:update(dt)
         Gamestate.switch(require("states.result"), self.battle.status,
             { d = self.d, stageId = self.stageId, p = self.p })
     end
+
+    -- 뷰 전용 프레임-diff 이펙트 발동 (battle 코어 상태는 읽기만 한다)
+    local b = self.battle
+    local fx = self.fx
+
+    -- 타워: 발사 감지(cd 증가) + 크래시 연기 + 크래시 전환 스파크
+    for _, tw in ipairs(b.towers) do
+        if tw.cd > (fx.prevCd[tw] or 0) then fx.firedTimer[tw] = 0.1 end
+        fx.prevCd[tw] = tw.cd
+        if fx.firedTimer[tw] and fx.firedTimer[tw] > 0 then
+            fx.firedTimer[tw] = math.max(0, fx.firedTimer[tw] - dt)
+        end
+        local crashedNow = tw.crashed > 0 or tw.disabled
+        if crashedNow then
+            fx.smokeAcc[tw] = (fx.smokeAcc[tw] or 0) + dt
+            while fx.smokeAcc[tw] >= 0.15 do
+                particles.spawn("smoke", tw.x, tw.y, { color = { 0.55, 0.58, 0.62 } })
+                fx.smokeAcc[tw] = fx.smokeAcc[tw] - 0.15
+            end
+            if not fx.prevCrashed[tw] then
+                particles.spawn("spark", tw.x, tw.y, { count = 6, color = art.pal.red })
+            end
+        else
+            fx.smokeAcc[tw] = 0
+        end
+        fx.prevCrashed[tw] = crashedNow
+    end
+
+    -- 적 사망/도달 감지 + 피격 점멸
+    local now = {}
+    for _, e in ipairs(b.enemies) do
+        now[e.id] = { x = e.x, y = e.y, reward = e.def.reward or 0, hp = e.hp }
+        local prev = fx.prevEnemies[e.id]
+        if prev and e.hp < prev.hp then fx.hitTimer[e.id] = 0.08 end
+    end
+    for id, timer in pairs(fx.hitTimer) do
+        if timer > 0 then fx.hitTimer[id] = math.max(0, timer - dt) end
+    end
+    for id, info in pairs(fx.prevEnemies) do
+        if not now[id] then
+            if b.serverHP < fx.prevServerHP then
+                -- 도달분은 아래 serverHP 처리에서 일괄
+            else
+                particles.spawn("burst", info.x, info.y, { count = 8, color = art.pal.orange })
+                particles.spawn("float", info.x - 8, info.y - 12, { text = "+" .. info.reward, color = art.pal.green })
+            end
+        end
+    end
+    fx.prevEnemies = now
+    -- 서버 피격
+    if b.serverHP < fx.prevServerHP then
+        fx.shake = 0.2
+        fx.redFlash = 0.35
+    end
+    fx.prevServerHP = b.serverHP
+    -- 설치 감지
+    if #b.towers > fx.prevTowerCount then
+        local tw = b.towers[#b.towers]
+        particles.spawn("flash", tw.x, tw.y, { color = art.pal.cyan })
+    end
+    fx.prevTowerCount = #b.towers
+    fx.shake = math.max(0, fx.shake - dt)
+    fx.redFlash = math.max(0, fx.redFlash - dt)
+    particles.update(dt)
 end
 
 function play:draw()
     local b = self.battle
+    local fx = self.fx
+    local t = love.timer.getTime()
+    -- 셰이크는 전장(그리드/엔티티/파티클)에만 — 에디터/HUD/튜토리얼은 고정
+    local shakeX = fx.shake > 0 and math.sin(t * 60) * 3 or 0
+    local shakeY = fx.shake > 0 and math.cos(t * 60) * 3 or 0
+
     -- 상단 바
     love.graphics.setFont(fonts.ui)
     love.graphics.setColor(0.9, 0.92, 0.95)
@@ -113,48 +192,74 @@ function play:draw()
         or ("%.0f / 300초"):format(b.clock)
     love.graphics.print(("%s   서버 HP %d   잔액 %d   배속 x%d"):format(clockText, b.serverHP, b.money, self.speed), 8, 12)
 
-    -- 전장
+    -- 전장 타일
     for r = 1, grid.ROWS do
         for c = 1, grid.COLS do
             local x, y = grid.toXY(r, c)
-            x, y = x + GRID_X, y + GRID_Y
-            if b.grid.build[r][c] then love.graphics.setColor(0.2, 0.3, 0.2)
-            elseif b.grid.walls[r][c] then love.graphics.setColor(0.22, 0.24, 0.3)
-            else love.graphics.setColor(0.12, 0.13, 0.17) end
-            love.graphics.rectangle("fill", x, y, grid.CELL - 1, grid.CELL - 1)
+            x, y = x + GRID_X + shakeX, y + GRID_Y + shakeY
+            if b.grid.build[r][c] then art.drawPad(x, y, t)
+            elseif b.grid.walls[r][c] then art.drawWall(x, y, t)
+            else art.drawFloor(x, y) end
         end
     end
     -- 행·열 좌표 라벨 (코드로 좌표를 지정하므로 상시 표기)
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.5, 0.55, 0.6)
-    for c = 1, grid.COLS do love.graphics.print(tostring(c), GRID_X + (c - 1) * grid.CELL + 10, GRID_Y - 16) end
-    for r = 1, grid.ROWS do love.graphics.print(tostring(r), GRID_X - 6 - fonts.small:getWidth(tostring(r)) + 4, GRID_Y + (r - 1) * grid.CELL + 8) end
+    for c = 1, grid.COLS do love.graphics.print(tostring(c), GRID_X + shakeX + (c - 1) * grid.CELL + 10, GRID_Y + shakeY - 16) end
+    for r = 1, grid.ROWS do love.graphics.print(tostring(r), GRID_X + shakeX - 6 - fonts.small:getWidth(tostring(r)) + 4, GRID_Y + shakeY + (r - 1) * grid.CELL + 8) end
     -- 서버라인
-    love.graphics.setColor(0.3, 0.7, 1, 0.6)
-    love.graphics.rectangle("fill", GRID_X, GRID_Y + grid.ROWS * grid.CELL, grid.COLS * grid.CELL, 4)
-    -- 타워/적/총알 (기존 states/battle.lua 렌더 블록 재사용: 색상 파싱, 크래시 라벨, HP바)
+    art.drawServerline(GRID_X + shakeX, GRID_Y + shakeY + grid.ROWS * grid.CELL, grid.COLS * grid.CELL, t)
+
+    -- 타워 (justFired 플래시 프레임, 크래시/disabled 틴트 오버레이 — art.drawTower는 항상
+    -- 자체 팔레트 색으로 그리므로 사전 setColor 틴트가 먹지 않아 사후 반투명 오버레이로 표현)
     for _, tw in ipairs(b.towers) do
-        local rgb = {}
-        for v in tw.def.color:gmatch("[^;]+") do rgb[#rgb + 1] = tonumber(v) end
-        if tw.crashed > 0 or tw.disabled then love.graphics.setColor(0.4, 0.4, 0.4)
-        else love.graphics.setColor(rgb[1], rgb[2], rgb[3]) end
-        love.graphics.rectangle("fill", GRID_X + tw.x - 12, GRID_Y + tw.y - 12, 24, 24)
-        love.graphics.setColor(0.8, 0.85, 0.9)
-        love.graphics.print(tw.name or "", GRID_X + tw.x - 10, GRID_Y + tw.y - 26)
+        local cx, cy = GRID_X + shakeX + tw.x, GRID_Y + shakeY + tw.y
+        local firing = (fx.firedTimer[tw] or 0) > 0
+        art.drawTower(tw.def.id, cx, cy, t, firing)
+        if tw.crashed > 0 or tw.disabled then
+            love.graphics.setColor(0.08, 0.08, 0.1, 0.55)
+            love.graphics.rectangle("fill", cx - 16, cy - 16, 32, 32)
+        end
+        love.graphics.setColor(art.pal.white[1], art.pal.white[2], art.pal.white[3])
+        love.graphics.print(tw.name or "", cx - 10, cy - 26)
     end
+    -- 적 (hit 점멸 — 흰 실루엣 시트)
     for _, e in ipairs(b.enemies) do
-        local rgb = {}
-        for v in e.def.color:gmatch("[^;]+") do rgb[#rgb + 1] = tonumber(v) end
-        love.graphics.setColor(rgb[1], rgb[2], rgb[3])
-        love.graphics.circle("fill", GRID_X + e.x, GRID_Y + e.y, 9)
+        local ex, ey = GRID_X + shakeX + e.x, GRID_Y + shakeY + e.y
+        local hit = (fx.hitTimer[e.id] or 0) > 0
+        art.drawEnemy(e.def.id, ex, ey, t, hit)
         love.graphics.setColor(0.1, 0.1, 0.1)
-        love.graphics.rectangle("fill", GRID_X + e.x - 10, GRID_Y + e.y - 16, 20, 3)
-        love.graphics.setColor(0.3, 0.9, 0.4)
-        love.graphics.rectangle("fill", GRID_X + e.x - 10, GRID_Y + e.y - 16, 20 * e.hp / e.max_hp, 3)
+        love.graphics.rectangle("fill", ex - 10, ey - 16, 20, 3)
+        love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+        love.graphics.rectangle("fill", ex - 10, ey - 16, 20 * e.hp / e.max_hp, 3)
     end
-    love.graphics.setColor(1, 0.95, 0.6)
+    love.graphics.setColor(1, 1, 1)
+    -- 총알: 글로우(알파0.3·2배 크기) + 본체 — 차지 총알(size>4)은 마젠타, 일반은 흰색
     for _, pr in ipairs(b.projectiles) do
-        love.graphics.circle("fill", GRID_X + pr.x, GRID_Y + pr.y, pr.size)
+        local glow = pr.size > 4 and art.pal.magenta or art.pal.white
+        local px, py = GRID_X + shakeX + pr.x, GRID_Y + shakeY + pr.y
+        love.graphics.setColor(glow[1], glow[2], glow[3], 0.3)
+        love.graphics.circle("fill", px, py, pr.size * 2)
+        love.graphics.setColor(glow[1], glow[2], glow[3], 1)
+        love.graphics.circle("fill", px, py, pr.size)
+    end
+    love.graphics.setColor(1, 1, 1)
+    -- 파티클 (사망 burst/보상 float/설치 flash/크래시 smoke/spark)
+    particles.draw(GRID_X + shakeX, GRID_Y + shakeY)
+
+    -- IDE 패널 (에디터 뒤 배경 + 타이틀바) — 우측 20px은 Task 5의 개발자 아바타 자리
+    do
+        local ex, ey, ew, eh = self.editor.x, self.editor.y, self.editor.w, self.editor.h
+        local px, py = ex - 4, ey - 22
+        local pw, ph = ew + 8, eh + 26
+        love.graphics.setColor(art.pal.panel[1], art.pal.panel[2], art.pal.panel[3])
+        love.graphics.rectangle("fill", px, py, pw, ph)
+        love.graphics.setColor(art.pal.panelLight[1], art.pal.panelLight[2], art.pal.panelLight[3])
+        love.graphics.rectangle("fill", px, py, pw, 22)
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(art.pal.white[1], art.pal.white[2], art.pal.white[3])
+        love.graphics.print("script.lua", px + 8, py + 4)
+        love.graphics.setColor(1, 1, 1)
     end
 
     -- 에디터 또는 버튼 패널
@@ -195,6 +300,18 @@ function play:draw()
             and "숫자키 버튼 실행 · Ctrl+1/2/4 배속 · ESC 나가기"
             or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+1/2/4 배속 · ESC 나가기"
         love.graphics.printf(hint, 0, 620, 960, "center")
+    end
+
+    -- 서버 피격 화면 테두리 플래시 (화면 전체 오버레이 — 튜토리얼 아래, HUD보다 위)
+    if fx.redFlash > 0 then
+        local a = math.min(1, fx.redFlash * 2)
+        local sw, sh = love.graphics.getWidth(), love.graphics.getHeight()
+        love.graphics.setColor(art.pal.red[1], art.pal.red[2], art.pal.red[3], a)
+        love.graphics.rectangle("fill", 0, 0, sw, 6)
+        love.graphics.rectangle("fill", 0, sh - 6, sw, 6)
+        love.graphics.rectangle("fill", 0, 0, 6, sh)
+        love.graphics.rectangle("fill", sw - 6, 0, 6, sh)
+        love.graphics.setColor(1, 1, 1)
     end
 
     if self.tut then self.tut:draw(fonts, GRID_X, GRID_Y) end
