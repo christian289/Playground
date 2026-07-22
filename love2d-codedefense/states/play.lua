@@ -21,16 +21,147 @@ local function loadText(root, rel)
     return s
 end
 
--- Task 3 스텁: 정보 칼럼 ③ 함수 사전 자리. 지금은 섹션 제목 + 안내 한 줄만 그리고, 다음
--- 섹션이 이어질 y좌표를 반환한다(호출부가 이어서 ④ 전투 로그를 배치). 본 구현(등록된
--- 함수 목록 표시)은 Task 3.
+-- 함수 사전 ①: 빌트인 문서 리터럴. build()만 등재(유저 함수는 소스 발췌로 대신한다).
+local BUILTIN_DOCS = {
+    build = {
+        sig = 'build(종류, 행, 열, "이름")',
+        lines = {
+            "타워를 짓는 유일한 수단",
+            "같은 이름 재호출은 무시(멱등)",
+            "예산 차감 · 건설칸(B) 전용",
+            "스나이퍼는 컴파일러 필요",
+            '한글 별칭: build("구구클래스", ...)',
+        },
+        example = 'build("printer", 3, 10, "a")',
+    },
+}
+
+local DICT_ROW_H = 16 -- fonts.small(14px) 기준 줄 높이
+
+-- 유저 함수 소스 발췌 휴리스틱: `function 이름` 줄부터 키워드 카운팅
+-- (function/if/for/while/do +1, end -1)으로 대응 end까지 훑는다. 정밀한 파서가 아니라
+-- 근사치이며(예: `while x do`처럼 한 줄에 두 키워드가 오면 이중 카운트될 수 있음), 화면
+-- 표시 전용이라 최대 10줄 + "…" 절단으로 방어한다.
+local function extractFuncSource(lines, name)
+    local pat1 = "^%s*function%s+" .. name .. "%s*%("
+    local pat2 = "^%s*function%s+" .. name .. "%s*$"
+    local startIdx
+    for i, line in ipairs(lines) do
+        if line:match(pat1) or line:match(pat2) then startIdx = i break end
+    end
+    if not startIdx then return nil end
+    local depth, endIdx = 0, startIdx
+    for i = startIdx, #lines do
+        for kw in lines[i]:gmatch("%a+") do
+            if kw == "function" or kw == "if" or kw == "for" or kw == "while" or kw == "do" then
+                depth = depth + 1
+            elseif kw == "end" then
+                depth = depth - 1
+            end
+        end
+        endIdx = i
+        if depth <= 0 then break end
+    end
+    local out, truncated = {}, endIdx - startIdx + 1 > 10
+    for i = startIdx, math.min(endIdx, startIdx + 9) do out[#out + 1] = lines[i] end
+    return out, startIdx, truncated
+end
+
+-- 사전 카드(펼침 상태) — 빌트인은 문서 리터럴, 유저 함수는 소스 발췌. 다음 y를 반환한다.
+local function drawDictCard(self, x, y, w, name)
+    local pad = 6
+    love.graphics.setFont(fonts.small)
+    if name == "build" then
+        local doc = BUILTIN_DOCS.build
+        local n = 1 + #doc.lines + 1
+        local h = pad * 2 + n * DICT_ROW_H
+        love.graphics.setColor(art.pal.panelLight[1], art.pal.panelLight[2], art.pal.panelLight[3])
+        love.graphics.rectangle("fill", x, y, w, h, 4)
+        local cy = y + pad
+        love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
+        love.graphics.print(doc.sig, x + pad, cy)
+        cy = cy + DICT_ROW_H
+        love.graphics.setColor(0.85, 0.88, 0.92)
+        for _, l in ipairs(doc.lines) do
+            love.graphics.print("· " .. l, x + pad, cy)
+            cy = cy + DICT_ROW_H
+        end
+        love.graphics.setColor(0.6, 0.9, 0.7)
+        love.graphics.print(doc.example, x + pad, cy)
+        love.graphics.setColor(1, 1, 1)
+        return y + h
+    else
+        local src, startLine, truncated = extractFuncSource(self.editor.lines, name)
+        if not src then
+            local h = pad * 2 + DICT_ROW_H
+            love.graphics.setColor(art.pal.panelLight[1], art.pal.panelLight[2], art.pal.panelLight[3])
+            love.graphics.rectangle("fill", x, y, w, h, 4)
+            love.graphics.setColor(0.7, 0.75, 0.8)
+            love.graphics.print("소스를 찾을 수 없습니다", x + pad, y + pad)
+            love.graphics.setColor(1, 1, 1)
+            return y + h
+        end
+        local n = 1 + #src + (truncated and 1 or 0)
+        local h = pad * 2 + n * DICT_ROW_H
+        love.graphics.setColor(art.pal.panelLight[1], art.pal.panelLight[2], art.pal.panelLight[3])
+        love.graphics.rectangle("fill", x, y, w, h, 4)
+        local cy = y + pad
+        love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
+        love.graphics.print("L" .. startLine, x + pad, cy)
+        cy = cy + DICT_ROW_H
+        love.graphics.setColor(0.85, 0.88, 0.92)
+        for _, l in ipairs(src) do
+            love.graphics.print(l, x + pad, cy)
+            cy = cy + DICT_ROW_H
+        end
+        if truncated then
+            love.graphics.setColor(0.6, 0.65, 0.7)
+            love.graphics.print("…", x + pad, cy)
+        end
+        love.graphics.setColor(1, 1, 1)
+        return y + h
+    end
+end
+
+-- 함수 사전 ③: 접힘 목록(> build + 유저 함수들, 클릭 판정용 self.dictRows 갱신) + 클릭된
+-- 항목의 펼침 카드(목록의 해당 줄 바로 아래에 삽입돼 다음 섹션을 밀어낸다).
 local function drawFuncDict(self, x, y, w)
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
     love.graphics.print("함수 사전", x, y)
-    love.graphics.setColor(0.7, 0.75, 0.8)
-    love.graphics.printf("F5로 저장하면 함수가 등록됩니다", x, y + 18, w, "left")
-    return y + 18 + 32
+    local cy = y + 18
+
+    self.dictRows = {}
+    local function addRow(name, label)
+        local open = self.dictOpen == name
+        if open then love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
+        else love.graphics.setColor(0.85, 0.88, 0.92) end
+        love.graphics.print(label, x, cy)
+        self.dictRows[#self.dictRows + 1] = { name = name, x0 = x, x1 = x + w, y0 = cy, y1 = cy + DICT_ROW_H }
+        cy = cy + DICT_ROW_H
+        if open then
+            cy = cy + 3
+            cy = drawDictCard(self, x, cy, w, name)
+            cy = cy + 6
+        end
+    end
+
+    addRow("build", "> build")
+    local funcs = self.battle.userFuncs
+    if #funcs == 0 then
+        love.graphics.setColor(0.7, 0.75, 0.8)
+        love.graphics.print("F5로 저장하면 함수가 등록됩니다", x, cy)
+        cy = cy + DICT_ROW_H
+    else
+        for _, name in ipairs(funcs) do addRow(name, "  " .. name) end
+    end
+
+    cy = cy + 2
+    love.graphics.setColor(0.5, 0.55, 0.6)
+    love.graphics.print("(local 함수는 목록에 잡히지 않아요)", x, cy)
+    cy = cy + DICT_ROW_H
+    love.graphics.setColor(1, 1, 1)
+    return cy
 end
 
 function play:enter(_, d, stageId, p)
@@ -40,6 +171,9 @@ function play:enter(_, d, stageId, p)
     self.speed = 1
     self.tut = nil
     self.tutSaved = false
+    self.dictOpen = nil     -- 함수 사전 펼침 상태: nil | "build" | 함수명
+    self.dictRows = {}      -- 정보 칼럼 사전 목록 클릭 판정({name,x0,x1,y0,y1})
+    self.funcCounted = {}   -- 판당 funcbook 카운트 1회 가드(이름별)
     self.autotype = nil                 -- {target=문자열, pos=글자수, timer}
     self.buttons = {}
     if self.stage.buttons_file ~= "" then
@@ -95,6 +229,15 @@ function play:save()
     local ok = self.battle:setScript(code)
     if ok then
         self.p.codes[self.stageId] = code
+        -- funcbook 영구 수집: 판당 이름별 1회만 등록/카운트한다(F5를 여러 번 눌러도 중복 집계 방지).
+        self.funcCounted = self.funcCounted or {}
+        for _, name in ipairs(self.battle.userFuncs) do
+            if not self.funcCounted[name] then
+                self.funcCounted[name] = true
+                self.p.funcbook[name] = self.p.funcbook[name] or { first = self.stageId, count = 0 }
+                self.p.funcbook[name].count = self.p.funcbook[name].count + 1
+            end
+        end
         progress.save(self.p)
         self.fx.devAnim.pose = "typing"; self.fx.devAnim.timer = 1.0  -- 저장 성공 → 타이핑 1초
         if #self.battle.towers > before and self.tut then self.tut:notify("built") end
@@ -573,6 +716,37 @@ function play:textinput(ch)
     if self.tut and not self.tut:done() and not self.tut:allowsText() then return end
     if self:isButtonStage() or self.autotype then return end
     self.editor:textinput(ch)
+end
+
+-- 함수 사전 클릭 연동: 에디터에서 build/유저 함수 식별자를 클릭하거나, 정보 칼럼의
+-- 사전 목록 항목을 직접 클릭하면 dictOpen을 토글(같은 항목 재클릭 시 닫힘)/교체한다.
+-- 그 외 클릭(빈 곳, 다른 식별자, 우클릭 등)은 무시한다.
+function play:mousepressed(x, y, button)
+    if button ~= 1 then return end
+    local editor = self.editor
+    if x >= editor.x and x < editor.x + editor.w and y >= editor.y and y < editor.y + editor.h then
+        local lineH = fonts.mono:getHeight() + 4
+        local measure = function(s) return fonts.mono:getWidth(s) end
+        local li, ci = editor:charAt(x - editor.x, y - editor.y, lineH, measure)
+        if not li then return end
+        local tok = Editor.tokenAt(editor.lines[li], ci)
+        if not tok then return end
+        local isDict = tok == "build"
+        if not isDict then
+            for _, name in ipairs(self.battle.userFuncs) do
+                if name == tok then isDict = true break end
+            end
+        end
+        if isDict then self.dictOpen = (self.dictOpen == tok) and nil or tok end
+        return
+    end
+
+    for _, row in ipairs(self.dictRows or {}) do
+        if x >= row.x0 and x < row.x1 and y >= row.y0 and y < row.y1 then
+            self.dictOpen = (self.dictOpen == row.name) and nil or row.name
+            return
+        end
+    end
 end
 
 return play
