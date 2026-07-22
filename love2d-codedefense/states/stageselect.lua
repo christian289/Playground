@@ -47,6 +47,22 @@ function sel:draw()
         local mark = self.p.cleared[id] and " [클리어]" or (locked and " [잠김]" or "")
         local prefix = (i == self.cursor) and "> " or "   "
         love.graphics.printf(("%s%d. %s%s"):format(prefix, id, s.concept, mark), 0, y, 960, "center")
+
+        -- 배포 기록 표기 (§6.7)
+        local rec = self.p.records and self.p.records[id]
+        if rec then
+            local recText
+            if self.p.cleared[id] then
+                -- "九"(구구 마크)는 나눔고딕에 글리프가 없어("九".hasGlyphs == false) "구"로 대체
+                recText = ("[클리어 · HP %d%s]"):format(rec.bestHP, rec.gugu and " · 구" or "")
+            else
+                recText = ("[시도 %d]"):format(rec.tries)
+            end
+            love.graphics.setFont(fonts.small)
+            love.graphics.setColor(0.55, 0.58, 0.62)
+            love.graphics.printf(recText, 500, y + 2, 250, "right")
+            love.graphics.setFont(fonts.ui)
+        end
     end
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.6, 0.65, 0.7)

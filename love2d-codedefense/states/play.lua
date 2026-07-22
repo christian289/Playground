@@ -127,7 +127,9 @@ function play:update(dt)
 
     if self.battle.status == "clear" or self.battle.status == "defeat" then
         Gamestate.switch(require("states.result"), self.battle.status,
-            { d = self.d, stageId = self.stageId, p = self.p })
+            { d = self.d, stageId = self.stageId, p = self.p,
+              guguUsed = self.fx.guguSeen or false, towerCount = #self.battle.towers,
+              serverHP = self.battle.serverHP })
     end
 
     -- 뷰 전용 프레임-diff 이펙트 발동 (battle 코어 상태는 읽기만 한다)

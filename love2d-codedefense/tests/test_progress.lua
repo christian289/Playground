@@ -14,4 +14,11 @@ return function(t)
     p2.intro_seen = true
     progress.save(p2)
     t.ok(progress.load().intro_seen, "intro_seen 저장/복원")
+
+    local pr = progress.load()
+    pr.records = { [3] = { tries = 2, clears = 1, bestHP = 9, lastResult = "clear", gugu = true } }
+    progress.save(pr)
+    local qr = progress.load()
+    t.eq(qr.records[3].bestHP, 9, "records 왕복")
+    t.ok(qr.records[3].gugu, "gugu 기록 왕복")
 end
