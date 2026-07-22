@@ -484,6 +484,9 @@ function play:draw()
     do
         local ix, iy, iw, ih = INFO_X, GRID_Y, INFO_W, FIELD_H
         local pad = 10
+        -- 함수 사전 카드 펼침 + 적 구성 줄바꿈이 겹치면 내용이 칼럼 바닥(iy+ih)을 넘어설 수
+        -- 있으므로, 칼럼 밖(힌트바/창 밖)으로 새지 않도록 draw 전체를 scissor로 감싼다.
+        love.graphics.setScissor(ix, iy, iw, ih)
         love.graphics.setColor(art.pal.panel[1], art.pal.panel[2], art.pal.panel[3])
         love.graphics.rectangle("fill", ix, iy, iw, ih)
         local cx, cy = ix + pad, iy + pad
@@ -540,19 +543,27 @@ function play:draw()
         cy = drawFuncDict(self, cx, cy, cw)
         cy = cy + 8
 
-        -- ④ 전투 로그 (최근 8줄, 오래된 줄일수록 옅어지는 페이드 유지)
-        love.graphics.setFont(fonts.small)
-        love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
-        love.graphics.print("전투 로그", cx, cy)
-        cy = cy + 18
-        local logCount = math.min(8, #b.log)
-        for i = math.max(1, #b.log - 7), #b.log do
-            local idx = i - math.max(1, #b.log - 7) + 1
-            love.graphics.setColor(0.8, 0.82, 0.86, 1 - (logCount - idx) * 0.1)
-            love.graphics.print(b.log[i], cx, cy)
-            cy = cy + 16
+        -- ④ 전투 로그 (최근 최대 8줄, 오래된 줄일수록 옅어지는 페이드 유지) — 위 섹션들이
+        -- 이미 칼럼 바닥 근처까지 차 있으면 scissor로 잘리기 전에 표시 줄 수 자체를 남은
+        -- 높이만큼 줄인다(0줄 이하면 섹션 자체를 생략).
+        local avail = (iy + ih) - cy
+        local rows = math.min(8, math.floor((avail - 18) / 18))
+        if rows > 0 then
+            love.graphics.setFont(fonts.small)
+            love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+            love.graphics.print("전투 로그", cx, cy)
+            cy = cy + 18
+            local logCount = math.min(rows, #b.log)
+            local startI = math.max(1, #b.log - logCount + 1)
+            for i = startI, #b.log do
+                local idx = i - startI + 1
+                love.graphics.setColor(0.8, 0.82, 0.86, 1 - (logCount - idx) * 0.1)
+                love.graphics.print(b.log[i], cx, cy)
+                cy = cy + 16
+            end
+            love.graphics.setColor(1, 1, 1)
         end
-        love.graphics.setColor(1, 1, 1)
+        love.graphics.setScissor()
     end
 
     -- IDE 패널 (에디터 뒤 배경 + 타이틀바) — 우측 20px은 Task 5의 개발자 아바타 자리
@@ -723,6 +734,9 @@ end
 -- 그 외 클릭(빈 곳, 다른 식별자, 우클릭 등)은 무시한다.
 function play:mousepressed(x, y, button)
     if button ~= 1 then return end
+    -- 문제 카드가 열려 있으면 좌클릭은 카드 닫기로만 소비한다(Enter 닫기와 대칭) — 그렇지
+    -- 않으면 카드 뒤에 가려진 사전 목록이 오작동으로 클릭될 수 있다.
+    if self.showBrief then self.showBrief = false; return end
     local editor = self.editor
     if x >= editor.x and x < editor.x + editor.w and y >= editor.y and y < editor.y + editor.h then
         local lineH = fonts.mono:getHeight() + 4

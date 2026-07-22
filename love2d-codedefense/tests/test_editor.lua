@@ -42,4 +42,8 @@ return function(t)
     t.eq(Editor.tokenAt("build(1)", 3), "build", "tokenAt 식별자")
     t.eq(Editor.tokenAt("local x = helper(w)", 12), "helper", "tokenAt 중간 위치")
     t.eq(Editor.tokenAt("build(1)", 6), nil, "괄호 위치는 nil")
+
+    local lnE, ciE = ed2:charAt(40 + 300, 5, 18, mono)
+    t.eq(lnE, 1, "줄끝 초과 클릭 줄")
+    t.eq(ciE, 9, "줄끝 초과는 마지막+1")   -- "build(1)" = 8글자 → 9
 end
