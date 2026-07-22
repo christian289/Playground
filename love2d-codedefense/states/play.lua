@@ -11,6 +11,7 @@ local stageinfo = require("src.stageinfo")
 local GRID_X, GRID_Y = 8, 48
 local FIELD_W = grid.COLS * grid.CELL -- 384
 local FIELD_H = grid.ROWS * grid.CELL -- 512
+local INFO_X, INFO_W = 400, 240 -- 정보 칼럼(전장과 에디터 사이)
 local play = {}
 
 local function loadText(root, rel)
@@ -18,6 +19,18 @@ local function loadText(root, rel)
     if not f then return nil end
     local s = f:read("*a"); f:close()
     return s
+end
+
+-- Task 3 스텁: 정보 칼럼 ③ 함수 사전 자리. 지금은 섹션 제목 + 안내 한 줄만 그리고, 다음
+-- 섹션이 이어질 y좌표를 반환한다(호출부가 이어서 ④ 전투 로그를 배치). 본 구현(등록된
+-- 함수 목록 표시)은 Task 3.
+local function drawFuncDict(self, x, y, w)
+    love.graphics.setFont(fonts.small)
+    love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+    love.graphics.print("함수 사전", x, y)
+    love.graphics.setColor(0.7, 0.75, 0.8)
+    love.graphics.printf("F5로 저장하면 함수가 등록됩니다", x, y + 18, w, "left")
+    return y + 18 + 32
 end
 
 function play:enter(_, d, stageId, p)
@@ -33,7 +46,7 @@ function play:enter(_, d, stageId, p)
         local chunk = loadstring(loadText(d.root, self.stage.buttons_file) or "")
         if chunk then self.buttons = chunk() or {} end
     end
-    self.editor = Editor(400, 48, 552, 470)
+    self.editor = Editor(656, 48, 610, 470)
     self.editor:setQuickbar({
         { key = "f1", label = "build", text = 'build("printer", ${1}, , "")' },
         { key = "f2", label = "on_tick", text = "function on_tick(self, world)\n  ${1}\nend" },
@@ -284,42 +297,6 @@ function play:draw()
     -- 서버라인
     art.drawServerline(GRID_X + shakeX, GRID_Y + shakeY + grid.ROWS * grid.CELL, grid.COLS * grid.CELL, t)
 
-    -- 적 구성 패널 (전장 우상단, 좌하단 로그 오버레이와 대칭인 반투명 박스). 모든 스폰이
-    -- 끝나면 패널 하단에 "잔여 소탕" 문구를 한 줄 더 붙인다 — HUD 한 줄에 붙였다가 긴
-    -- 문장이 에디터 패널 쪽으로 넘쳐 겹치는 문제가 있어(스크린샷으로 발견) 폭이 고정된
-    -- 이 패널 안으로 옮겼다.
-    do
-        local killed = stageinfo.killedCounts(self.info, b)
-        local sweeping = b.clock >= self.info.lastEnd and (b.status == "running" or b.status == "clear")
-        local panelW, rowH = 172, 26
-        local n = #self.enemyTypes
-        local panelH = 10 + 18 + (n + (sweeping and 1 or 0)) * rowH + 4
-        local px2 = GRID_X + shakeX + FIELD_W - panelW - 4
-        local py2 = GRID_Y + shakeY + 4
-        love.graphics.setColor(art.pal.bg[1], art.pal.bg[2], art.pal.bg[3], 0.75)
-        love.graphics.rectangle("fill", px2, py2, panelW, panelH)
-        love.graphics.setFont(fonts.small)
-        love.graphics.setColor(0.75, 0.8, 0.86)
-        love.graphics.print("적 구성", px2 + 8, py2 + 5)
-        for i, id in ipairs(self.enemyTypes) do
-            local rowY = py2 + 10 + 18 + (i - 1) * rowH
-            art.drawEnemy(id, px2 + 22, rowY + rowH / 2, t, false)
-            local def = self.d.enemies[id]
-            local kn = killed[id] or 0
-            local tot = self.info.byType[id] or 0
-            love.graphics.setColor(0.85, 0.88, 0.92)
-            love.graphics.print(("%s"):format(def and def.name or id), px2 + 40, rowY + rowH / 2 - 15)
-            love.graphics.setColor(0.6, 0.9, 0.7)
-            love.graphics.print(("처리 %d / %d"):format(kn, tot), px2 + 40, rowY + rowH / 2 - 1)
-        end
-        if sweeping then
-            local rowY = py2 + 10 + 18 + n * rowH
-            love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
-            love.graphics.print("잔여 소탕 · 생존!", px2 + 8, rowY + rowH / 2 - 7)
-        end
-        love.graphics.setColor(1, 1, 1)
-    end
-
     -- 타워 (justFired 플래시 프레임, 크래시/disabled 틴트 오버레이 — art.drawTower는 항상
     -- 자체 팔레트 색으로 그리므로 사전 setColor 틴트가 먹지 않아 사후 반투명 오버레이로 표현)
     for _, tw in ipairs(b.towers) do
@@ -357,6 +334,84 @@ function play:draw()
     -- 파티클 (사망 burst/보상 float/설치 flash/크래시 smoke/spark)
     particles.draw(GRID_X + shakeX, GRID_Y + shakeY)
 
+    -- 정보 칼럼 (전장과 에디터 사이, x=400 y=48 w=240 h=512 — 전장과 바닥이 나란하다):
+    -- ① 문제 요약 ② 적 구성(구 전장 오버레이 흡수) ③ 함수 사전 자리(Task 3 스텁)
+    -- ④ 전투 로그(구 전장 오버레이 흡수, 최근 8줄). 셰이크는 전장 전용이라 이 칼럼은
+    -- 흔들리지 않는다(에디터/HUD와 동일하게 고정).
+    do
+        local ix, iy, iw, ih = INFO_X, GRID_Y, INFO_W, FIELD_H
+        local pad = 10
+        love.graphics.setColor(art.pal.panel[1], art.pal.panel[2], art.pal.panel[3])
+        love.graphics.rectangle("fill", ix, iy, iw, ih)
+        local cx, cy = ix + pad, iy + pad
+        local cw = iw - pad * 2
+
+        -- ① 문제 요약
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+        love.graphics.print("문제 요약", cx, cy)
+        cy = cy + 18
+        love.graphics.setColor(0.85, 0.88, 0.92)
+        love.graphics.print(("[문제 %d] %s"):format(self.stageId, self.stage.concept), cx, cy)
+        cy = cy + 16
+        love.graphics.setColor(0.7, 0.75, 0.8)
+        love.graphics.print("메모리 영역: " .. self.stage.theme, cx, cy)
+        cy = cy + 16
+        love.graphics.setColor(0.55, 0.6, 0.65)
+        love.graphics.print("Ctrl+I 상세", cx, cy)
+        cy = cy + 22
+
+        -- ② 적 구성 (구 전장 우상단 오버레이 이동) — 모든 스폰이 끝나면 "잔여 소탕" 한 줄 추가
+        love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+        love.graphics.print("적 구성", cx, cy)
+        cy = cy + 20
+        local killed = stageinfo.killedCounts(self.info, b)
+        local sweeping = b.clock >= self.info.lastEnd and (b.status == "running" or b.status == "clear")
+        local rowH = 26
+        local nameW = cw - 32 -- 아이콘(32px) 뺀 이름 가용 폭 — 좁은 칼럼 밖(에디터 쪽)으로
+        -- 넘치지 않도록 긴 이름(예: concat-nil의 농담 이름 "attempt to concatenate a nil
+        -- value")은 printf로 줄바꿈하고, 줄바꿈된 만큼 행 높이를 늘린다.
+        for _, id in ipairs(self.enemyTypes) do
+            local def = self.d.enemies[id]
+            local name = def and def.name or id
+            local _, wrapped = fonts.small:getWrap(name, nameW)
+            local nameLines = math.max(1, #wrapped)
+            local blockH = math.max(rowH, nameLines * 16 + 16 + 6)
+            art.drawEnemy(id, cx + 14, cy + blockH / 2, t, false)
+            local kn = killed[id] or 0
+            local tot = self.info.byType[id] or 0
+            love.graphics.setColor(0.85, 0.88, 0.92)
+            love.graphics.printf(name, cx + 32, cy + 2, nameW, "left")
+            love.graphics.setColor(0.6, 0.9, 0.7)
+            love.graphics.print(("처리 %d / %d"):format(kn, tot), cx + 32, cy + 2 + nameLines * 16)
+            cy = cy + blockH
+        end
+        if sweeping then
+            love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+            love.graphics.print("잔여 소탕 · 생존!", cx, cy + rowH / 2 - 7)
+            cy = cy + rowH
+        end
+        cy = cy + 6
+
+        -- ③ 함수 사전 자리 (Task 3이 본 구현)
+        cy = drawFuncDict(self, cx, cy, cw)
+        cy = cy + 8
+
+        -- ④ 전투 로그 (최근 8줄, 오래된 줄일수록 옅어지는 페이드 유지)
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+        love.graphics.print("전투 로그", cx, cy)
+        cy = cy + 18
+        local logCount = math.min(8, #b.log)
+        for i = math.max(1, #b.log - 7), #b.log do
+            local idx = i - math.max(1, #b.log - 7) + 1
+            love.graphics.setColor(0.8, 0.82, 0.86, 1 - (logCount - idx) * 0.1)
+            love.graphics.print(b.log[i], cx, cy)
+            cy = cy + 16
+        end
+        love.graphics.setColor(1, 1, 1)
+    end
+
     -- IDE 패널 (에디터 뒤 배경 + 타이틀바) — 우측 20px은 Task 5의 개발자 아바타 자리
     do
         local ex, ey, ew, eh = self.editor.x, self.editor.y, self.editor.w, self.editor.h
@@ -385,37 +440,19 @@ function play:draw()
         -- Task 5: 튜토리얼 말풍선(y>=580)과 겹치지 않도록 버튼 패널을 에디터 바로 아래로 당김
         love.graphics.setFont(fonts.small)
         love.graphics.setColor(0.95, 0.85, 0.4)
-        love.graphics.print("버튼 → 코드 자동 입력·저장:", 400, 520)
+        love.graphics.print("버튼 → 코드 자동 입력·저장:", self.editor.x, 520)
         for i, btn in ipairs(self.buttons) do
             love.graphics.setColor(0.85, 0.88, 0.92)
-            love.graphics.print(("[%d] %s"):format(i, btn.label), 400, 534 + (i - 1) * 13)
+            love.graphics.print(("[%d] %s"):format(i, btn.label), self.editor.x, 534 + (i - 1) * 13)
         end
     else
         self.editor:draw(fonts, true)
     end
 
-    -- 전투 로그 오버레이 (전장 내부, 상단 왼쪽 — 최근 3줄만 표시)
-    do
-        local logStartY = GRID_Y + shakeY + grid.ROWS * grid.CELL - 3 * 18 - 8
-        local logX = GRID_X + shakeX + 4
-        local logCount = math.min(3, #b.log)
-        if logCount > 0 then
-            -- 배경 반투명 박스
-            love.graphics.setColor(art.pal.bg[1], art.pal.bg[2], art.pal.bg[3], 0.7)
-            love.graphics.rectangle("fill", logX - 2, logStartY - 2, 200, logCount * 18 + 4)
-            -- 로그 텍스트 (가장 최근 3줄)
-            love.graphics.setFont(fonts.small)
-            for i = math.max(1, #b.log - 2), #b.log do
-                local idx = i - math.max(1, #b.log - 2) + 1
-                love.graphics.setColor(0.8, 0.82, 0.86, 1 - (logCount - idx) * 0.1)
-                love.graphics.print(b.log[i], logX, logStartY + (idx - 1) * 18)
-            end
-        end
-    end
     -- 저장 오류
     if b.scriptError then
         love.graphics.setColor(1, 0.45, 0.4)
-        love.graphics.printf("저장 실패 — " .. b.scriptError, 400, 545, 552, "left")
+        love.graphics.printf("저장 실패 — " .. b.scriptError, self.editor.x, 545, self.editor.w, "left")
     end
     -- 힌트바 (튜토리얼 말풍선이 대신 안내하는 동안은 겹치지 않도록 숨긴다)
     if not (self.tut and not self.tut:done()) then
@@ -423,7 +460,7 @@ function play:draw()
         local hint = self:isButtonStage()
             and "숫자키 버튼 실행 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · ESC 나가기"
             or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · ESC 나가기"
-        love.graphics.printf(hint, 0, 620, 960, "center")
+        love.graphics.printf(hint, 0, 620, 1280, "center")
     end
 
     -- 서버 피격 화면 테두리 플래시 (화면 전체 오버레이 — 튜토리얼 아래, HUD보다 위)
@@ -466,7 +503,8 @@ function play:draw()
     if self.showBrief then
         local stage = self.stage
         local cardW = 360
-        local cardX = GRID_X + (FIELD_W - cardW) / 2
+        local combinedW = (INFO_X + INFO_W) - GRID_X -- 전장+정보 칼럼 기준 중앙(x≈320)
+        local cardX = GRID_X + (combinedW - cardW) / 2
         local cardH = 190
         local cardY = GRID_Y + (grid.ROWS * grid.CELL - cardH) / 2
         love.graphics.setColor(art.pal.panel[1], art.pal.panel[2], art.pal.panel[3], 0.94)

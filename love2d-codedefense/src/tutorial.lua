@@ -59,10 +59,11 @@ function Tutorial:notify(event)
     if adv.on == "event" and adv.event == event then self:advance() end
 end
 
--- 말풍선 박스 (화면 하단 고정). 그리드(960x640, GRID_Y=48, 16행*32=512 ⇒ 그리드/서버라인은
+-- 말풍선 박스 (화면 하단 고정). 그리드(1280x640, GRID_Y=48, 16행*32=512 ⇒ 그리드/서버라인은
 -- y<=564)와 하단 힌트바(y=620) 사이의 좁은 띠에 배치 — 서버라인 하이라이트를 가리지 않도록
 -- y=580부터 시작한다 (버튼 스테이지의 버튼 목록도 play.lua 쪽에서 y<=575로 당겨져 있다).
-local BOX_X, BOX_Y, BOX_W, BOX_H = 8, 580, 944, 54
+-- 폭은 창 전체(1280, x=8 여백 대칭)만큼 넓힌 1264.
+local BOX_X, BOX_Y, BOX_W, BOX_H = 8, 580, 1264, 54
 
 function Tutorial:draw(fonts, gx, gy)
     if self:done() then return end
@@ -79,8 +80,9 @@ function Tutorial:draw(fonts, gx, gy)
         love.graphics.setLineWidth(1)
     elseif a and a.type == "ui" and blink then
         if a.id == "editor" then
+            -- 에디터는 states/play.lua에서 Editor(656, 48, 610, 470)로 생성된다 — 2px 여유로 감싼다.
             love.graphics.setColor(1, 0.85, 0.3, 0.8)
-            love.graphics.rectangle("line", 398, 46, 556, 474)
+            love.graphics.rectangle("line", 654, 46, 614, 474)
         elseif a.id == "serverline" then
             -- 서버라인은 states/play.lua에서 (GRID_X, GRID_Y + 16*32, 12*32, 4)에 그려진다.
             love.graphics.setColor(1, 0.85, 0.3, 0.9)
@@ -88,8 +90,9 @@ function Tutorial:draw(fonts, gx, gy)
             love.graphics.rectangle("line", gx - 2, gy + 16 * 32 - 3, 12 * 32 + 4, 10)
             love.graphics.setLineWidth(1)
         elseif a.id == "quickbar" then
+            -- 퀵바는 에디터 바로 아래(x=654, y=editor.y+editor.h+2=520)에 그려진다.
             love.graphics.setColor(1, 0.85, 0.3, 0.8)
-            love.graphics.rectangle("line", 398, 520, 372, 32)
+            love.graphics.rectangle("line", 654, 520, 372, 32)
         end
     end
     -- 말풍선 (하단 고정)
