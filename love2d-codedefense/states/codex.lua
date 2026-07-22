@@ -6,7 +6,8 @@ local utf8 = require("utf8")
 
 local codex = {}
 
-local TABS = { "타워", "몬스터" }
+local TABS = { "타워", "몬스터", "내 함수" }
+local NO_FUNCS_MSG = "아직 수집된 함수가 없습니다. 전투 중 F5로 저장하면 기록됩니다."
 
 -- 몬스터 abilities 키워드 → 한글 설명 (§3/설계서)
 local ABILITY_KO = {
@@ -74,11 +75,19 @@ local function isHiddenTower(def, p)
     return def.hidden == 1 and not p.gugu_found
 end
 
+-- progress.funcbook(이름→{first,count})의 키를 이름 정렬 배열로 뽑는다.
+local function funcNameOrder(p)
+    local names = {}
+    for name in pairs(p.funcbook or {}) do names[#names + 1] = name end
+    table.sort(names)
+    return names
+end
+
 function codex:enter(_, d, p)
     self.d, self.p = d, p
     self.tab = 1
     self.cursor = 1
-    self.lists = { towerOrder(d), enemyOrder(d) }
+    self.lists = { towerOrder(d), enemyOrder(d), funcNameOrder(p) }
 end
 
 function codex:currentList()
@@ -227,11 +236,31 @@ local function drawEnemyCard(self, id, t)
     love.graphics.setColor(1, 1, 1)
 end
 
+-- [내 함수] 탭 카드 — 이름 + "스테이지 N에서 처음 정의 · M회" (§2.3, 스프라이트 없음)
+local function drawFuncCard(self, name)
+    local P = art.pal
+    local entry = self.p.funcbook[name]
+    local textX = CARD_X + 40
+    local textW = CARD_X + CARD_W - textX - 40
+    local y = CARD_Y + 60
+
+    local nameFont = fonts.big:getWidth(name) <= textW and fonts.big or fonts.ui
+    y = stackText(nameFont, name, textX, y, textW, P.green, 16)
+    local detail = ("스테이지 %d에서 처음 정의 · %d회"):format(entry.first, entry.count)
+    stackText(fonts.ui, detail, textX, y, textW, { 0.85, 0.88, 0.92 }, 0)
+end
+
 function codex:draw()
     local t = love.timer.getTime()
     local P = art.pal
+    local W = love.graphics.getWidth()
+    local OX = (W - 960) / 2 -- 960 기준 레이아웃을 창 폭 중앙에 배치하는 오프셋
     love.graphics.setColor(P.bg[1], P.bg[2], P.bg[3])
-    love.graphics.rectangle("fill", 0, 0, 960, 640)
+    love.graphics.rectangle("fill", 0, 0, W, 640)
+
+    -- 이하 좌표는 전부 원래 960 기준 그대로 두고, OX만큼 평행이동해 창 중앙에 놓는다.
+    love.graphics.push()
+    love.graphics.translate(OX, 0)
 
     love.graphics.setFont(fonts.big)
     love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3])
@@ -239,7 +268,7 @@ function codex:draw()
 
     -- 탭
     love.graphics.setFont(fonts.ui)
-    local tabX = 400
+    local tabX = 370
     for i, label in ipairs(TABS) do
         if i == self.tab then
             love.graphics.setColor(P.green[1], P.green[2], P.green[3])
@@ -265,8 +294,10 @@ function codex:draw()
         if self.tab == 1 then
             local def = self.d.towers[id]
             label = isHiddenTower(def, self.p) and "???" or def.name
-        else
+        elseif self.tab == 2 then
             label = self.d.enemies[id].name
+        else
+            label = id -- 내 함수 탭: id 자체가 함수 이름 문자열
         end
         label = truncate(fonts.ui, label, labelMaxW)
         if i == self.cursor then
@@ -285,7 +316,16 @@ function codex:draw()
     love.graphics.rectangle("fill", CARD_X, CARD_Y, CARD_W, CARD_H, 8, 8)
 
     local id = list[self.cursor]
-    if id then
+    if self.tab == 3 then
+        if id then
+            drawFuncCard(self, id)
+        else
+            love.graphics.setFont(fonts.ui)
+            love.graphics.setColor(0.6, 0.65, 0.7)
+            love.graphics.printf(NO_FUNCS_MSG, CARD_X + 40, CARD_Y + CARD_H / 2 - 20, CARD_W - 80, "center")
+            love.graphics.setColor(1, 1, 1)
+        end
+    elseif id then
         if self.tab == 1 then
             drawTowerCard(self, id, t)
         else
@@ -297,6 +337,8 @@ function codex:draw()
     love.graphics.setColor(0.55, 0.6, 0.66)
     love.graphics.printf("←/→ 탭 · ↑↓ 이동 · ESC 타이틀", 0, 600, 960, "center")
     love.graphics.setColor(1, 1, 1)
+
+    love.graphics.pop()
 end
 
 function codex:keypressed(key)

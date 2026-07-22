@@ -444,6 +444,59 @@ function art.drawDev(pose, x, y, scale, t)
 end
 
 --------------------------------------------------------------------------------
+-- 게임 심볼 — 룩(Rook, 체스 성탑). 타워 디펜스를 상징하는 16x16 도트.
+-- 하단 받침 2줄 + 몸통 기둥 + 상단 총안(crenellation) 3개 돌출. green 몸체 + cyan 하이라이트.
+-- 시트로 캐싱하지 않고 매 호출 직접 그린다(art.drawRook) — 창 아이콘은 rookIconData()가
+-- 같은 도트를 ImageData에 2배 스케일로 직접 찍어 만든다(정적, t 없음).
+--------------------------------------------------------------------------------
+-- {컬러키, x, y, w, h} — 16x16 논리 좌표. green을 먼저 채우고 cyan을 나중에 겹쳐 하이라이트로 삼는다.
+local ROOK_DOTS = {
+    -- 상단 총안 3개 돌출
+    { "green", 3, 1, 2, 3 }, { "green", 7, 1, 2, 3 }, { "green", 11, 1, 2, 3 },
+    -- 총안 사이를 잇는 브릿지(몸통 상단)
+    { "green", 3, 4, 10, 1 },
+    -- 몸통 기둥
+    { "green", 4, 5, 8, 8 },
+    -- 하단 받침 2줄(몸통보다 넓게)
+    { "green", 2, 13, 12, 1 }, { "green", 2, 14, 12, 1 },
+    -- cyan 하이라이트: 총안 캡 + 몸통 좌측 세로선
+    { "cyan", 3, 1, 2, 1 }, { "cyan", 7, 1, 2, 1 }, { "cyan", 11, 1, 2, 1 },
+    { "cyan", 4, 5, 1, 8 },
+}
+
+-- (x, y) 좌상단 기준으로 scale배 확대해 룩을 직접 그린다. t로 가운데 총안 위 미세한 발광이 변한다.
+function art.drawRook(x, y, scale, t)
+    local P = art.pal
+    for _, dd in ipairs(ROOK_DOTS) do
+        setCol(P[dd[1]])
+        love.graphics.rectangle("fill", x + dd[2] * scale, y + dd[3] * scale, dd[4] * scale, dd[5] * scale)
+    end
+    -- 가운데 총안 위 미세 발광 펄스
+    local glow = 0.35 + 0.25 * math.sin((t or 0) * 3)
+    setCol(P.cyan, glow)
+    love.graphics.rectangle("fill", x + 7 * scale, y, 2 * scale, 1 * scale)
+    love.graphics.setColor(1, 1, 1)
+end
+
+-- 같은 16x16 도트를 2배 스케일(=32x32)로 ImageData에 직접 찍어 만든다. 투명 배경, 정적(t 없음) —
+-- love.window.setIcon(art.rookIconData())로 창/작업표시줄 아이콘에 쓴다.
+function art.rookIconData()
+    local P = art.pal
+    local px = 2
+    local img = love.image.newImageData(SZ * px, SZ * px)
+    img:mapPixel(function() return 0, 0, 0, 0 end)
+    for _, dd in ipairs(ROOK_DOTS) do
+        local col = P[dd[1]]
+        for oy = 0, dd[5] * px - 1 do
+            for ox = 0, dd[4] * px - 1 do
+                img:setPixel(dd[2] * px + ox, dd[3] * px + oy, col[1], col[2], col[3], 1)
+            end
+        end
+    end
+    return img
+end
+
+--------------------------------------------------------------------------------
 -- 로고 "CODE DEFENSE" (5x7 도트 폰트, cx 중심)
 --------------------------------------------------------------------------------
 local GLYPH = {

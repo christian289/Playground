@@ -7,7 +7,9 @@ function love.load()
     love.graphics.setDefaultFilter("nearest", "nearest")
     love.keyboard.setKeyRepeat(true)
     fonts.load()
-    require("src.art").load()
+    local art = require("src.art")
+    art.load()
+    love.window.setIcon(art.rookIconData())
     -- 개발 시(love .): 소스 폴더에서 io로 데이터를 읽는다.
     -- 패키징(fuse) 시: 데이터는 zip 밖 exe 옆 data/ 폴더로 배포되므로 exe가 있는 폴더를 루트로 쓴다.
     local root = love.filesystem.getSource()

@@ -24,15 +24,17 @@ end
 
 function sel:draw()
     local P = art.pal
+    local W = love.graphics.getWidth()
+    local OX = (W - 960) / 2 -- 960 기준 좌표(패널·목록)를 창 폭 중앙에 배치하는 오프셋
     love.graphics.setColor(P.bg[1], P.bg[2], P.bg[3])
-    love.graphics.rectangle("fill", 0, 0, 960, 640)
+    love.graphics.rectangle("fill", 0, 0, W, 640)
     -- 목록 패널
     love.graphics.setColor(P.panel[1], P.panel[2], P.panel[3], 0.85)
-    love.graphics.rectangle("fill", 200, 96, 560, 470, 10, 10)
+    love.graphics.rectangle("fill", OX + 200, 96, 560, 470, 10, 10)
 
     love.graphics.setFont(fonts.big)
     love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3])
-    love.graphics.printf("스테이지 선택", 0, 40, 960, "center")
+    love.graphics.printf("스테이지 선택", 0, 40, W, "center")
     love.graphics.setFont(fonts.ui)
     for i, id in ipairs(self.ids) do
         local s = self.d.stages[id]
@@ -40,13 +42,13 @@ function sel:draw()
         local locked = not self:unlocked(id)
         if i == self.cursor then
             love.graphics.setColor(P.green[1], P.green[2], P.green[3], 0.14)
-            love.graphics.rectangle("fill", 220, y - 4, 520, 32, 5, 5)
+            love.graphics.rectangle("fill", OX + 220, y - 4, 520, 32, 5, 5)
             love.graphics.setColor(P.green[1], P.green[2], P.green[3])
         elseif locked then love.graphics.setColor(0.35, 0.38, 0.42)
         else love.graphics.setColor(0.85, 0.88, 0.92) end
         local mark = self.p.cleared[id] and " [클리어]" or (locked and " [잠김]" or "")
         local prefix = (i == self.cursor) and "> " or "   "
-        love.graphics.printf(("%s%d. %s%s"):format(prefix, id, s.concept, mark), 0, y, 960, "center")
+        love.graphics.printf(("%s%d. %s%s"):format(prefix, id, s.concept, mark), 0, y, W, "center")
 
         -- 배포 기록 표기 (§6.7)
         local rec = self.p.records and self.p.records[id]
@@ -60,13 +62,13 @@ function sel:draw()
             end
             love.graphics.setFont(fonts.small)
             love.graphics.setColor(0.55, 0.58, 0.62)
-            love.graphics.printf(recText, 500, y + 2, 250, "right")
+            love.graphics.printf(recText, OX + 500, y + 2, 250, "right")
             love.graphics.setFont(fonts.ui)
         end
     end
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.6, 0.65, 0.7)
-    love.graphics.printf("↑↓ 이동 · Enter 선택 · ESC 타이틀", 0, 600, 960, "center")
+    love.graphics.printf("↑↓ 이동 · Enter 선택 · ESC 타이틀", 0, 600, W, "center")
     love.graphics.setColor(1, 1, 1)
 end
 

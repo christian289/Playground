@@ -25,7 +25,8 @@ Lua 코드(`on_tick(self, world)`, `build(type, r, c, name)`)를 작성해 타�
 love2d-codedefense/
 ├─ main.lua              ← 엔트리 포인트: 폰트·아트 로드 → db.load → 데이터 무결성 검증 →
 │                            intro_seen 여부로 intro 또는 title 상태로 진입
-├─ conf.lua               ← 창 크기(960x640), 타이틀 등 설정
+├─ conf.lua               ← 창 크기(1280x640, play만 3칼럼 재배치·나머지 화면은 960 기준 레이아웃을
+│                            중앙 정렬로 감쌈), 타이틀 등 설정
 ├─ src/
 │  ├─ csv.lua             ← 따옴표/이스케이프 지원 CSV 파서, 레코드 로더
 │  ├─ db.lua               ← data/*.csv 로드·색인, 참조 무결성 검증(d.validate)
@@ -49,13 +50,15 @@ love2d-codedefense/
 │                               한다. 뷰 비의존, 헤드리스 테스트 가능(`tests/test_stageinfo.lua`)
 ├─ states/                ← hump Gamestate 화면들 (뷰 전담, 로직은 src/battle.lua·src/tutorial.lua에 위임)
 │  ├─ intro.lua             ← 인트로 컷신 4장면 (첫 실행 1회 자동 재생, 타이틀 "세계관" 메뉴로 재생)
-│  ├─ title.lua             ← 타이틀 메뉴 4항목: 게임 시작 / 세계관 / 도감 / 종료
+│  ├─ title.lua             ← 타이틀 메뉴 4항목(게임 시작/세계관/도감/종료), 로고 위 룩(Rook) 심볼,
+│  │                            ↑↓+Enter 및 마우스(호버 이동·좌클릭 선택) 겸용
 │  ├─ stageselect.lua       ← 스테이지 목록 + 배포 기록 표기(`[클리어 · HP n · 구]`/`[시도 n]`)
 │  ├─ play.lua              ← 그리드 + 코드 에디터 + 실시간 전투 + 적 구성 패널·진행 바·문제
 │  │                            카드·구구 클래스 소환 연출을 한 화면에서 진행 (구 prep/battle 통합)
-│  ├─ result.lua            ← 클리어/패배 결과 + 배포 로그 한 줄(§6.7) + 여운 문구
-│  └─ codex.lua             ← 도감: 타워/몬스터 탭, 히든 타워 ??? 카드 (뷰 전용, `progress.gugu_found`
-│                               로 공개 여부 판정)
+│  ├─ result.lua            ← 클리어/패배 결과 + 배포 로그 한 줄(§6.7) + 여운 문구, Enter/좌클릭 공용
+│  └─ codex.lua             ← 도감: 타워/몬스터/내 함수 3탭(←/→ 순환), 히든 타워 ??? 카드
+│                               (뷰 전용, `progress.gugu_found`로 공개 여부 판정). 내 함수 탭은
+│                               `progress.funcbook`(이름→{first,count})을 이름 정렬로 나열한다
 ├─ data/
 │  ├─ towers.csv, enemies.csv, items.csv, stages.csv, timelines.csv
 │  ├─ mazes/                ← 스테이지별 미로 텍스트(#=벽, .=통로, B=건설칸), 12개(001~012),
@@ -176,10 +179,11 @@ love2d-codedefense/
   브리핑 카드 토글 — 아래 참고), ESC(스테이지 선택으로 나가기)가 기본이다. 버튼 모드
   스테이지(1~2)는 숫자키로 버튼을 누른다. 구 조작이던 Tab(포커스 전환)/B(건설)/T(타워
   순환)/Space(전략 순환)는 통합 스크립트 도입과 함께 삭제되었다 — 건설은 코드의 `build()`
-  호출로만 한다. 타이틀 화면은 ↑↓로 메뉴(게임 시작/세계관/도감/종료, 4항목) 이동, Enter로
-  확정한다. "도감"을 고르면 `codex` 상태로 들어간다 — ←/→로 탭(타워/몬스터) 전환, ↑↓로 목록
-  이동, ESC로 타이틀 복귀. 인트로 컷신은 Enter(타이핑 중이면 즉시 완성, 완성 후엔 다음
-  장면)로 진행하고 ESC로 전체 스킵한다.
+  호출로만 한다. 타이틀 화면은 ↑↓(또는 마우스 호버)로 메뉴(게임 시작/세계관/도감/종료, 4항목)
+  이동, Enter(또는 좌클릭)로 확정한다. "도감"을 고르면 `codex` 상태로 들어간다 — ←/→로 탭
+  (타워/몬스터/내 함수, 3탭) 전환, ↑↓로 목록 이동, ESC로 타이틀 복귀. 인트로 컷신은
+  Enter/좌클릭(타이핑 중이면 즉시 완성, 완성 후엔 다음 장면)로 진행하고 ESC로 전체 스킵한다.
+  결과 화면은 Enter 또는 좌클릭으로 스테이지 선택으로 돌아간다.
 - **적 구성 패널·진행 바·문제 브리핑 카드** (`states/play.lua`, 뷰 전용 — `src/stageinfo.lua`가
   battle의 timeline/spawned/enemies를 읽기만 해서 집계): 전장 우상단에 이 스테이지에 등장하는
   적 종류별 미니 스프라이트 + "처리 n / 전체 N"을 보여주는 적 구성 패널이 있고(모든 스폰이
@@ -193,7 +197,12 @@ love2d-codedefense/
   4장면 컷신을 보여준다 — 지상의 화려한 서비스 → 새벽 서버실의 개발자 → 버그로 인한 장애 발생 →
   코드로 맞서는 결의. 장면마다 `src/art.lua`의 코드 생성 일러스트와 `src/cutscene.lua`의 초당
   30자 타이프라이터 텍스트가 함께 나온다. 타이틀 화면은 네온 서버실 배경에 로고와 책상 앞
-  개발자 뒷모습을 그린다. 전투 화면(`states/play.lua`)에는 코드 생성 픽셀아트 몬스터/타워,
+  개발자 뒷모습, 그리고 로고 위 룩(Rook, 체스 성탑) 심볼을 그린다 — `art.drawRook(x, y, scale, t)`가
+  16×16 도트(총안 3개+몸통+받침, green 몸체·cyan 하이라이트)를 직접 그리고, `art.rookIconData()`가
+  같은 도트를 32×32 `ImageData`로 만들어 `main.lua`가 부팅 시 `love.window.setIcon`으로 창/작업
+  표시줄 아이콘을 설정한다. intro/title/stageselect/result/codex는 `love.graphics.getWidth()` 기반
+  중앙 정렬로 1280 폭 창에 대응한다(intro의 960×420 일러스트는 재작업 없이 `translate`로 중앙에
+  감쌈). 전투 화면(`states/play.lua`)에는 코드 생성 픽셀아트 몬스터/타워,
   `src/particles.lua` 이펙트, IDE 패널 옆 개발자 미니 아바타(저장 시 타이핑 포즈, 타워 크래시
   시 놀람 포즈)가 있다. 결과 화면(`states/result.lua`)은 클리어/패배에 맞는 여운 문구를 덧붙인다
   (예: 클리어 — "오늘도 서비스는 무사히 돌아간다. 아무 일 없었다는 듯이.").

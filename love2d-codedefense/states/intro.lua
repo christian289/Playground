@@ -44,18 +44,24 @@ end
 function intro:draw()
     local P = art.pal
     local t = love.timer.getTime()
+    local W = love.graphics.getWidth()
+    local OX = (W - SCENE_W) / 2 -- 일러스트(960 기준)를 창 폭 중앙에 배치하는 오프셋
     love.graphics.setColor(P.bg[1], P.bg[2], P.bg[3])
-    love.graphics.rectangle("fill", 0, 0, 960, 640)
+    love.graphics.rectangle("fill", 0, 0, W, 640)
 
-    -- 일러스트 (상단 960×420)
+    -- 일러스트 (960×420 기준, 일러스트 자체는 그대로 두고 중앙 정렬만 감싼다)
+    love.graphics.push()
+    love.graphics.translate(OX, 0)
     art.drawIntroScene(self.cs:sceneIndex(), t)
+    love.graphics.pop()
 
     -- 일러스트 하단 페이드(텍스트 박스로의 전환)
     love.graphics.setColor(P.bg[1], P.bg[2], P.bg[3], 0.85)
-    love.graphics.rectangle("fill", 0, SCENE_H - 24, 960, 24)
+    love.graphics.rectangle("fill", 0, SCENE_H - 24, W, 24)
 
-    -- 하단 텍스트 박스
-    local bx, by, bw, bh = 60, 448, 840, 150
+    -- 하단 텍스트 박스 (창 폭 중앙 정렬, 원래 840폭 비율 유지)
+    local bw, bh = 840, 150
+    local bx, by = (W - bw) / 2, 448
     love.graphics.setColor(0.04, 0.06, 0.11, 0.94)
     love.graphics.rectangle("fill", bx, by, bw, bh, 8, 8)
     love.graphics.setColor(P.green[1], P.green[2], P.green[3], 0.7)
@@ -90,7 +96,7 @@ function intro:draw()
     -- 하단 안내
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.6, 0.65, 0.7)
-    love.graphics.printf("Enter 다음 · ESC 건너뛰기", 0, 612, 960, "center")
+    love.graphics.printf("Enter/클릭 다음 · ESC 건너뛰기", 0, 612, W, "center")
     love.graphics.setColor(1, 1, 1)
 end
 
@@ -102,6 +108,12 @@ function intro:keypressed(key)
         self.cs:skip()
         self:finish()
     end
+end
+
+function intro:mousepressed(_, _, button)
+    if button ~= 1 then return end
+    self.cs:press()
+    if self.cs:done() then self:finish() end
 end
 
 return intro
