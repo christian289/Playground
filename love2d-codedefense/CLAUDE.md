@@ -53,8 +53,10 @@ love2d-codedefense/
 │  ├─ title.lua             ← 타이틀 메뉴 4항목(게임 시작/세계관/도감/종료), 로고 위 룩(Rook) 심볼,
 │  │                            ↑↓+Enter 및 마우스(호버 이동·좌클릭 선택) 겸용
 │  ├─ stageselect.lua       ← 스테이지 목록 + 배포 기록 표기(`[클리어 · HP n · 구]`/`[시도 n]`)
-│  ├─ play.lua              ← 그리드 + 코드 에디터 + 실시간 전투 + 적 구성 패널·진행 바·문제
-│  │                            카드·구구 클래스 소환 연출을 한 화면에서 진행 (구 prep/battle 통합)
+│  ├─ play.lua              ← 3칼럼(전장 384 / 정보 칼럼 240 / 에디터 610): 그리드 + 코드
+│  │                            에디터 + 실시간 전투 + 정보 칼럼(문제 요약·적 구성·함수 사전·
+│  │                            전투 로그)·진행 바·문제 카드·구구 클래스 소환 연출을 한 화면에서
+│  │                            진행 (구 prep/battle 통합, 전장 오버레이는 정보 칼럼으로 이동)
 │  ├─ result.lua            ← 클리어/패배 결과 + 배포 로그 한 줄(§6.7) + 여운 문구, Enter/좌클릭 공용
 │  └─ codex.lua             ← 도감: 타워/몬스터/내 함수 3탭(←/→ 순환), 히든 타워 ??? 카드
 │                               (뷰 전용, `progress.gugu_found`로 공개 여부 판정). 내 함수 탭은
@@ -65,7 +67,7 @@ love2d-codedefense/
 │  │                            12×16 규격, 테마별 형태(§ "메모리 테마 미로" 참고)
 │  └─ curriculum/            ← 스테이지별 solution(정답)·hints(따라치기/빈칸)·tutorial(가이드)·
 │                               buttons(생성기)·naive(퍼즐 스테이지 순진 배치, 반드시 패배해야 함) Lua 파일
-├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (194개, 11개 스위트:
+├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (206개, 11개 스위트:
 │                               csv/grid/sandbox/battle/data/editor/progress/tutorial/particles/
 │                               cutscene/stageinfo)
 ├─ lib/                    ← 외부 라이브러리 (직접 수정 금지)
@@ -183,16 +185,55 @@ love2d-codedefense/
   이동, Enter(또는 좌클릭)로 확정한다. "도감"을 고르면 `codex` 상태로 들어간다 — ←/→로 탭
   (타워/몬스터/내 함수, 3탭) 전환, ↑↓로 목록 이동, ESC로 타이틀 복귀. 인트로 컷신은
   Enter/좌클릭(타이핑 중이면 즉시 완성, 완성 후엔 다음 장면)로 진행하고 ESC로 전체 스킵한다.
-  결과 화면은 Enter 또는 좌클릭으로 스테이지 선택으로 돌아간다.
-- **적 구성 패널·진행 바·문제 브리핑 카드** (`states/play.lua`, 뷰 전용 — `src/stageinfo.lua`가
-  battle의 timeline/spawned/enemies를 읽기만 해서 집계): 전장 우상단에 이 스테이지에 등장하는
-  적 종류별 미니 스프라이트 + "처리 n / 전체 N"을 보여주는 적 구성 패널이 있고(모든 스폰이
-  끝나면 "잔여 소탕 · 생존!" 한 줄이 더 붙는다), 상단 HUD 바로 아래에 300초 대비 현재 진행률과
-  스폰 이벤트 시점 눈금을 그리는 얇은(4px) 진행 바가 있다. 스테이지 진입(카운트다운 중)에는
-  전장 중앙에 문제 카드가 자동으로 뜬다 — `[문제 N] concept`, `메모리 영역: theme`,
-  `problem` 한 줄 서술, `예산 X · 유입 예정 N기`, 제출/채점 안내를 보여주며 Enter로 닫고
-  전투 중 언제든 Ctrl+I로 다시 연다. 튜토리얼 말풍선이 활성 상태면 문제 카드보다 z순서상
-  위에 그려져 튜토리얼이 우선한다.
+  결과 화면은 Enter 또는 좌클릭으로 스테이지 선택으로 돌아간다. **play 화면의 마우스**:
+  `play:mousepressed`가 좌클릭을 두 영역에서 받는다 — ① 에디터 안에서 `build`나
+  `battle.userFuncs`에 등록된 식별자를 클릭하면 함수 사전 카드가 펼쳐지고(재클릭 시 접힘),
+  ② 정보 칼럼의 사전 목록 항목을 직접 클릭해도 같은 토글이 일어난다(자세한 동작은 "함수
+  사전" 절 참고). 그 외 클릭(빈 곳, 우클릭 등)은 무시된다 — 타워 건설은 여전히 코드의
+  `build()` 호출로만 한다.
+- **3칼럼 레이아웃** (`states/play.lua`): `play` 화면은 창(1280×640) 안에서 좌→우로 전장(x=8,
+  w=384) / 정보 칼럼(x=400, w=240) / 에디터(x=656, w=610) 세 칼럼으로 나뉜다. 구 버전의 전장
+  우상단 오버레이(적 구성 패널·전투 로그)는 모두 정보 칼럼으로 흡수되었다 — 전장에는 더 이상
+  텍스트 오버레이가 없다. 셰이크는 전장에만 적용되고 정보 칼럼·에디터·HUD는 고정이다.
+- **정보 칼럼** (x=400, y=48, w=240, h=512 — 전장과 바닥이 나란함): 위에서부터 순서대로
+  ① **문제 요약**(`[문제 N] concept` / `메모리 영역: theme` / `Ctrl+I 상세` 안내),
+  ② **적 구성**(구 전장 우상단 오버레이 — 스테이지 등장 적 종류별 미니 스프라이트 +
+  "처리 n / 전체 N", 모든 스폰이 끝나면 "잔여 소탕 · 생존!" 한 줄 추가),
+  ③ **함수 사전**(아래 별도 절 참고),
+  ④ **전투 로그**(구 전장 오버레이 — 최근 8줄, 오래된 줄일수록 옅어지는 페이드)가 이어진다.
+  상단 HUD 바로 아래에는(전장 폭 기준) 300초 대비 현재 진행률과 스폰 이벤트 시점 눈금을 그리는
+  얇은(4px) 진행 바가 별도로 있다. 스테이지 진입(카운트다운 중)에는 전장+정보 칼럼을 아우르는
+  중앙에 문제 카드가 자동으로 뜬다 — `[문제 N] concept`, `메모리 영역: theme`, `problem` 한 줄
+  서술, `예산 X · 유입 예정 N기`, 제출/채점 안내를 보여주며 Enter로 닫고 전투 중 언제든 Ctrl+I로
+  다시 연다. 튜토리얼 말풍선이 활성 상태면 문제 카드보다 z순서상 위에 그려져 튜토리얼이
+  우선한다.
+- **함수 사전** (`states/play.lua`의 `drawFuncDict`/`drawDictCard` — 정보 칼럼 ③): 빌트인 함수
+  `build`의 문서(시그니처·설명 5줄·예시)가 `BUILTIN_DOCS` 리터럴로 항상 목록 첫 줄에 있고, 그
+  아래로 유저 정의 함수 목록이 이어진다.
+  - **수집 원리(env diff)**: `Battle:setScript`(`src/battle.lua`)가 F5로 코드를 저장할 때마다
+    `api.buildEnv`로 만든 env의 키 집합을 컴파일 *전*에 스냅샷(`known`)해 두고, 컴파일 *후* env에
+    새로 생긴 키 중 `type(v) == "function"`인 것만 이름 정렬해 `battle.userFuncs`에 담는다.
+    **`local function`은 감지되지 않는다** — 로컬 함수는 청크의 지역 변수일 뿐 env 테이블에
+    할당되지 않기 때문이다(전역으로 정의한 `function foo() end`만 env에 남는다). 정보 칼럼에는
+    "(local 함수는 목록에 잡히지 않아요)" 안내가 항상 붙는다.
+  - **클릭 → 펼침**: 에디터 안에서(`Editor:charAt`+`Editor.tokenAt`로 클릭 좌표 → 식별자 토큰
+    변환) `build` 또는 `battle.userFuncs`에 있는 식별자를 좌클릭하거나, 정보 칼럼의 사전 목록
+    항목(`self.dictRows`)을 직접 좌클릭하면 `self.dictOpen`이 토글된다(같은 항목 재클릭 시
+    접힘). 펼쳐지면 목록의 해당 줄 바로 아래에 카드가 삽입되어 이후 섹션(예: 전투 로그)을
+    밀어낸다 — 빌트인(`build`)은 `BUILTIN_DOCS`의 문서 카드, 유저 함수는
+    `extractFuncSource`(`function 이름` 줄부터 function/if/for/while/do(+1)·end(-1) 키워드
+    카운팅으로 대응 `end`까지 훑는 휴리스틱, 정밀 파서 아님)가 뽑은 소스 발췌를 `L시작줄번호` +
+    최대 10줄(초과 시 "…" 절단)로 보여준다.
+  - **`BUILTIN_DOCS` 확장법**: 새 빌트인 API를 문서화하려면 `states/play.lua`의
+    `BUILTIN_DOCS` 테이블에 `{ sig = "이름(인자...)", lines = {설명 줄...}, example = "예시 코드" }`
+    항목을 키(함수 이름)로 추가하면 `drawDictCard`가 자동으로 카드를 그린다 — 별도 렌더 코드를
+    추가할 필요는 없다.
+  - **funcbook 영구 수집** (`src/progress.lua`의 `p.funcbook`, `play:save`): F5 저장이 성공할
+    때마다 `battle.userFuncs`를 훑어 판당(전투당) 이름별로 **한 번만**(`self.funcCounted` 가드)
+    `p.funcbook[name] = { first = stageId, count = 0 }`를 만들고 `count`를 1 증가시켜
+    `progress.save`로 영구 저장한다. 도감(`states/codex.lua`)의 3번째 탭 **"내 함수"**가 이
+    `funcbook`을 이름 정렬로 나열하고, 카드는 "스테이지 N에서 처음 정의 · M회"를 보여준다(아직
+    없으면 "아직 수집된 함수가 없습니다..." 안내).
 - **세계관·비주얼**: `states/intro.lua`가 첫 실행 시 자동으로(또는 타이틀 "세계관" 메뉴로 언제든)
   4장면 컷신을 보여준다 — 지상의 화려한 서비스 → 새벽 서버실의 개발자 → 버그로 인한 장애 발생 →
   코드로 맞서는 결의. 장면마다 `src/art.lua`의 코드 생성 일러스트와 `src/cutscene.lua`의 초당
@@ -325,11 +366,13 @@ v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스
 ```
 
 `tests/main.lua`가 `tests/test_*.lua` 스위트를 전부 실행하고 `RESULT pass=N fail=N`을 출력한다
-(현재 194개, 전부 PASS — 11개 스위트: `test_csv`·`test_grid`·`test_sandbox`·`test_battle`·
+(현재 206개, 전부 PASS — 11개 스위트: `test_csv`·`test_grid`·`test_sandbox`·`test_battle`·
 `test_data`·`test_editor`·`test_progress`·`test_tutorial`·`test_particles`·`test_cutscene`·
 `test_stageinfo`. `test_particles.lua`·`test_cutscene.lua`가 뷰 전용 이펙트/컷신 로직을,
-`test_stageinfo.lua`가 적 구성 패널 집계 유틸을 다룬다). 실패가 있으면 콘솔 종료 코드도 0이
-아니게 된다.
+`test_stageinfo.lua`가 적 구성 패널 집계 유틸을 다룬다. 이번 웨이브(3칼럼 레이아웃+함수 사전)는
+신규 스위트를 추가하지 않고 기존 `test_editor`/`test_battle`/`test_progress` 스위트를 확장해
+`Editor:charAt`/`Editor.tokenAt`, `battle.userFuncs`(env diff), `progress.funcbook`을 검증한다).
+실패가 있으면 콘솔 종료 코드도 0이 아니게 된다.
 
 스테이지를 추가할 때는 `data/curriculum/<n>_solution.lua`를 **반드시** 함께 추가해야 한다 —
 `tests/test_battle.lua`가 CSV에 등록된 모든 스테이지를 순회하며 `solution_file`의 코드로 실제

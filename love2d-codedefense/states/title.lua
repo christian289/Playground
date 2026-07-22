@@ -96,7 +96,7 @@ function title:draw()
 
     -- 룩 심볼 (로고 위, scale 4)
     local rookScale = 4
-    art.drawRook(W / 2 - 8 * rookScale, 4, rookScale, t)
+    art.drawRook(W / 2 - 8 * rookScale, 10, rookScale, t)
 
     -- 로고
     art.drawLogo(W / 2, 76)
