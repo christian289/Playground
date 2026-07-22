@@ -6,8 +6,11 @@ local Battle = require("src.battle")
 local progress = require("src.progress")
 local art = require("src.art")
 local particles = require("src.particles")
+local stageinfo = require("src.stageinfo")
 
 local GRID_X, GRID_Y = 8, 48
+local FIELD_W = grid.COLS * grid.CELL -- 384
+local FIELD_H = grid.ROWS * grid.CELL -- 512
 local play = {}
 
 local function loadText(root, rel)
@@ -44,11 +47,26 @@ function play:enter(_, d, stageId, p)
     end
     self.battle:start()                 -- 카운트다운부터 실시간 진행
 
+    -- 적 구성 패널·문제 카드용 데이터: 타임라인은 결정론이라 진입 시 1회만 계산
+    self.info = stageinfo.totals(self.battle.timeline)
+    self.enemyTypes = {}                -- 적 구성 패널 표시 순서 = 타임라인 첫 등장 순
+    do
+        local seen = {}
+        for _, ev in ipairs(self.info.events) do
+            if not seen[ev.spawn] then
+                seen[ev.spawn] = true
+                self.enemyTypes[#self.enemyTypes + 1] = ev.spawn
+            end
+        end
+    end
+    self.showBrief = true               -- 문제 카드: 카운트다운 중 자동 표시, Ctrl+I로 재열람
+
     particles.clear()
     self.fx = {
         prevEnemies = {}, prevTowerCount = #self.battle.towers, prevServerHP = self.battle.serverHP,
         prevCrashed = {}, shake = 0, redFlash = 0, devAnim = { pose = "idle", timer = 0 },
         prevCd = {}, firedTimer = {}, smokeAcc = {}, hitTimer = {},
+        guguFx = 0, guguSeen = false,    -- 구구 클래스 소환 연출 타이머(§6.6) — 원시 dt 감쇠
     }
 
     if self.stage.tutorial_file ~= "" and not p.tutorial_done[stageId] then
@@ -167,14 +185,41 @@ function play:update(dt)
         fx.redFlash = 0.35
     end
     fx.prevServerHP = b.serverHP
-    -- 설치 감지
+    -- 설치 감지 (+ 구구 클래스 등장 frame-diff → 소환 연출, 스펙 §6.6)
     if #b.towers > fx.prevTowerCount then
         local tw = b.towers[#b.towers]
         particles.spawn("flash", tw.x, tw.y, { color = art.pal.cyan })
+        if tw.def.id == "gugu-class" then
+            fx.guguFx = 1.2
+            fx.guguSeen = true
+            fx.shake = 0.4
+            -- 구구단 파티클 6개: 타워 위치가 아니라 전장 여러 x,y에 흩뿌린다(3열×2행) —
+            -- 타워가 우상단(적 구성 패널 부근)에 세워져도 패널 텍스트와 겹치지 않도록.
+            for i = 1, 6 do
+                local col = (i - 1) % 3
+                local row = math.floor((i - 1) / 3)
+                local px = FIELD_W * (col + 0.5) / 3
+                local py = FIELD_H * 0.32 + row * FIELD_H * 0.34
+                particles.spawn("float", px, py,
+                    { text = ("2 × %d = %d"):format(i, 2 * i), color = art.pal.orange, ttl = 1.4 })
+            end
+        end
     end
     fx.prevTowerCount = #b.towers
     fx.shake = math.max(0, fx.shake - dt)
     fx.redFlash = math.max(0, fx.redFlash - dt)
+    fx.guguFx = math.max(0, fx.guguFx - dt) -- 원시 dt 감쇠(배속 무관하게 1.2초 유지)
+
+    -- 구구 클래스 최초 발견 → progress에 1회 저장 (도감 ???, Task 6 배포 로그가 사용)
+    if not self.p.gugu_found then
+        for _, tw in ipairs(b.towers) do
+            if tw.def.id == "gugu-class" then
+                self.p.gugu_found = true
+                progress.save(self.p)
+                break
+            end
+        end
+    end
     -- 개발자 아바타 포즈 감쇠 (원시 dt — 배속 무관하게 1초 유지)
     if fx.devAnim.timer > 0 then
         fx.devAnim.timer = fx.devAnim.timer - dt
@@ -199,6 +244,23 @@ function play:draw()
         or ("%.0f / 300초"):format(b.clock)
     love.graphics.print(("%s   서버 HP %d   잔액 %d   배속 x%d"):format(clockText, b.serverHP, b.money, self.speed), 8, 12)
 
+    -- 진행 바 (HUD 아래, 300초 대비 현재 시각 + 스폰 이벤트 눈금) — 좌표 라벨(아래에서 y를
+    -- GRID_Y-12로 내림)과 겹치지 않도록 얇게(4px) y=30에 둔다.
+    do
+        local barX, barY, barW, barH = GRID_X, 30, FIELD_W, 4
+        love.graphics.setColor(art.pal.panel[1], art.pal.panel[2], art.pal.panel[3], 0.9)
+        love.graphics.rectangle("fill", barX, barY, barW, barH)
+        local frac = math.max(0, math.min(1, b.clock / Battle.TOTAL))
+        love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3], 0.9)
+        love.graphics.rectangle("fill", barX, barY, barW * frac, barH)
+        love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3], 0.9)
+        for _, ev in ipairs(self.info.events) do
+            local tx = barX + (ev.at / Battle.TOTAL) * barW
+            love.graphics.rectangle("fill", tx, barY, 1, barH)
+        end
+        love.graphics.setColor(1, 1, 1)
+    end
+
     -- 전장 타일
     for r = 1, grid.ROWS do
         for c = 1, grid.COLS do
@@ -209,13 +271,50 @@ function play:draw()
             else art.drawFloor(x, y) end
         end
     end
-    -- 행·열 좌표 라벨 (코드로 좌표를 지정하므로 상시 표기)
+    -- 행·열 좌표 라벨 (코드로 좌표를 지정하므로 상시 표기) — 진행 바(y=30~34)와 겹치지
+    -- 않도록 열 라벨을 그리드 쪽으로 4px 내려 y=-12 오프셋(=38)에서 그린다.
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.5, 0.55, 0.6)
-    for c = 1, grid.COLS do love.graphics.print(tostring(c), GRID_X + shakeX + (c - 1) * grid.CELL + 10, GRID_Y + shakeY - 16) end
+    for c = 1, grid.COLS do love.graphics.print(tostring(c), GRID_X + shakeX + (c - 1) * grid.CELL + 10, GRID_Y + shakeY - 12) end
     for r = 1, grid.ROWS do love.graphics.print(tostring(r), GRID_X + shakeX - 6 - fonts.small:getWidth(tostring(r)) + 4, GRID_Y + shakeY + (r - 1) * grid.CELL + 8) end
     -- 서버라인
     art.drawServerline(GRID_X + shakeX, GRID_Y + shakeY + grid.ROWS * grid.CELL, grid.COLS * grid.CELL, t)
+
+    -- 적 구성 패널 (전장 우상단, 좌하단 로그 오버레이와 대칭인 반투명 박스). 모든 스폰이
+    -- 끝나면 패널 하단에 "잔여 소탕" 문구를 한 줄 더 붙인다 — HUD 한 줄에 붙였다가 긴
+    -- 문장이 에디터 패널 쪽으로 넘쳐 겹치는 문제가 있어(스크린샷으로 발견) 폭이 고정된
+    -- 이 패널 안으로 옮겼다.
+    do
+        local killed = stageinfo.killedCounts(self.info, b)
+        local sweeping = b.clock >= self.info.lastEnd and (b.status == "running" or b.status == "clear")
+        local panelW, rowH = 172, 26
+        local n = #self.enemyTypes
+        local panelH = 10 + 18 + (n + (sweeping and 1 or 0)) * rowH + 4
+        local px2 = GRID_X + shakeX + FIELD_W - panelW - 4
+        local py2 = GRID_Y + shakeY + 4
+        love.graphics.setColor(art.pal.bg[1], art.pal.bg[2], art.pal.bg[3], 0.75)
+        love.graphics.rectangle("fill", px2, py2, panelW, panelH)
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(0.75, 0.8, 0.86)
+        love.graphics.print("적 구성", px2 + 8, py2 + 5)
+        for i, id in ipairs(self.enemyTypes) do
+            local rowY = py2 + 10 + 18 + (i - 1) * rowH
+            art.drawEnemy(id, px2 + 22, rowY + rowH / 2, t, false)
+            local def = self.d.enemies[id]
+            local kn = killed[id] or 0
+            local tot = self.info.byType[id] or 0
+            love.graphics.setColor(0.85, 0.88, 0.92)
+            love.graphics.print(("%s"):format(def and def.name or id), px2 + 40, rowY + rowH / 2 - 15)
+            love.graphics.setColor(0.6, 0.9, 0.7)
+            love.graphics.print(("처리 %d / %d"):format(kn, tot), px2 + 40, rowY + rowH / 2 - 1)
+        end
+        if sweeping then
+            local rowY = py2 + 10 + 18 + n * rowH
+            love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+            love.graphics.print("잔여 소탕 · 생존!", px2 + 8, rowY + rowH / 2 - 7)
+        end
+        love.graphics.setColor(1, 1, 1)
+    end
 
     -- 타워 (justFired 플래시 프레임, 크래시/disabled 틴트 오버레이 — art.drawTower는 항상
     -- 자체 팔레트 색으로 그리므로 사전 setColor 틴트가 먹지 않아 사후 반투명 오버레이로 표현)
@@ -318,8 +417,8 @@ function play:draw()
     if not (self.tut and not self.tut:done()) then
         love.graphics.setColor(0.6, 0.65, 0.7)
         local hint = self:isButtonStage()
-            and "숫자키 버튼 실행 · Ctrl+1/2/4 배속 · ESC 나가기"
-            or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+1/2/4 배속 · ESC 나가기"
+            and "숫자키 버튼 실행 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · ESC 나가기"
+            or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · ESC 나가기"
         love.graphics.printf(hint, 0, 620, 960, "center")
     end
 
@@ -335,6 +434,59 @@ function play:draw()
         love.graphics.setColor(1, 1, 1)
     end
 
+    -- 구구 클래스 소환 연출 (스펙 §6.6, 뷰 전용 frame-diff 이펙트) — 튜토리얼 아래 z순서
+    if fx.guguFx > 0 then
+        local sw, sh = love.graphics.getWidth(), love.graphics.getHeight()
+        -- 흰 전체 플래시: 트리거 직후 0.3초 구간만 (1.2 → 0.9)
+        local flashA = math.max(0, fx.guguFx - 0.9)
+        if flashA > 0 then
+            love.graphics.setColor(1, 1, 1, flashA)
+            love.graphics.rectangle("fill", 0, 0, sw, sh)
+        end
+        -- 금색 테두리 펄스
+        local pulse = 0.6 + 0.4 * math.sin(t * 16)
+        love.graphics.setColor(art.pal.orange[1], art.pal.orange[2], art.pal.orange[3], pulse)
+        love.graphics.setLineWidth(6)
+        love.graphics.rectangle("line", 3, 3, sw - 6, sh - 6)
+        love.graphics.setLineWidth(1)
+        -- 중앙 배너
+        love.graphics.setFont(fonts.big)
+        local bannerA = math.min(1, fx.guguFx * 2)
+        love.graphics.setColor(art.pal.orange[1], art.pal.orange[2], art.pal.orange[3], bannerA)
+        love.graphics.printf("전설의 클래스, 소환.", 0, sh / 2 - 24, sw, "center")
+        love.graphics.setColor(1, 1, 1)
+    end
+
+    -- 문제 카드 (카운트다운 중 자동 표시, Ctrl+I 재열람) — 튜토리얼 말풍선보다 아래 z순서이므로
+    -- tut:draw보다 반드시 먼저 그려 튜토리얼이 카드 위에 겹쳐 보이게 한다.
+    if self.showBrief then
+        local stage = self.stage
+        local cardW = 360
+        local cardX = GRID_X + (FIELD_W - cardW) / 2
+        local cardH = 190
+        local cardY = GRID_Y + (grid.ROWS * grid.CELL - cardH) / 2
+        love.graphics.setColor(art.pal.panel[1], art.pal.panel[2], art.pal.panel[3], 0.94)
+        love.graphics.rectangle("fill", cardX, cardY, cardW, cardH, 6)
+        love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3], 0.8)
+        love.graphics.rectangle("line", cardX, cardY, cardW, cardH, 6)
+        local pad = 14
+        love.graphics.setFont(fonts.ui)
+        love.graphics.setColor(art.pal.white[1], art.pal.white[2], art.pal.white[3])
+        love.graphics.printf(("[문제 %d] %s"):format(self.stageId, stage.concept), cardX + pad, cardY + pad, cardW - pad * 2, "left")
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
+        love.graphics.printf("메모리 영역: " .. stage.theme, cardX + pad, cardY + pad + 24, cardW - pad * 2, "left")
+        love.graphics.setColor(0.85, 0.88, 0.92)
+        love.graphics.printf(stage.problem, cardX + pad, cardY + pad + 46, cardW - pad * 2, "left")
+        love.graphics.setColor(0.7, 0.75, 0.8)
+        love.graphics.printf(("제한: 예산 %d · 유입 예정 %d기"):format(stage.budget, self.info.total),
+            cardX + pad, cardY + cardH - 58, cardW - pad * 2, "left")
+        love.graphics.printf("제출: F5 · 채점: 300초 생존", cardX + pad, cardY + cardH - 40, cardW - pad * 2, "left")
+        love.graphics.setColor(0.55, 0.6, 0.65)
+        love.graphics.printf("Enter 닫기 · Ctrl+I 다시 보기", cardX + pad, cardY + cardH - 20, cardW - pad * 2, "left")
+        love.graphics.setColor(1, 1, 1)
+    end
+
     if self.tut then self.tut:draw(fonts, GRID_X, GRID_Y) end
 end
 
@@ -345,6 +497,16 @@ function play:keypressed(key)
     if self.tut and not self.tut:done() then
         if not self.tut:allows(key, ctrl) then return end
         if self.tut:keypressed(key, ctrl) then return end
+    end
+    -- 문제 카드: Ctrl+I로 언제든 토글(버튼/에디터 입력과 무충돌), Enter는 카드가 열려
+    -- 있는 동안만 닫기로 소비한다(그 외에는 에디터 개행으로 그대로 흘러간다).
+    if ctrl and key == "i" then
+        self.showBrief = not self.showBrief
+        return
+    end
+    if key == "return" and self.showBrief then
+        self.showBrief = false
+        return
     end
     if key == "escape" then
         Gamestate.switch(require("states.stageselect"), self.d, self.p)
