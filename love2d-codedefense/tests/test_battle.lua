@@ -166,4 +166,41 @@ function on_tick(self, world) self:attack(world.nearest()) end
         run(bb, 420)
         t.eq(bb.status, "clear", "buttons_2 마지막 버튼 스크립트로 스테이지2 클리어")
     end
+
+    -- 구구 클래스: 별칭·limit·단 성장·배율
+    local GUGU = 'build("구구클래스", 3, 10, "g")\nfunction on_tick(self, world)\n  self:attack(world.nearest())\nend'
+    local bg = Battle(d, 1, {})
+    t.ok(bg:setScript(GUGU), "한글 별칭 컴파일")
+    t.eq(bg.towers[1].def.id, "gugu-class", "별칭이 gugu-class로 해석")
+    t.eq(bg.towers[1].dan, 2, "2단 시작")
+    bg:setScript(GUGU .. '\nbuild("gugu-class", 11, 3, "g2")')
+    t.eq(#bg.towers, 1, "스테이지당 1개 제한")
+    t.ok(table.concat(bg.log, "/"):find("1개뿐"), "limit 한글 오류 로그")
+
+    -- 단 성장: 발사 여부와 무관하게 전투 시간(clock>=0) 기준 30초마다 진행
+    bg:start()
+    local dt = 1 / 30
+    local totalSteps = math.floor((d.stages[1].countdown + 31) / dt)
+    for _ = 1, totalSteps do bg:update(dt) end
+    t.eq(bg.towers[1].dan, 3, "30초 후 3단")
+    t.ok(table.concat(bg.log, "/"):find("3단 돌입"), "단 상승 로그")
+    t.eq(Battle.TOTAL, 300, "TOTAL 상수 노출")
+
+    -- 배율 검증: (11,3)은 초반 웨이브(col=4)가 지나가는 실제 정답 좌표(001_solution.lua의 "b")와
+    -- 같아 이른 시각에 사격이 이뤄진다. 카운트다운 중 charge가 최대치(3)로 포화되므로
+    -- 첫 발은 damage(6) * dan(2) * (1 + 3*0.5) = 30 으로 결정론적이다.
+    local GUGU2 = 'build("구구클래스", 11, 3, "g")\nfunction on_tick(self, world)\n  self:attack(world.nearest())\nend'
+    local bg2 = Battle(d, 1, {})
+    bg2:setScript(GUGU2)
+    bg2:start()
+    local firstProjDamage = nil
+    for _ = 1, math.floor(60 / dt) do
+        bg2:update(dt)
+        if not firstProjDamage and #bg2.projectiles > 0 then
+            firstProjDamage = bg2.projectiles[1].damage
+        end
+        if firstProjDamage then break end
+    end
+    t.ok(firstProjDamage ~= nil, "구구 클래스 첫 발사")
+    t.eq(firstProjDamage, 30, "발사 데미지 = damage(6) * dan(2) * 차지배율(2.5)")
 end

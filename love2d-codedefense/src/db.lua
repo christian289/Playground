@@ -17,7 +17,7 @@ end
 function db.load(root)
     local d = { root = root }
     d.towers = index(csv.load(root .. "/data/towers.csv"),
-        { "cost", "damage", "range", "cooldown", "bullet_speed" })
+        { "cost", "damage", "range", "cooldown", "bullet_speed", "limit", "hidden" })
     d.enemies = index(csv.load(root .. "/data/enemies.csv"), { "hp", "speed", "reward" })
     d.items = index(csv.load(root .. "/data/items.csv"), {})
     d.stages = index(csv.load(root .. "/data/stages.csv"), { "budget", "wave_clock", "countdown" })

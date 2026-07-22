@@ -13,6 +13,7 @@ local WATCHDOG = 3          -- 크래시 후 재시작(초)
 local CHARGE_MAX = 3
 
 local Battle = Object:extend()
+Battle.TOTAL = TOTAL
 
 function Battle:new(d, stageId, opts)
     opts = opts or {}
@@ -48,6 +49,7 @@ end
 
 -- 실시간 스크립트로 타워를 짓는다. 멱등: 같은 이름이 이미 있으면 성공(no-op).
 function Battle:buildTower(typeId, r, c, name)
+    if typeId == "구구클래스" then typeId = "gugu-class" end
     if type(name) ~= "string" or name == "" then return false, "타워 이름(4번째 인자)이 필요합니다" end
     if self.towersByName[name] then return true end          -- 멱등
     local def = self.d.towers[typeId]
@@ -60,6 +62,15 @@ function Battle:buildTower(typeId, r, c, name)
         if not has then
             return false, ("'%s' 건설에는 '%s' 타워가 먼저 필요합니다")
                 :format(def.name, self.d.towers[def.requires].name)
+        end
+    end
+    if def.limit then
+        local n = 0
+        for _, tw in ipairs(self.towers) do
+            if tw.def.id == def.id then n = n + 1 end
+        end
+        if n >= def.limit then
+            return false, ("%s는 스테이지당 %d개뿐입니다"):format(def.name, def.limit)
         end
     end
     r, c = tonumber(r), tonumber(c)
@@ -75,6 +86,7 @@ function Battle:buildTower(typeId, r, c, name)
     self.money = self.money - def.cost
     local tw = Tower(def, r, c, {})
     tw.name = name
+    if def.ability == "gugu" then tw.dan = 2; tw.danTimer = 0 end
     self.towersByName[name] = tw
     self.towers[#self.towers + 1] = tw
     self:say(("[설치] %s → \"%s\" (%d,%d)"):format(def.name, name, r, c))
@@ -162,8 +174,9 @@ function Battle:resolveAttack(tw)
     local dx, dy = target.x - tw.x, target.y - tw.y
     if dx * dx + dy * dy > tw.def.range * tw.def.range then return end
     local mult = 1 + tw.charge * 0.5
+    local dmg = tw.def.damage * (tw.dan or 1)
     self.projectiles[#self.projectiles + 1] =
-        Projectile(tw.x, tw.y, target, tw.def.damage * mult, tw.def.bullet_speed, 4 * mult)
+        Projectile(tw.x, tw.y, target, dmg * mult, tw.def.bullet_speed, 4 * mult)
     tw.charge = 0
     tw.cd = tw:effectiveCooldown()
 end
@@ -182,6 +195,14 @@ function Battle:update(dt)
 
     for _, tw in ipairs(self.towers) do
         tw.cd = math.max(0, tw.cd - dt)
+        if tw.dan and self.clock >= 0 and tw.dan < 9 then
+            tw.danTimer = tw.danTimer + dt
+            if tw.danTimer >= 30 then
+                tw.danTimer = tw.danTimer - 30
+                tw.dan = tw.dan + 1
+                self:say(("[구구 클래스] %d단 돌입! %d × 1 = %d..."):format(tw.dan, tw.dan, tw.dan))
+            end
+        end
         if tw.crashed > 0 then
             tw.crashed = math.max(0, tw.crashed - dt)
             if tw.crashed == 0 then

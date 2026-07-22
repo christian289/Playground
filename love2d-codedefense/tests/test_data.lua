@@ -14,6 +14,8 @@ return function(t)
     t.eq(d.stages[1].buttons_file, "curriculum/buttons_1.lua", "buttons_file 값 로드")
     t.eq(d.stages[3].buttons_file, "", "buttons_file 빈 값(버튼 없는 스테이지)")
     t.eq(d.stages[1].wave_clock, nil, "빈 셀은 nil로 변환")
+    t.eq(d.towers["gugu-class"].limit, 1, "gugu-class limit 숫자 변환")
+    t.eq(d.towers.printer.limit, nil, "빈 limit은 nil")
 
     local tl = d.timeline(1)
     t.ok(#tl >= 4, "타임라인 이벤트 존재")
