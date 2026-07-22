@@ -12,7 +12,7 @@ local AFTERWORD = {
 }
 
 function result:enter(_, status, ctx)
-    self.status, self.ctx, self.recorded = status, ctx, false
+    self.status, self.ctx = status, ctx
     if status == "clear" then
         ctx.p.cleared[ctx.stageId] = true
         local reward = ctx.d.stages[ctx.stageId].reward_item
@@ -23,9 +23,9 @@ function result:enter(_, status, ctx)
         end
     end
 
-    -- 배포 기록 갱신 (1회 가드)
-    if not self.recorded then
-        self.recorded = true
+    -- 같은 전투 결과(ctx)에 대한 이중 기록 방지 (enter 재호출 대비)
+    if self.recordedCtx ~= ctx then
+        self.recordedCtx = ctx
         ctx.p.records = ctx.p.records or {}
         local rec = ctx.p.records[ctx.stageId]
         if not rec then
