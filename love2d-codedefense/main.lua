@@ -15,5 +15,10 @@ function love.load()
         error("데이터 무결성 오류:\n" .. table.concat(errs, "\n"))
     end
     Gamestate.registerEvents()
-    Gamestate.switch(require("states.title"), d, progress.load())
+    local p = progress.load()
+    if p.intro_seen then
+        Gamestate.switch(require("states.title"), d, p)
+    else
+        Gamestate.switch(require("states.intro"), d, p)
+    end
 end

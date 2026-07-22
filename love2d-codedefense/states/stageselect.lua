@@ -1,5 +1,6 @@
 local Gamestate = require("lib.hump.gamestate")
 local fonts = require("src.fonts")
+local art = require("src.art")
 
 local sel = {}
 
@@ -22,23 +23,35 @@ function sel:unlocked(id)
 end
 
 function sel:draw()
+    local P = art.pal
+    love.graphics.setColor(P.bg[1], P.bg[2], P.bg[3])
+    love.graphics.rectangle("fill", 0, 0, 960, 640)
+    -- 목록 패널
+    love.graphics.setColor(P.panel[1], P.panel[2], P.panel[3], 0.85)
+    love.graphics.rectangle("fill", 200, 96, 560, 470, 10, 10)
+
     love.graphics.setFont(fonts.big)
-    love.graphics.setColor(0.9, 0.92, 0.95)
+    love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3])
     love.graphics.printf("스테이지 선택", 0, 40, 960, "center")
     love.graphics.setFont(fonts.ui)
     for i, id in ipairs(self.ids) do
         local s = self.d.stages[id]
-        local y = 110 + (i - 1) * 40
+        local y = 118 + (i - 1) * 40
         local locked = not self:unlocked(id)
-        if i == self.cursor then love.graphics.setColor(1, 0.85, 0.3)
+        if i == self.cursor then
+            love.graphics.setColor(P.green[1], P.green[2], P.green[3], 0.14)
+            love.graphics.rectangle("fill", 220, y - 4, 520, 32, 5, 5)
+            love.graphics.setColor(P.green[1], P.green[2], P.green[3])
         elseif locked then love.graphics.setColor(0.35, 0.38, 0.42)
         else love.graphics.setColor(0.85, 0.88, 0.92) end
         local mark = self.p.cleared[id] and " [클리어]" or (locked and " [잠김]" or "")
-        love.graphics.printf(("%d. %s%s"):format(id, s.concept, mark), 0, y, 960, "center")
+        local prefix = (i == self.cursor) and "> " or "   "
+        love.graphics.printf(("%s%d. %s%s"):format(prefix, id, s.concept, mark), 0, y, 960, "center")
     end
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.6, 0.65, 0.7)
     love.graphics.printf("↑↓ 이동 · Enter 선택 · ESC 타이틀", 0, 600, 960, "center")
+    love.graphics.setColor(1, 1, 1)
 end
 
 function sel:keypressed(key)

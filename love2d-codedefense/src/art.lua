@@ -452,4 +452,283 @@ function art.drawLogo(cx, y)
     love.graphics.setColor(1, 1, 1)
 end
 
+--------------------------------------------------------------------------------
+-- 인트로 컷신 일러스트 4종 (960×420 영역, 0,0 기준. love.timer 미사용 — t 인자)
+--------------------------------------------------------------------------------
+
+-- drawWall 을 s배 확대해 (x,y)에 그린다 (서버랙 확대용)
+local function bigWall(x, y, s, t)
+    love.graphics.push()
+    love.graphics.translate(x, y)
+    love.graphics.scale(s)
+    art.drawWall(0, 0, t)
+    love.graphics.pop()
+    love.graphics.setColor(1, 1, 1)
+end
+
+-- 하트 (cx, cy 중심)
+local function heart(col, cx, cy, r)
+    setCol(col)
+    love.graphics.circle("fill", cx - r * 0.55, cy - r * 0.35, r * 0.6)
+    love.graphics.circle("fill", cx + r * 0.55, cy - r * 0.35, r * 0.6)
+    love.graphics.polygon("fill", cx - r, cy, cx + r, cy, cx, cy + r * 1.2)
+end
+
+-- 말풍선 (꼬리 아래) + 안의 심볼 그리기
+local function bubble(cx, cy, w, h, kind)
+    local P = art.pal
+    setCol(P.white)
+    love.graphics.rectangle("fill", cx - w / 2, cy - h / 2, w, h, 5, 5)
+    love.graphics.polygon("fill", cx - 5, cy + h / 2 - 1, cx + 5, cy + h / 2 - 1, cx - 2, cy + h / 2 + 8)
+    if kind == "heart" then
+        heart(P.magenta, cx, cy - 2, 7)
+    else -- "!"
+        setCol(P.red)
+        love.graphics.rectangle("fill", cx - 2, cy - 9, 4, 11)
+        love.graphics.rectangle("fill", cx - 2, cy + 4, 4, 4)
+    end
+    love.graphics.setColor(1, 1, 1)
+end
+
+-- 지상 서비스 이용자 (발밑 중심 px, 바닥 py)
+local function drawCitizen(px, py, shirt, kind, t)
+    local skin, hair = c("#f2cca0"), c("#3a2a1c")
+    -- 다리 + 신발
+    rect(c("#33405e"), px - 10, py - 24, 8, 24)
+    rect(c("#33405e"), px + 2, py - 24, 8, 24)
+    rect(c("#20283c"), px - 11, py - 3, 9, 3); rect(c("#20283c"), px + 2, py - 3, 9, 3)
+    -- 몸통
+    rect(shirt, px - 12, py - 50, 24, 27)
+    rect(c("#000000"), px - 12, py - 50, 24, 2, 0.12) -- 어깨 음영
+    -- 목/머리
+    rect(skin, px - 4, py - 54, 8, 5)
+    rect(skin, px - 9, py - 71, 18, 18)
+    rect(hair, px - 10, py - 74, 20, 8)
+    rect(hair, px - 10, py - 71, 3, 9); rect(hair, px + 7, py - 71, 3, 9)
+    -- 폰 든 팔 (앞으로) + 스마트폰
+    rect(shirt, px + 8, py - 47, 7, 5)
+    rect(skin, px + 13, py - 47, 5, 15)
+    rect(c("#161a24"), px + 15, py - 55, 13, 21)
+    local glow = 0.55 + 0.35 * math.sin(t * 3 + px)
+    setCol(art.pal.cyan, glow)
+    love.graphics.rectangle("fill", px + 17, py - 52, 9, 15)
+    setCol(art.pal.white, glow * 0.7)
+    love.graphics.rectangle("fill", px + 18, py - 50, 7, 3)
+    love.graphics.setColor(1, 1, 1)
+    -- 말풍선 (머리 위, 부드러운 상하 진동)
+    local by = py - 92 + math.sin(t * 2 + px) * 2
+    bubble(px + 4, by, 34, 26, kind)
+end
+
+-- 벽시계 (아날로그, 3:00 표시)
+local function drawWallClock(cx, cy, r)
+    local P = art.pal
+    setCol(c("#e8ecf4"))
+    love.graphics.circle("fill", cx, cy, r)
+    setCol(c("#20283c"))
+    love.graphics.circle("line", cx, cy, r)
+    setCol(c("#3a4256"))
+    for i = 0, 11 do
+        local a = i * math.pi / 6
+        love.graphics.rectangle("fill", cx + math.cos(a) * (r - 3) - 1, cy + math.sin(a) * (r - 3) - 1, 2, 2)
+    end
+    -- 3:00 — 분침 위(12), 시침 우(3)
+    love.graphics.setLineWidth(2)
+    setCol(c("#20283c"))
+    love.graphics.line(cx, cy, cx, cy - r * 0.62)          -- 분침
+    setCol(c("#b03028"))
+    love.graphics.line(cx, cy, cx + r * 0.5, cy)            -- 시침
+    love.graphics.setLineWidth(1)
+    setCol(P.red)
+    love.graphics.circle("fill", cx, cy, 2)
+    love.graphics.setColor(1, 1, 1)
+end
+
+-- 서버실 공용 배경 (씬 2·3 공유). alarm=true 면 붉은 비상 톤
+local function drawServerRoom(t, alarm)
+    local P = art.pal
+    -- 어두운 바닥/벽
+    rect(c("#080b14"), 0, 0, 960, 420)
+    rect(c("#0c1120"), 0, 250, 960, 170)          -- 바닥
+    -- 바닥 원근 격자
+    setCol(P.grid, 0.5)
+    for i = 0, 960, 48 do love.graphics.rectangle("fill", i, 250, 1, 170) end
+    for j = 0, 170, 24 do love.graphics.rectangle("fill", 0, 250 + j, 960, 1) end
+    -- 서버랙 6대 (뒤열 3 + 앞열 3, 원근감)
+    bigWall(70, 70, 2.4, t)
+    bigWall(190, 70, 2.4, t)
+    bigWall(310, 70, 2.4, t)
+    bigWall(40, 190, 3.0, t)
+    bigWall(180, 190, 3.0, t)
+    bigWall(320, 190, 3.0, t)
+    -- 구석 책상 (우측)
+    rect(c("#241a12"), 640, 300, 260, 90)          -- 책상
+    rect(c("#160f0a"), 640, 300, 260, 6)
+    -- 모니터
+    rect(c("#0a0e18"), 720, 190, 130, 96)          -- 베젤
+    local scr = alarm and P.red or P.cyan
+    setCol(scr, alarm and 0.9 or 0.8)
+    love.graphics.rectangle("fill", 728, 198, 114, 80)
+    -- 화면 코드 라인
+    setCol(P.white, 0.5)
+    for i = 0, 6 do love.graphics.rectangle("fill", 736, 206 + i * 10, 60 + (i % 3) * 20, 3) end
+    rect(c("#0a0e18"), 780, 286, 10, 18)           -- 스탠드
+    rect(c("#0a0e18"), 760, 304, 50, 4)
+    -- 모니터 발광 원뿔 (알파 다각형, 개발자 쪽으로)
+    setCol(scr, alarm and 0.16 or 0.12)
+    love.graphics.polygon("fill", 785, 240, 690, 340, 690, 400, 900, 400, 900, 300)
+    love.graphics.setColor(1, 1, 1)
+    -- 개발자 (책상 앞, 모니터 불빛 아래) — idle
+    art.drawDev(alarm and "alarm" or "idle", 630, 250, 4, t)
+    -- 벽시계 (3:00)
+    drawWallClock(560, 90, 34)
+    if alarm then
+        -- 붉은 앰비언트 워시 + 랙 사이 붉은 LED 오버레이
+        setCol(P.red, 0.10 + 0.05 * math.sin(t * 6))
+        love.graphics.rectangle("fill", 0, 0, 960, 420)
+        setCol(P.red, 0.6 + 0.4 * math.sin(t * 8))
+        for _, xy in ipairs({ { 96, 155 }, { 216, 155 }, { 336, 155 }, { 70, 320 }, { 210, 320 }, { 350, 320 } }) do
+            love.graphics.rectangle("fill", xy[1], xy[2], 10, 6)
+        end
+        love.graphics.setColor(1, 1, 1)
+    end
+end
+
+-- 확대된 적 (id, 중심 px,py, s배)
+local function bigEnemy(id, px, py, s, t)
+    love.graphics.push()
+    love.graphics.translate(px, py)
+    love.graphics.scale(s)
+    art.drawEnemy(id, 0, 0, t, false)
+    love.graphics.pop()
+    love.graphics.setColor(1, 1, 1)
+end
+
+-- 씬 1: 지상 — 화려한 서비스
+local function drawIntro1(t)
+    local P = art.pal
+    -- 하늘 그라데이션 3단
+    rect(c("#7ec8ee"), 0, 0, 960, 130)
+    rect(c("#a9dcf0"), 0, 130, 960, 90)
+    rect(c("#d8eee2"), 0, 220, 960, 70)
+    -- 해 + 글로우
+    setCol(c("#fff4c0"), 0.5); love.graphics.circle("fill", 810, 78, 62)
+    setCol(c("#fff8dc")); love.graphics.circle("fill", 810, 78, 38)
+    -- 건물 스카이라인 (실루엣 + 창문)
+    local blds = {
+        { 20, 150, 110, "#4a6a86" }, { 120, 110, 150, "#3e5c78" }, { 260, 90, 200, "#48678a" },
+        { 450, 130, 130, "#3a5670" }, { 570, 100, 170, "#42627e" }, { 730, 120, 150, "#3e5c78" },
+        { 870, 150, 130, "#48678a" },
+    }
+    for _, b2 in ipairs(blds) do
+        rect(c(b2[4]), b2[1], 290 - b2[3], b2[2], b2[3])
+        setCol(c("#fff0a0"), 0.55)
+        for wy = 290 - b2[3] + 12, 290 - 14, 22 do
+            for wx = b2[1] + 8, b2[1] + b2[2] - 12, 20 do
+                if (wx + wy) % 3 ~= 0 then love.graphics.rectangle("fill", wx, wy, 8, 10) end
+            end
+        end
+    end
+    love.graphics.setColor(1, 1, 1)
+    -- 인도
+    rect(c("#cfc7b6"), 0, 290, 960, 130)
+    rect(c("#b6ad9a"), 0, 290, 960, 5)
+    setCol(c("#a49a86"))
+    for i = 60, 960, 120 do love.graphics.rectangle("fill", i, 296, 2, 124) end
+    love.graphics.setColor(1, 1, 1)
+    -- 사람 3명 (폰 사용, 말풍선)
+    drawCitizen(230, 410, c("#e0554e"), "heart", t)
+    drawCitizen(480, 415, c("#4f8de0"), "bang", t)
+    drawCitizen(720, 408, c("#4fc07c"), "heart", t)
+end
+
+-- 씬 2: 지하 — 서버실
+local function drawIntro2(t)
+    drawServerRoom(t, false)
+end
+
+-- 씬 3: 장애 발생
+local function drawIntro3(t)
+    local P = art.pal
+    drawServerRoom(t, true)
+    -- 랙 사이에서 기어나오는 버그/널포인터 6마리
+    bigEnemy("bug", 130, 300, 2.0, t)
+    bigEnemy("null-ptr", 250, 340, 2.2, t)
+    bigEnemy("bug", 380, 300, 1.8, t)
+    bigEnemy("null-ptr", 110, 250, 1.6, t)
+    bigEnemy("bug", 300, 250, 1.6, t)
+    bigEnemy("null-ptr", 440, 350, 2.4, t)
+    -- 상단 알림 박스 3개 (red 테두리 + "!")
+    local blink = (math.floor(t * 4) % 2) == 0
+    for i = 0, 2 do
+        local bx = 560 + i * 130
+        setCol(c("#1a0e0e"), 0.92)
+        love.graphics.rectangle("fill", bx, 24 + i * 6, 120, 40, 4, 4)
+        setCol(P.red, (i == 0 and blink) and 1 or 0.85)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", bx, 24 + i * 6, 120, 40, 4, 4)
+        love.graphics.setLineWidth(1)
+        -- "!" 아이콘
+        setCol(P.red)
+        love.graphics.rectangle("fill", bx + 12, 32 + i * 6, 5, 16)
+        love.graphics.rectangle("fill", bx + 12, 51 + i * 6, 5, 5)
+        setCol(P.white, 0.8)
+        love.graphics.rectangle("fill", bx + 28, 34 + i * 6, 76, 4)
+        love.graphics.rectangle("fill", bx + 28, 44 + i * 6, 56, 4)
+    end
+    love.graphics.setColor(1, 1, 1)
+end
+
+-- 씬 4: 결의
+local function drawIntro4(t)
+    local P = art.pal
+    rect(c("#070a12"), 0, 0, 960, 420)
+    -- 배경 은은한 랙 실루엣
+    setCol(P.panel, 0.5)
+    for i = 0, 5 do love.graphics.rectangle("fill", 40 + i * 70, 30, 50, 150) end
+    love.graphics.setColor(1, 1, 1)
+    -- 모니터 (우측) + 깜빡이는 커서
+    rect(c("#0a0e18"), 560, 60, 340, 220)
+    rect(c("#0e1424"), 574, 74, 312, 192)
+    setCol(P.green, 0.7)
+    for i = 0, 8 do
+        love.graphics.rectangle("fill", 590, 90 + i * 20, 120 + (i * 37) % 160, 5)
+    end
+    -- 깜빡이는 커서 블록
+    if (math.floor(t * 2) % 2) == 0 then
+        setCol(P.green)
+        love.graphics.rectangle("fill", 590 + (8 * 37) % 160 + 130, 90 + 8 * 20, 12, 16)
+    end
+    love.graphics.setColor(1, 1, 1)
+    -- 모니터 발광
+    setCol(P.green, 0.10)
+    love.graphics.polygon("fill", 730, 200, 430, 420, 900, 420, 900, 280)
+    love.graphics.setColor(1, 1, 1)
+    -- 개발자 타이핑 대형 클로즈업 (scale 6 → 96px)
+    art.drawDev("typing", 150, 90, 6, t)
+    -- 키보드
+    rect(c("#181d2a"), 130, 340, 340, 60)
+    rect(c("#0e121c"), 130, 340, 340, 5)
+    setCol(c("#2a3346"))
+    for row = 0, 2 do
+        for kx = 0, 11 do
+            love.graphics.rectangle("fill", 142 + kx * 27 + row * 8, 350 + row * 16, 22, 12)
+        end
+    end
+    -- 타이핑 하이라이트 키 (t 기반)
+    setCol(P.green, 0.8)
+    local kk = math.floor(t * 9) % 12
+    love.graphics.rectangle("fill", 142 + kk * 27, 350, 22, 12)
+    love.graphics.setColor(1, 1, 1)
+end
+
+local INTRO = { drawIntro1, drawIntro2, drawIntro3, drawIntro4 }
+
+-- n(1..4) 장면을 960×420 영역(0,0 기준)에 그린다. 뷰가 translate/여백 담당.
+function art.drawIntroScene(n, t)
+    local fn = INTRO[n]
+    if fn then fn(t or 0) end
+    love.graphics.setColor(1, 1, 1)
+end
+
 return art

@@ -65,6 +65,7 @@ function play:save()
     if ok then
         self.p.codes[self.stageId] = code
         progress.save(self.p)
+        self.fx.devAnim.pose = "typing"; self.fx.devAnim.timer = 1.0  -- 저장 성공 → 타이핑 1초
         if #self.battle.towers > before and self.tut then self.tut:notify("built") end
         if self.tut then self.tut:notify("saved") end
     end
@@ -131,6 +132,7 @@ function play:update(dt)
             end
             if not fx.prevCrashed[tw] then
                 particles.spawn("spark", tw.x, tw.y, { count = 6, color = art.pal.red })
+                fx.devAnim.pose = "alarm"; fx.devAnim.timer = 1.0  -- 크래시 전이 → 놀람 1초
             end
         else
             fx.smokeAcc[tw] = 0
@@ -173,6 +175,11 @@ function play:update(dt)
     fx.prevTowerCount = #b.towers
     fx.shake = math.max(0, fx.shake - dt)
     fx.redFlash = math.max(0, fx.redFlash - dt)
+    -- 개발자 아바타 포즈 감쇠 (원시 dt — 배속 무관하게 1초 유지)
+    if fx.devAnim.timer > 0 then
+        fx.devAnim.timer = fx.devAnim.timer - dt
+        if fx.devAnim.timer <= 0 then fx.devAnim.pose = "idle" end
+    end
     particles.update(dt)
 end
 
@@ -259,6 +266,8 @@ function play:draw()
         love.graphics.setFont(fonts.small)
         love.graphics.setColor(art.pal.white[1], art.pal.white[2], art.pal.white[3])
         love.graphics.print("script.lua", px + 8, py + 4)
+        -- 개발자 미니 아바타 (우측): 저장 시 typing, 크래시 전이 시 alarm, 그 외 idle
+        art.drawDev(fx.devAnim.pose, px + pw - 22, py + 3, 1, t)
         love.graphics.setColor(1, 1, 1)
     end
 
