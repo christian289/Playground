@@ -1,6 +1,6 @@
 build("printer", 3, 3, "a")
-build("printer", 7, 3, "b")
-build("printer", 11, 3, "c")
+build("printer", 9, 9, "b")
+build("printer", 12, 6, "c")
 
 -- 빈칸을 채우세요: 타겟을 고르는 함수를 직접 선언합니다 (힌트: local function 이름(world))
 local ______ pick(world)

@@ -3,13 +3,6 @@ return function(t)
     local Battle = require("src.battle")
     local d = db.load(PROJECT_ROOT)
 
-    local function readSolution(stageId)
-        local s = d.stages[stageId]
-        local f = assert(io.open(PROJECT_ROOT .. "/data/" .. s.solution_file, "rb"))
-        local code = f:read("*a"); f:close()
-        return code
-    end
-
     local ATK = [[
 build("printer", 3, 10, "a")
 build("printer", 11, 3, "b")
@@ -140,16 +133,32 @@ function on_tick(self, world) self:attack(world.nearest()) end
     run(b9, d.stages[1].countdown + 10)
     t.eq(b9.env.cache.get("last"), "bug", "on_spawn이 적 스냅샷 수신")
 
-    -- 전 스테이지 정답 회귀 (그 시점 보유 아이템으로)
+    -- 전 스테이지 회귀 (데이터 주도): CSV의 모든 스테이지를 순회하며
+    -- solution_file은 클리어, naive_file이 있으면 그 순진 배치는 반드시 패배임을 증명한다.
+    local function readCode(rel)
+        local f = assert(io.open(PROJECT_ROOT .. "/data/" .. rel, "rb"))
+        local code = f:read("*a"); f:close()
+        return code
+    end
+    local stageIds = {}
+    for id in pairs(d.stages) do stageIds[#stageIds + 1] = id end
+    table.sort(stageIds)
     local owned = {}
-    for stageId = 1, 8 do
-        local sol = readSolution(stageId)
+    for _, stageId in ipairs(stageIds) do
+        local stage = d.stages[stageId]
         local b = Battle(d, stageId, { items = owned })
-        t.ok(b:setScript(sol), ("스테이지 %d 정답 컴파일"):format(stageId))
+        t.ok(b:setScript(readCode(stage.solution_file)), ("스테이지 %d 정답 컴파일"):format(stageId))
         b:start()
         run(b, 420)
         t.eq(b.status, "clear", ("스테이지 %d 정답 클리어"):format(stageId))
-        local reward = d.stages[stageId].reward_item
+        if stage.naive_file and stage.naive_file ~= "" then
+            local bn = Battle(d, stageId, { items = owned })
+            t.ok(bn:setScript(readCode(stage.naive_file)), ("스테이지 %d 순진 배치 컴파일"):format(stageId))
+            bn:start()
+            run(bn, 420)
+            t.eq(bn.status, "defeat", ("스테이지 %d 순진 배치는 패배(퍼즐 강제)"):format(stageId))
+        end
+        local reward = stage.reward_item
         if reward ~= "" then owned[#owned + 1] = reward end
     end
 

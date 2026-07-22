@@ -20,7 +20,7 @@ function db.load(root)
         { "cost", "damage", "range", "cooldown", "bullet_speed", "limit", "hidden" })
     d.enemies = index(csv.load(root .. "/data/enemies.csv"), { "hp", "speed", "reward" })
     d.items = index(csv.load(root .. "/data/items.csv"), {})
-    d.stages = index(csv.load(root .. "/data/stages.csv"), { "budget", "wave_clock", "countdown" })
+    d.stages = index(csv.load(root .. "/data/stages.csv"), { "budget", "wave_clock", "countdown", "puzzle" })
 
     local events = csv.load(root .. "/data/timelines.csv")
     for _, e in ipairs(events) do
@@ -117,6 +117,9 @@ function db.load(root)
             end
             if s.buttons_file ~= "" and not fileExists(s.buttons_file) then
                 errs[#errs + 1] = ("stages %s: 버튼 파일 없음 %s"):format(id, s.buttons_file)
+            end
+            if s.naive_file and s.naive_file ~= "" and not fileExists(s.naive_file) then
+                errs[#errs + 1] = ("stages %s: 순진 배치 파일 없음 %s"):format(id, s.naive_file)
             end
         end
         for id, tw in pairs(d.towers) do
