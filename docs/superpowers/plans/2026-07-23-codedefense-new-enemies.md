@@ -13,7 +13,7 @@
 - 모든 사용자 향 문구·오류·로그는 한글. 코어(src/)는 love API 금지(순수 Lua), `love.timer` 금지 — 시간은 battle clock/틱 기반.
 - **결정론**: 모든 주기 행동은 스폰 시각 기준. 상수(코어에 정의): `GROW_EVERY=1.0`s·`GROW_AMOUNT=2`·상한 기본 maxHP×5 / `PHASE_VISIBLE=3.0`s·`PHASE_HIDDEN=2.0`s / `DASH_PERIOD=1.5`s·`DASH_LEN=0.3`s·`DASH_MULT=3` / pair 경감 시 데미지 ×`0.4` / resist:printer 데미지 ×`0.5` / splash 반경 `60`px·가장자리 감쇠 `50%` 선형 / slowfield 이동 ×`0.6`·중첩 불가.
 - 데미지 계산 결과는 항상 `math.max(1, math.floor(x))` (0데미지 금지).
-- abilities CSV 표기: `grow`, `pair`, `phase`, `split2`, `dash`, `resist:printer` (`;` 조합, 콜론=대상 지정). 미지의 키워드는 조용히 무시(기존 동작 유지).
+- abilities CSV 표기: `grow`, `pair`, `phase`, `split2`, `dash`, `resist:printer` (`;` 조합, 콜론=대상 지정). 미지의 키워드는 조용히 무시 — **알려진 예외**: 기존 `battle.lua`의 `(abilities):find("split")` 부분 문자열 검사가 `split2`를 오탐한다(Task 1 검증에서 발견). Task 2가 `;` 분리 **토큰 완전 일치** 파서로 교체해 해소하며, 그 전까지 fork-bomb/kernel-panic은 어느 스테이지 타임라인에도 없어 시뮬 영향 0.
 - 신규 스테이지 규칙(기존 CLAUDE.md 그대로): 12×16 미로·건설칸 ≥6, `solution_file` 필수(회귀가 클리어 증명), naive_file은 반드시 패배, 마지막 스폰 종료 ≥240s·이벤트 공백 ≤40s, `countdown` 15~30, `theme`/`problem`/`lore_file` 채움.
 - 스탯 수치는 전부 CSV로(코어 하드코딩 금지). 절대값은 기존 bug/concat-nil 행을 기준으로 한 상대 규칙(각 태스크에 명시)으로 정하고, 회귀 통과를 완료 조건으로 조정 가능(조정 시 보고서에 기록).
 - 기존 테스트 316개 전체 통과 유지. 커밋마다 스위트 실행.
@@ -60,7 +60,7 @@
 
 - [ ] **Step 1: 실패 테스트 작성** — test_abilities.lua: ① grow: 스폰 3초 경과 시 maxHP=기본+6·hp도 +6, 상한 ×5 도달 후 불변 ② dash: age 0.1s(대시 창)에서 실효 speed=기본×3, age 0.5s(창 밖)에서 기본×1 — 틱 단위 결정론 확인 ③ resist:printer: printer 데미지 절반(floor·min1), sniper 데미지는 그대로 ④ 스냅샷에 age/speed 존재·값 일치 ⑤ world.oldest()가 먼저 스폰된 적 반환, 적 없으면 nil
 - [ ] **Step 2: 실행해 실패 확인**
-- [ ] **Step 3: 구현** — abilities 파서(콜론 인자), enemy 이동에 실효 속도 계산 훅(대시·감속을 한 곳에서 곱셈 — Task 3 slowfield가 같은 훅 사용), battle 데미지 적용부에 resist 계수, 스폰 시 `e.spawnedAt=clock`, grow는 틱 누적으로 1.0s마다 적용. api.lua: 스냅샷에 age/speed 추가, `env.world.oldest` 추가(은신 제외 규칙은 Task 3에서 phase와 함께 — 여기선 전 적 대상).
+- [ ] **Step 3: 구현** — abilities 파서: `;` 분리 후 **토큰 완전 일치**(콜론 인자 지원, 예: `resist:printer` → name=`resist`, arg=`printer`). 기존 `(abilities):find("split")` 부분 문자열 검사(battle.lua ~267행 등 전체 검색)를 이 파서 기반 완전 일치로 교체 — `split2` 오탐 해소(기존 `split` 동작은 불변, 회귀로 확인). enemy 이동에 실효 속도 계산 훅(대시·감속을 한 곳에서 곱셈 — Task 3 slowfield가 같은 훅 사용), battle 데미지 적용부에 resist 계수, 스폰 시 `e.spawnedAt=clock`, grow는 틱 누적으로 1.0s마다 적용. api.lua: 스냅샷에 age/speed 추가, `env.world.oldest` 추가(은신 제외 규칙은 Task 3에서 phase와 함께 — 여기선 전 적 대상).
 - [ ] **Step 4: 전체 스위트 통과 확인** — 316 + 신규 ≥5
 - [ ] **Step 5: 커밋** — `codedefense: 적 능력 grow·dash·resist + world.oldest(코어)`
 
