@@ -14,7 +14,8 @@ art.pal = {
     bg = c("#0e1220"), panel = c("#171c2e"), panelLight = c("#232a42"),
     grid = c("#1c2338"), green = c("#3cf07c"), cyan = c("#41d8e0"),
     magenta = c("#e04fd8"), red = c("#e8483f"), orange = c("#f0a03c"),
-    purple = c("#a06ce8"), white = c("#e8ecf4"),
+    purple = c("#a06ce8"), white = c("#e8ecf4"), blue = c("#4f74e8"),
+    yellow = c("#f2e050"),
 }
 
 local function setCol(col, a)
@@ -27,6 +28,12 @@ local monoColor = nil
 -- 프레임 내부에서 1px 단위 도트를 찍는 헬퍼
 local function dot(col, x, y, w, h)
     setCol(monoColor or col)
+    love.graphics.rectangle("fill", x, y, w or 1, h or 1)
+end
+
+-- 알파 있는 도트(반투명 효과용, monoColor 실루엣 오버라이드는 동일하게 존중)
+local function dotA(col, a, x, y, w, h)
+    setCol(monoColor or col, a)
     love.graphics.rectangle("fill", x, y, w or 1, h or 1)
 end
 
@@ -147,6 +154,156 @@ local function drawConcatFrame(f)
     dot(eye, 11, 10 + ro, 1, 1)
     -- 연결 다리 (1px)
     dot(org, 6, 11, 4, 1)
+end
+
+-- memory-leak: 부풀어 오르는 초록 물방울 + 우측 게이지(프레임2에서 몸집·게이지 모두 증가)
+local function drawMemleakFrame(f)
+    local P = art.pal
+    local grn, dgrn, hl, eye = P.green, c("#1c6b38"), c("#b8f4cc"), c("#0e2414")
+    local o = (f == 2) and 1 or 0 -- 프레임2: 살짝 부풀어오름
+    dot(grn, 3 - o, 6 - o, 8 + o * 2, 7 + o)
+    dot(grn, 4 - o, 4, 6 + o * 2, 2)
+    dot(grn, 6, 2, 2, 2) -- 꼭짓점
+    dot(dgrn, 3 - o, 12 + o, 8 + o * 2, 1) -- 밑단 음영
+    dot(hl, 4 - o, 6 - o, 2, 3) -- 하이라이트
+    dot(eye, 5, 9, 1, 1); dot(eye, 8, 9, 1, 1)
+    -- 우측 게이지(누적 표시 — grow 능력의 시각적 예고)
+    dot(dgrn, 13, 3, 2, 11)
+    dot(grn, 13, 11, 2, 3)
+    if o == 1 then dot(grn, 13, 7, 2, 4); dot(hl, 13, 3, 2, 2) end
+end
+
+-- deadlock: 서로 맞물린 자물쇠 2개(걸쇠가 중앙에서 교차) — 프레임별 팽팽한 당김(1px 진동)
+local function drawDeadlockFrame(f)
+    local P = art.pal
+    local blu, dblu, lblu = P.blue, c("#22367a"), c("#a8bdf5")
+    local o = (f == 2) and 1 or 0
+    -- 왼쪽 자물쇠 몸체
+    dot(blu, 1, 9 + o, 6, 6)
+    dot(lblu, 1, 9 + o, 6, 1)
+    dot(dblu, 1, 14 + o, 6, 1)
+    dot(c("#101830"), 3, 11 + o, 1, 2)
+    -- 왼쪽 걸쇠(우상단으로 뻗어 중앙에서 교차)
+    dot(dblu, 4, 4, 6, 3)
+    dot(blu, 5, 5, 4, 2)
+    -- 오른쪽 자물쇠 몸체
+    dot(blu, 9, 9 - o, 6, 6)
+    dot(lblu, 9, 9 - o, 6, 1)
+    dot(dblu, 9, 14 - o, 6, 1)
+    dot(c("#101830"), 12, 11 - o, 1, 2)
+    -- 오른쪽 걸쇠(좌상단으로 뻗어 중앙에서 교차)
+    dot(dblu, 6, 3, 6, 3)
+    dot(blu, 7, 4, 4, 2)
+end
+
+-- heisenbug: 각진 반투명 유령(관측하면 사라진다 — 프레임2에서 몸체 알파가 크게 옅어짐).
+-- 눈·물음표는 항상 또렷하게 남긴다("정체는 분명한데 실체가 안 잡힌다").
+local function drawHeisenbugFrame(f)
+    local P = art.pal
+    local pur, dpur = P.purple, c("#4a2c78")
+    local a = (f == 1) and 0.55 or 0.2
+    dotA(pur, a, 4, 3, 8, 9)
+    dotA(pur, a, 3, 5, 1, 7); dotA(pur, a, 12, 5, 1, 7)
+    dotA(dpur, a, 4, 3, 8, 1)
+    -- 밑단 각진 지그재그(null-ptr의 둥근 물결과 구분)
+    dotA(pur, a, 4, 12, 2, 2); dotA(pur, a, 8, 12, 2, 2); dotA(pur, a, 11, 12, 1, 2)
+    dotA(pur, a, 6, 13, 2, 1); dotA(pur, a, 10, 13, 1, 1)
+    -- 눈(어두운 세로 2도트, 항상 또렷)
+    dot(c("#180c28"), 6, 6, 1, 2); dot(c("#180c28"), 9, 6, 1, 2)
+    -- 흰 물음표(항상 또렷)
+    dot(P.white, 6, 8, 3, 1)
+    dot(P.white, 8, 9, 1, 1)
+    dot(P.white, 7, 10, 1, 1)
+end
+
+-- fork-bomb: 포크(3갈래) + 손잡이 + 도화선 스파크(프레임별 위치 교차 — 자기복제 폭발 예고)
+local function drawForkbombFrame(f)
+    local P = art.pal
+    local org, dork, hl, wht = P.orange, c("#a3501c"), c("#ffe0a0"), P.white
+    dot(org, 7, 6, 2, 7) -- 손잡이
+    dot(dork, 7, 12, 2, 1)
+    dot(org, 4, 2, 2, 5); dot(org, 7, 1, 2, 6); dot(org, 10, 2, 2, 5) -- 갈래 3개
+    dot(hl, 4, 2, 1, 2); dot(hl, 7, 1, 1, 2); dot(hl, 10, 2, 1, 2)
+    dot(org, 4, 6, 8, 1) -- 갈래를 잇는 목
+    dot(dork, 6, 13, 1, 2); dot(dork, 9, 13, 1, 2) -- 도화선
+    if f == 1 then
+        dot(wht, 5, 14, 1, 1); dot(hl, 10, 14, 1, 1)
+    else
+        dot(hl, 5, 14, 1, 1); dot(wht, 10, 14, 1, 1); dot(hl, 7, 15, 1, 1)
+    end
+end
+
+-- race-cond: 앞으로 기울어진 주자 + 왼쪽으로 뻗은 번개 꼬리(교차 스텝 애니메이션)
+local function drawRacecondFrame(f)
+    local P = art.pal
+    local yl, dyl, wht = P.yellow, c("#a37800"), P.white
+    local o = (f == 1) and 0 or 1
+    dot(yl, 7, 5, 5, 6) -- 몸통
+    dot(dyl, 7, 10, 5, 1)
+    dot(yl, 8, 2, 3, 3) -- 머리
+    dot(c("#3a2c08"), 9, 3, 1, 1) -- 눈
+    dot(dyl, 12, 6, 2, 2) -- 앞으로 뻗은 팔
+    dot(dyl, 7, 11 + o, 2, 3 - o); dot(dyl, 10, 12 - o, 2, 2 + o) -- 교차 다리
+    -- 번개 꼬리(지그재그)
+    dot(wht, 4, 6, 3, 1); dot(wht, 2, 7, 3, 1); dot(wht, 0, 8, 3, 1)
+    dot(yl, 3, 9, 2, 1); dot(yl, 1, 10, 2, 1)
+end
+
+-- legacy: 먼지 쌓인 거미줄 상자(두 모서리 거미줄 + 미세한 먼지 부유)
+local function drawLegacyFrame(f)
+    local wood, dwood, lwood, web = c("#8a6a3c"), c("#5c4322"), c("#b4956a"), c("#d8d0c0")
+    dot(wood, 3, 5, 10, 9)
+    dot(lwood, 3, 5, 10, 1)
+    dot(dwood, 3, 13, 10, 1)
+    dot(dwood, 6, 5, 1, 9); dot(dwood, 9, 5, 1, 9) -- 나무결
+    -- 거미줄(좌상단)
+    dot(web, 3, 5, 4, 1); dot(web, 3, 5, 1, 4)
+    dot(web, 4, 6, 2, 1); dot(web, 4, 6, 1, 2)
+    -- 거미줄(우상단)
+    dot(web, 9, 5, 4, 1); dot(web, 12, 5, 1, 4)
+    dot(web, 10, 6, 2, 1); dot(web, 11, 6, 1, 2)
+    -- 먼지(프레임별 위치 이동)
+    if f == 1 then
+        dot(web, 5, 3, 1, 1); dot(web, 11, 9, 1, 1); dot(web, 8, 2, 1, 1)
+    else
+        dot(web, 6, 2, 1, 1); dot(web, 10, 10, 1, 1); dot(web, 9, 3, 1, 1)
+    end
+end
+
+-- ddos-bot: 작은 미니 드론 한 대(개별은 하찮다는 컨셉으로 캔버스 중앙에 작게)
+-- 프로펠러가 "+"형/"x"형으로 교차해 회전감을 준다
+local function drawDdosbotFrame(f)
+    local P = art.pal
+    local red, dred, hl = P.red, c("#7a1e18"), c("#ffb0a0")
+    dot(dred, 6, 6, 4, 4); dot(red, 7, 7, 2, 2) -- 몸체
+    dot(dred, 4, 4, 2, 1); dot(dred, 10, 4, 2, 1)
+    dot(dred, 4, 11, 2, 1); dot(dred, 10, 11, 2, 1)
+    if f == 1 then
+        dot(hl, 4, 3, 2, 1); dot(hl, 10, 3, 2, 1)
+        dot(hl, 4, 12, 2, 1); dot(hl, 10, 12, 2, 1)
+    else
+        dot(hl, 3, 4, 1, 2); dot(hl, 12, 4, 1, 2)
+        dot(hl, 3, 10, 1, 2); dot(hl, 12, 10, 1, 2)
+    end
+    dot(f == 1 and P.white or red, 7, 7, 1, 1) -- 점멸 표시등
+end
+
+-- kernel-panic: 깨진 화면(BSOD 청색 + 적색 균열) — 프레임2에서 균열이 마젠타/흰색으로 번쩍인다
+local function drawKernelpanicFrame(f)
+    local P = art.pal
+    local bsod, dbsod, red = c("#1030a0"), c("#0a1c60"), P.red
+    dot(c("#22283a"), 2, 2, 12, 12) -- 베젤
+    dot(bsod, 3, 3, 10, 10) -- 화면
+    dot(c("#c0d0f0"), 4, 4, 6, 1); dot(c("#c0d0f0"), 4, 6, 4, 1) -- 코드 라인 흔적
+    -- 균열(지그재그로 화면을 가로지름)
+    dot(red, 5, 3, 1, 2); dot(red, 6, 5, 1, 2); dot(red, 5, 7, 1, 2)
+    dot(red, 4, 9, 1, 2); dot(red, 6, 9, 2, 1); dot(red, 8, 8, 1, 3)
+    dot(red, 9, 6, 1, 2); dot(red, 10, 4, 1, 2)
+    dot(dbsod, 6, 14, 4, 1) -- 받침대
+    if f == 2 then -- 글리치 플래시
+        dotA(P.magenta, 0.6, 3, 3, 10, 10)
+        dotA(P.white, 0.8, 5, 3, 1, 2); dotA(P.white, 0.8, 8, 8, 1, 3)
+    end
 end
 
 -- printer 타워: 회색 몸체 + 상단 총구 슬릿(그린) + 측면 배기구 + 상태 LED. f>=3 → firing 플래시
@@ -271,6 +428,49 @@ local function drawGuguFrame(f)
     end
 end
 
+-- gc-collector 타워: 쓰레기통 몸체 + 재활용 마크 + 옆 집게 팔. f>=3 → 상단 광역 수거 플래시
+local function drawGcCollectorFrame(f)
+    local P = art.pal
+    local mint, dmint, lmint = c("#3f9a72"), c("#215c42"), c("#8fe0bc")
+    local anim = (f - 1) % 2
+    local firing = f >= 3
+    dot(dmint, 4, 6, 8, 8) -- 몸통
+    dot(mint, 4, 6, 8, 1)
+    dot(dmint, 4, 13, 8, 1)
+    local lidY = 4 + anim -- 뚜껑(살짝 열린 각도 애니메이션)
+    dot(lmint, 3, lidY, 10, 2)
+    dot(c("#173226"), 6, 8, 4, 4) -- 재활용 마크
+    dot(mint, 7, 9, 2, 2)
+    -- 집게 팔(프레임별 벌림/오므림)
+    local armO = (anim == 0) and 0 or 1
+    dot(dmint, 12, 7, 2, 1 + armO)
+    dot(dmint, 12, 10 - armO, 2, 1 + armO)
+    dot(lmint, 14, 6 - armO, 1, 2)
+    dot(lmint, 14, 10 + armO, 1, 2)
+    dot(dmint, 4, 14, 8, 1) -- 발
+    if firing then -- 광역 수거 플래시(상단으로 퍼지는 링)
+        dot(P.white, 5, 1, 6, 2)
+        dot(mint, 3, 0, 10, 1)
+    end
+end
+
+-- debugger 타워: 돋보기(렌즈+손잡이) + 렌즈 안 일시정지 막대 2개(브레이크포인트 상징).
+-- 공격하지 않으므로 firing 프레임 없음(compiler와 동일하게 2프레임 유휴만).
+local function drawDebuggerFrame(f)
+    local P = art.pal
+    local cy, dcy, lcy = P.cyan, c("#1c5860"), c("#b0eef2")
+    dot(dcy, 4, 2, 8, 8) -- 렌즈
+    dot(cy, 5, 3, 6, 6)
+    dot(lcy, 6, 4, 2, 2) -- 유리 하이라이트
+    dot(c("#2a3140"), 11, 10, 2, 2); dot(c("#2a3140"), 12, 11, 2, 2); dot(c("#2a3140"), 13, 12, 2, 2) -- 손잡이
+    dot(c("#0a2226"), 6, 4, 2, 5); dot(c("#0a2226"), 9, 4, 2, 5) -- 일시정지 막대 2개
+    if f == 1 then
+        dot(P.white, 5, 3, 1, 1)
+    else
+        dot(P.white, 10, 3, 1, 1)
+    end
+end
+
 -- 개발자 캐릭터 (16x16, 안경 쓴 남성)
 local function drawDevFrame(pose, f)
     local P = art.pal
@@ -314,11 +514,31 @@ function art.load()
     buildSheet("enemy_null_white", 2, drawNullFrame, P.white)
     buildSheet("enemy_concat", 2, drawConcatFrame)
     buildSheet("enemy_concat_white", 2, drawConcatFrame, P.white)
+    -- Wave B 신규 적 8종 (정상 + 흰 실루엣)
+    buildSheet("enemy_memleak", 2, drawMemleakFrame)
+    buildSheet("enemy_memleak_white", 2, drawMemleakFrame, P.white)
+    buildSheet("enemy_deadlock", 2, drawDeadlockFrame)
+    buildSheet("enemy_deadlock_white", 2, drawDeadlockFrame, P.white)
+    buildSheet("enemy_heisenbug", 2, drawHeisenbugFrame)
+    buildSheet("enemy_heisenbug_white", 2, drawHeisenbugFrame, P.white)
+    buildSheet("enemy_forkbomb", 2, drawForkbombFrame)
+    buildSheet("enemy_forkbomb_white", 2, drawForkbombFrame, P.white)
+    buildSheet("enemy_racecond", 2, drawRacecondFrame)
+    buildSheet("enemy_racecond_white", 2, drawRacecondFrame, P.white)
+    buildSheet("enemy_legacy", 2, drawLegacyFrame)
+    buildSheet("enemy_legacy_white", 2, drawLegacyFrame, P.white)
+    buildSheet("enemy_ddos", 2, drawDdosbotFrame)
+    buildSheet("enemy_ddos_white", 2, drawDdosbotFrame, P.white)
+    buildSheet("enemy_kernelpanic", 2, drawKernelpanicFrame)
+    buildSheet("enemy_kernelpanic_white", 2, drawKernelpanicFrame, P.white)
     -- 타워 (printer/sniper: 1-2 유휴, 3-4 발사 / compiler: 2 유휴)
     buildSheet("tower_printer", 4, drawPrinterFrame)
     buildSheet("tower_compiler", 2, drawCompilerFrame)
     buildSheet("tower_sniper", 4, drawSniperFrame)
     buildSheet("tower_gugu-class", 4, drawGuguFrame)
+    -- Wave B 신규 타워 2종
+    buildSheet("tower_gc-collector", 4, drawGcCollectorFrame)
+    buildSheet("tower_debugger", 2, drawDebuggerFrame)
     -- 개발자
     buildSheet("dev_idle", 2, function(f) drawDevFrame("idle", f) end)
     buildSheet("dev_typing", 2, function(f) drawDevFrame("typing", f) end)
@@ -403,7 +623,12 @@ end
 --------------------------------------------------------------------------------
 -- 시트 기반 draw 헬퍼
 --------------------------------------------------------------------------------
-local ENEMY = { bug = "enemy_bug", ["null-ptr"] = "enemy_null", ["concat-nil"] = "enemy_concat" }
+local ENEMY = {
+    bug = "enemy_bug", ["null-ptr"] = "enemy_null", ["concat-nil"] = "enemy_concat",
+    ["memory-leak"] = "enemy_memleak", deadlock = "enemy_deadlock", heisenbug = "enemy_heisenbug",
+    ["fork-bomb"] = "enemy_forkbomb", ["race-cond"] = "enemy_racecond", legacy = "enemy_legacy",
+    ["ddos-bot"] = "enemy_ddos", ["kernel-panic"] = "enemy_kernelpanic",
+}
 
 function art.drawEnemy(id, x, y, t, hit)
     local base = ENEMY[id]
