@@ -6,13 +6,13 @@ local api = {}
 local function snapshot(e, tower)
     local dx, dy = e.x - tower.x, e.y - tower.y
     return { id = e.id, hp = e.hp, max_hp = e.max_hp, x = e.x, y = e.y,
-        speed = e.def.speed, type = e.def.id, dist = math.sqrt(dx * dx + dy * dy) }
+        speed = e.speed, age = e.age, type = e.def.id, dist = math.sqrt(dx * dx + dy * dy) }
 end
 
 -- on_spawn 핸들러에 넘길 dist 없는 단일 적 스냅샷
 function api.plainSnapshot(e)
     return { id = e.id, hp = e.hp, max_hp = e.max_hp, x = e.x, y = e.y,
-        speed = e.def.speed, type = e.def.id }
+        speed = e.speed, age = e.age, type = e.def.id }
 end
 
 -- 전투당 하나의 스크립트 env. build/아이템 API 노출.
@@ -71,6 +71,17 @@ function api.refresh(env, tower, enemies)
     function world.fastest()
         local best
         for _, s in ipairs(snaps) do if not best or s.speed > best.speed then best = s end end
+        return best
+    end
+    -- 가장 먼저 스폰된(age 최대) 적. 동률이면 더 먼저 스폰된(=낮은 id) 쪽. 적이 없으면 nil.
+    -- 은신(phase) 등 필터링은 Task 3의 몫 — 여기서는 world.enemies()와 동일하게 전 적 대상.
+    function world.oldest()
+        local best
+        for _, s in ipairs(snaps) do
+            if not best or s.age > best.age or (s.age == best.age and s.id < best.id) then
+                best = s
+            end
+        end
         return best
     end
     env.world = world

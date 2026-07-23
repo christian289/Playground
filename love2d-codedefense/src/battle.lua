@@ -148,6 +148,7 @@ function Battle:spawnFromTimeline()
             local def = self.d.enemies[ev.spawn]
             local e = Enemy(def, 1, ev.col)
             e.id = self.nextEnemyId
+            e.spawnedAt = self.clock          -- 결정론: 스폰 시각(clock) 기준 산술만 사용
             self.nextEnemyId = self.nextEnemyId + 1
             self.enemies[#self.enemies + 1] = e
             n = n + 1
@@ -212,9 +213,14 @@ function Battle:resolveAttack(tw)
     local dx, dy = target.x - tw.x, target.y - tw.y
     if dx * dx + dy * dy > tw.def.range * tw.def.range then return end
     local mult = 1 + tw.charge * 0.5
-    local dmg = tw.def.damage * (tw.dan or 1)
+    local dmg = tw.def.damage * (tw.dan or 1) * mult
+    -- resist:<타워id> 능력: 그 타워 종류의 데미지만 절반으로 감쇄(내림, 최소 1). 무관한
+    -- 타워 종류의 데미지는 기존과 동일(반올림 없이) 그대로 적용된다.
+    if target.abilities.resist == tw.def.id then
+        dmg = math.max(1, math.floor(dmg * 0.5))
+    end
     self.projectiles[#self.projectiles + 1] =
-        Projectile(tw.x, tw.y, target, dmg * mult, tw.def.bullet_speed, 4 * mult)
+        Projectile(tw.x, tw.y, target, dmg, tw.def.bullet_speed, 4 * mult)
     tw.charge = 0
     tw.cd = tw:effectiveCooldown()
 end
@@ -251,7 +257,7 @@ function Battle:update(dt)
     end
 
     for _, e in ipairs(self.enemies) do
-        if not e.dead and not e.reached then e:update(dt, self.grid) end
+        if not e.dead and not e.reached then e:update(dt, self.grid, self.clock) end
     end
     for _, p in ipairs(self.projectiles) do
         if not p.done then p:update(dt) end
@@ -263,8 +269,8 @@ function Battle:update(dt)
         if e.hp <= 0 and not e.dead then
             e.dead = true
             self.money = self.money + (e.def.reward or 0)
-            -- split 능력: 죽으면 절반 체력 둘로
-            if (e.def.abilities or ""):find("split") and not e.isSplit then
+            -- split 능력: 죽으면 절반 체력 둘로 (토큰 완전 일치 — "split2"는 오탐되지 않는다)
+            if e.abilities.split and not e.isSplit then
                 for k = -1, 1, 2 do
                     local child = Enemy(e.def, e.r, e.c)
                     child.hp = math.floor(e.max_hp / 2)
@@ -272,6 +278,7 @@ function Battle:update(dt)
                     child.x = e.x + k * 8
                     child.isSplit = true
                     child.id = self.nextEnemyId
+                    child.spawnedAt = self.clock
                     self.nextEnemyId = self.nextEnemyId + 1
                     self.enemies[#self.enemies + 1] = child
                 end
@@ -281,8 +288,8 @@ function Battle:update(dt)
             e.counted = true
             self.serverHP = self.serverHP - 1
             self.reachedByType[e.def.id] = (self.reachedByType[e.def.id] or 0) + 1
-            -- crash_tower 능력: 도달 시 최근접 타워 크래시
-            if (e.def.abilities or ""):find("crash_tower") then
+            -- crash_tower 능력: 도달 시 최근접 타워 크래시 (토큰 완전 일치)
+            if e.abilities.crash_tower then
                 local best, bd
                 for _, tw in ipairs(self.towers) do
                     local dx, dy = tw.x - e.x, tw.y - e.y

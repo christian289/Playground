@@ -3,24 +3,85 @@ local grid = require("src.grid")
 
 local Enemy = Object:extend()
 
+-- 능력 상수(코어 상수 — 스탯 수치 자체는 CSV에서 옴)
+local GROW_EVERY = 1.0     -- grow: 이 주기(초)마다 성장
+local GROW_AMOUNT = 2      -- grow: 성장 시 maxHP/HP 증가량
+local GROW_CAP_MULT = 5    -- grow: 상한 = 기본(CSV) maxHP × 이 배수
+local DASH_PERIOD = 1.5    -- dash: 이 주기(초)마다 대시 창이 돌아옴
+local DASH_LEN = 0.3       -- dash: 대시 창의 길이(초)
+local DASH_MULT = 3        -- dash: 창 안에서의 속도 배율
+
+-- abilities 문자열("a;b:arg;c")을 세미콜론으로 분리해 토큰 "완전 일치"로 파싱한다.
+-- 반환: { [능력이름] = 인자문자열(콜론 뒤) 또는 true(인자 없음), ... }
+-- 부분 문자열 검사가 아니므로 "split2"가 "split" 검사에 오탐되지 않는다(Task 1 핸드오프 이슈
+-- 수정). battle.lua의 grow/dash/resist/split/crash_tower 판정과 Task 3(phase)·Task 4(slowfield)
+-- 가 모두 이 헬퍼를 재사용한다.
+function Enemy.parseAbilities(s)
+    local out = {}
+    for token in tostring(s or ""):gmatch("[^;]+") do
+        local name, arg = token:match("^([^:]+):(.+)$")
+        if name then out[name] = arg else out[token] = true end
+    end
+    return out
+end
+
 function Enemy:new(def, r, c)
     self.def = def
     self.id = nil          -- battle이 부여
     self.hp, self.max_hp = def.hp, def.hp
+    self.abilities = Enemy.parseAbilities(def.abilities)
     self.r, self.c = r, c
     self.x, self.y = grid.toXY(r, c)
     self.x = self.x + grid.CELL / 2
     self.y = self.y + grid.CELL / 2
     self.dead, self.reached = false, false
+    self.spawnedAt = 0        -- battle이 스폰 시 clock으로 덮어씀(스폰 시각 기준 산술)
+    self.age = 0               -- 스폰 후 경과 초(battle clock 기반), 스냅샷 필드로도 노출
+    self.growApplied = 0       -- grow: 이미 적용된 성장 횟수(중복 적용 방지)
+    self.speed = def.speed     -- 실효 속도(px/s) — 스냅샷/월드가 참조, 매 프레임 갱신
+end
+
+-- grow 능력: 스폰 후 GROW_EVERY마다 maxHP/HP를 GROW_AMOUNT만큼 증가시킨다. age(경과초)로부터
+-- "몇 번 적용됐어야 하는가"를 계산해 델타만 적용한다 — hp는 데미지로 줄 수 있으므로 절대값
+-- 재계산이 아니라 증분 적용이어야 기존 피해가 보존된다. 상한은 기본(CSV) maxHP × GROW_CAP_MULT.
+function Enemy:applyGrowth()
+    if not self.abilities.grow then return end
+    local due = math.floor(self.age / GROW_EVERY)
+    if due <= self.growApplied then return end
+    local cap = self.def.hp * GROW_CAP_MULT
+    local delta = (due - self.growApplied) * GROW_AMOUNT
+    self.growApplied = due
+    local newMax = math.min(cap, self.max_hp + delta)
+    self.hp = self.hp + (newMax - self.max_hp)
+    self.max_hp = newMax
+end
+
+-- 실효 속도 계산 훅(단일 지점) — dash 배율을 여기서 곱한다. Task 4의 slowfield도 같은 훅에
+-- 배율을 곱해 넣는다(감속 등 추가 배율은 이 함수 안에서 mult에 곱하는 방식으로 확장).
+function Enemy:effectiveSpeed()
+    local mult = 1
+    if self.abilities.dash then
+        if (self.age % DASH_PERIOD) < DASH_LEN then mult = mult * DASH_MULT end
+    end
+    return self.def.speed * mult
+end
+
+-- 스폰 이후 경과(age)를 battle clock 기준으로 갱신하고, grow/실효 속도를 계산한다.
+-- 그리드 이동과 분리되어 있어 이동 없이도(또는 테스트에서 그리드 없이도) 호출 가능하다.
+function Enemy:updateStats(clock)
+    self.age = (clock or 0) - self.spawnedAt
+    self:applyGrowth()
+    self.speed = self:effectiveSpeed()
 end
 
 -- 플로우필드를 따라 칸 중심에서 칸 중심으로 이동
-function Enemy:update(dt, g)
+function Enemy:update(dt, g, clock)
+    self:updateStats(clock)
     local tx, ty = grid.toXY(self.r, self.c)
     tx, ty = tx + grid.CELL / 2, ty + grid.CELL / 2
     local dx, dy = tx - self.x, ty - self.y
     local dist = math.sqrt(dx * dx + dy * dy)
-    local step = self.def.speed * dt
+    local step = self.speed * dt
     if dist <= step then
         self.x, self.y = tx, ty
         if g.dist[self.r][self.c] == 0 then
