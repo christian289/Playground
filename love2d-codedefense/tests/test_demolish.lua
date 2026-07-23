@@ -62,4 +62,46 @@ end
     b5:start()
     run(b5, 60)
     t.ok(b5.reachedByType["bug"] ~= nil and b5.reachedByType["bug"] >= 1, "도달 시 reachedByType 집계 증가")
+
+    -- ⑥ 멀티타워 mid-tick demolish: 같은 틱에 타워 A의 on_tick이 (배치 순서상 앞선) 타워 B를
+    -- demolish하면, runTick이 self.towers를 ipairs로 직접 순회할 경우 table.remove로 인해
+    -- 배열이 앞으로 당겨져 그 뒤(B보다도 뒤, A 다음 차례)의 타워 C의 on_tick이 그 틱에서
+    -- 통째로 스킵되는 버그가 있었다. B → A → C 순서로 건설(towers 배열 순서 그대로)해 재현한다.
+    -- (스테이지 6: 예산 360으로 3타워 300을 감당, 건설칸은 mazes/006.txt 기준)
+    local b6 = Battle(d, 6, {})
+    b6:start()
+    t.ok(b6:buildTower("printer", 2, 2, "B"), "B 빌드 성공")
+    t.ok(b6:buildTower("printer", 2, 10, "A"), "A 빌드 성공")
+    t.ok(b6:buildTower("printer", 4, 2, "C"), "C 빌드 성공")
+    local SKIP_SCRIPT = [[
+function on_tick(self, world)
+  if self.name == "A" then demolish("B") end
+end
+]]
+    t.ok(b6:setScript(SKIP_SCRIPT), "스킵 재현 스크립트 컴파일")
+    local twC = b6.towersByName["C"]
+    local chargeBefore = twC.charge
+    b6:runTick()
+    t.eq(#b6.towers, 2, "A가 B를 철거해 타워 수 2(A, C)")
+    t.ok(twC.charge > chargeBefore,
+        "A가 B를 철거한 그 틱에도 C의 on_tick이 스킵되지 않고 실행됨(charge 누적으로 확인)")
+
+    -- ⑦ 이미 철거된 타워의 on_tick은 실행되지 않아야 한다: P(먼저 건설)의 on_tick이 Q(나중
+    -- 건설, 같은 틱에 아직 실행 전)를 demolish하면 Q는 이번 틱에 아예 실행되지 않아야 한다.
+    local b7 = Battle(d, 6, {})
+    b7:start()
+    t.ok(b7:buildTower("printer", 2, 2, "P"), "P 빌드 성공")
+    t.ok(b7:buildTower("printer", 2, 10, "Q"), "Q 빌드 성공")
+    local DEMOLISHED_NO_RUN_SCRIPT = [[
+function on_tick(self, world)
+  if self.name == "P" then demolish("Q") end
+end
+]]
+    t.ok(b7:setScript(DEMOLISHED_NO_RUN_SCRIPT), "철거 대상 선실행 스크립트 컴파일")
+    local twP, twQ = b7.towersByName["P"], b7.towersByName["Q"]
+    local pChargeBefore, qChargeBefore = twP.charge, twQ.charge
+    b7:runTick()
+    t.eq(#b7.towers, 1, "Q 철거로 타워 수 1(P만 남음)")
+    t.ok(twP.charge > pChargeBefore, "P의 on_tick은 정상 실행됨(charge 누적)")
+    t.eq(twQ.charge, qChargeBefore, "이미 철거된 Q의 on_tick은 실행되지 않음(charge 불변)")
 end

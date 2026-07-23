@@ -1,8 +1,13 @@
 local Gamestate = require("lib.hump.gamestate")
 local fonts = require("src.fonts")
 local art = require("src.art")
+local stars = require("src.stars")
 
 local sel = {}
+
+-- ★/☆ 글리프: 오토플레이 스크린샷을 Read로 직접 확인한 결과 NanumGothic에 정상 렌더됨
+-- (픽셀 검증 포함, .superpowers/sdd/wa-task-2-report.md 참고) — "*"/"-" 대체 불필요.
+local STAR_FULL, STAR_EMPTY = "★", "☆"
 
 function sel:enter(_, d, p)
     self.d, self.p = d, p
@@ -78,7 +83,9 @@ function sel:draw()
             local recText
             if self.p.cleared[id] then
                 -- "九"(구구 마크)는 나눔고딕에 글리프가 없어("九".hasGlyphs == false) "구"로 대체
-                recText = ("[클리어 · HP %d%s]"):format(rec.bestHP, rec.gugu and " · 구" or "")
+                local n = stars.of(rec.bestHP)
+                local starText = STAR_FULL:rep(n) .. STAR_EMPTY:rep(3 - n)
+                recText = ("[%s · HP %d%s]"):format(starText, rec.bestHP, rec.gugu and " · 구" or "")
             else
                 recText = ("[시도 %d]"):format(rec.tries)
             end

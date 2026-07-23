@@ -108,6 +108,7 @@ function Battle:demolishTower(name)
     end
     table.remove(self.towers, idx)
     self.towersByName[name] = nil
+    tw.demolished = true -- runTick 스냅샷 순회 중 "이번 틱에 이미 철거됨" 판정용
     local refund = math.floor(tw.def.cost * 0.5)
     self.money = self.money + refund
     self:say(("[철거] %s → \"%s\" · +%d 환불"):format(tw.def.name, name, refund))
@@ -160,9 +161,17 @@ function Battle:spawnFromTimeline()
     end
 end
 
+-- 이번 틱에 순회할 타워 명단을 미리 스냅샷 복사해 둔다. self.towers를 직접 ipairs로 돌면,
+-- 순회 도중 어떤 타워의 on_tick이 demolish()로 "이미 지나온" 타워를 철거할 때 table.remove가
+-- 배열을 앞으로 당겨서 아직 차례가 오지 않은 뒤쪽 타워의 on_tick이 그 틱에서 통째로
+-- 스킵되는 문제가 있었다(테스트: tests/test_demolish.lua ⑥). 스냅샷은 self.towers의 변경에
+-- 영향받지 않으므로 이 문제가 사라지고, 대신 스냅샷 안의 타워가 이번 틱 중에 이미 철거됐는지는
+-- tw.demolished 플래그로 별도 확인해 그 타워의 on_tick은 실행하지 않는다(⑦).
 function Battle:runTick()
-    for _, tw in ipairs(self.towers) do
-        if self.env and self.env.on_tick and tw.crashed <= 0 and not tw.disabled then
+    local snapshot = {}
+    for i, tw in ipairs(self.towers) do snapshot[i] = tw end
+    for _, tw in ipairs(snapshot) do
+        if not tw.demolished and self.env and self.env.on_tick and tw.crashed <= 0 and not tw.disabled then
             self.setTower(tw)
             local selfApi, world = api.refresh(self.env, tw, self.enemies)
             tw.pendingTarget = nil

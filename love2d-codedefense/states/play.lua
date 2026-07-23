@@ -14,6 +14,13 @@ local FIELD_H = grid.ROWS * grid.CELL -- 512
 local INFO_X, INFO_W = 400, 240 -- 정보 칼럼(전장과 에디터 사이)
 local play = {}
 
+-- enemies.csv의 color 필드("r;g;b" 문자열, 0~1 실수)를 {r,g,b}로 파싱. 형식이 어긋나면 흰색.
+local function parseColor(s)
+    local r, g, b = tostring(s or ""):match("^([%d%.]+);([%d%.]+);([%d%.]+)$")
+    if not r then return { 1, 1, 1 } end
+    return { tonumber(r), tonumber(g), tonumber(b) }
+end
+
 local function loadText(root, rel)
     local f = io.open(root .. "/data/" .. rel, "rb")
     if not f then return nil end
@@ -199,12 +206,17 @@ function play:enter(_, d, stageId, p)
     -- 적 구성 패널·문제 카드용 데이터: 타임라인은 결정론이라 진입 시 1회만 계산
     self.info = stageinfo.totals(self.battle.timeline)
     self.enemyTypes = {}                -- 적 구성 패널 표시 순서 = 타임라인 첫 등장 순
+    self.enemyColors = {}               -- 진행 바 스폰 눈금 색 캐시(d.enemies[id].color 파싱)
     do
         local seen = {}
         for _, ev in ipairs(self.info.events) do
             if not seen[ev.spawn] then
                 seen[ev.spawn] = true
                 self.enemyTypes[#self.enemyTypes + 1] = ev.spawn
+            end
+            if not self.enemyColors[ev.spawn] then
+                local def = d.enemies[ev.spawn]
+                self.enemyColors[ev.spawn] = parseColor(def and def.color)
             end
         end
     end
@@ -216,6 +228,7 @@ function play:enter(_, d, stageId, p)
         prevCrashed = {}, shake = 0, redFlash = 0, devAnim = { pose = "idle", timer = 0 },
         prevCd = {}, firedTimer = {}, smokeAcc = {}, hitTimer = {},
         guguFx = 0, guguSeen = false,    -- 구구 클래스 소환 연출 타이머(§6.6) — 원시 dt 감쇠
+        crisisTimer = 0,                 -- 위기 경고 비네트 사인 펄스용 누적 타이머 — 원시 dt(배속 무관)
     }
 
     if self.stage.tutorial_file ~= "" and not p.tutorial_done[stageId] then
@@ -292,7 +305,8 @@ function play:update(dt)
         Gamestate.switch(require("states.result"), self.battle.status,
             { d = self.d, stageId = self.stageId, p = self.p,
               guguUsed = self.fx.guguSeen or false, towerCount = #self.battle.towers,
-              serverHP = self.battle.serverHP, clock = self.battle.clock })
+              serverHP = self.battle.serverHP, clock = self.battle.clock,
+              reached = self.battle.reachedByType })
     end
 
     -- 뷰 전용 프레임-diff 이펙트 발동 (battle 코어 상태는 읽기만 한다)
@@ -396,6 +410,8 @@ function play:update(dt)
     if (self.escArmed or 0) > 0 then self.escArmed = self.escArmed - dt end
     -- 저장 실패 테두리 플래시 감쇠 (원시 dt)
     if (fx.saveErrFlash or 0) > 0 then fx.saveErrFlash = fx.saveErrFlash - dt end
+    -- 위기 경고 비네트 사인 펄스 누적 (원시 dt — 배속 무관하게 항상 흘러 위기 진입 시 끊김 없이 이어짐)
+    fx.crisisTimer = fx.crisisTimer + dt
     particles.update(dt)
 end
 
@@ -415,11 +431,25 @@ function play:draw()
     love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), GRID_Y)
 
     love.graphics.setFont(fonts.ui)
-    love.graphics.setColor(0.9, 0.92, 0.95)
     local clockText = b.clock < 0
         and ("전투 시작까지 %d초 — 코드를 준비하세요!"):format(math.ceil(-b.clock))
         or ("%.0f / 300초"):format(b.clock)
-    love.graphics.print(("%s   서버 HP %d   잔액 %d   배속 x%d"):format(clockText, b.serverHP, b.money, self.speed), 8, 6)
+    -- 위기 경고: serverHP<=3이며 전투가 계속 진행 중이면 "서버 HP n" 부분만 빨갛게 강조하기
+    -- 위해 문자열을 셋으로 나눠 print를 세 번 호출한다(가운데 조각만 색이 다름).
+    local crisis = b.serverHP <= 3 and b.status == "running"
+    local hudLead = clockText .. "   "
+    local hudHP = ("서버 HP %d"):format(b.serverHP)
+    local hudTail = ("   잔액 %d   배속 x%g"):format(b.money, self.speed)
+    local hx = 8
+    love.graphics.setColor(0.9, 0.92, 0.95)
+    love.graphics.print(hudLead, hx, 6)
+    hx = hx + fonts.ui:getWidth(hudLead)
+    if crisis then love.graphics.setColor(art.pal.red[1], art.pal.red[2], art.pal.red[3])
+    else love.graphics.setColor(0.9, 0.92, 0.95) end
+    love.graphics.print(hudHP, hx, 6)
+    hx = hx + fonts.ui:getWidth(hudHP)
+    love.graphics.setColor(0.9, 0.92, 0.95)
+    love.graphics.print(hudTail, hx, 6)
 
     -- 진행 바 (HUD 아래, 300초 대비 현재 시각 + 스폰 이벤트 눈금)
     do
@@ -429,9 +459,13 @@ function play:draw()
         local frac = math.max(0, math.min(1, b.clock / Battle.TOTAL))
         love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3], 0.9)
         love.graphics.rectangle("fill", barX, barY, barW * frac, barH)
-        love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3], 0.9)
+        -- 스폰 눈금: 적 종류 색(d.enemies[ev.spawn].color)으로 구분 표시, 지나간 눈금은
+        -- 알파를 낮춰(0.35) 앞으로 올 이벤트와 구분한다.
         for _, ev in ipairs(self.info.events) do
             local tx = barX + (ev.at / Battle.TOTAL) * barW
+            local col = self.enemyColors[ev.spawn] or art.pal.cyan
+            local a = (b.clock >= ev.at) and 0.35 or 0.9
+            love.graphics.setColor(col[1], col[2], col[3], a)
             love.graphics.rectangle("fill", tx, barY, 1, barH)
         end
         love.graphics.setColor(1, 1, 1)
@@ -493,6 +527,21 @@ function play:draw()
     love.graphics.setColor(1, 1, 1)
     -- 파티클 (사망 burst/보상 float/설치 flash/크래시 smoke/spark)
     particles.draw(GRID_X + shakeX, GRID_Y + shakeY)
+
+    -- 위기 경고 비네트: 서버 HP가 3 이하로 떨어지고 전투가 계속되는 동안 전장 가장자리에
+    -- 붉은 테두리를 4겹 알파 그라데이션으로 겹쳐 그리고, 1.2초 주기 사인 펄스(원시 dt 누적
+    -- 타이머 fx.crisisTimer — 배속 무관)로 밝기를 흔든다.
+    if b.serverHP <= 3 and b.status == "running" then
+        local pulse = 0.5 + 0.5 * math.sin(fx.crisisTimer / 1.2 * (2 * math.pi))
+        love.graphics.setLineWidth(1)
+        for i = 1, 4 do
+            local inset = (i - 1) * 2
+            local a = (0.55 - (i - 1) * 0.1) * pulse
+            love.graphics.setColor(art.pal.red[1], art.pal.red[2], art.pal.red[3], a)
+            love.graphics.rectangle("line", GRID_X + inset, GRID_Y + inset, FIELD_W - inset * 2, FIELD_H - inset * 2)
+        end
+        love.graphics.setColor(1, 1, 1)
+    end
 
     -- 타워 호버: 사거리 원(전장 안으로 클리핑) — 코드로 (행,열)을 지정하는 게임이라
     -- 사거리 감각이 배치 판단의 핵심인데 지금까지 시각화가 없었다. 툴팁은 draw 끝에서
@@ -659,8 +708,8 @@ function play:draw()
     if not (self.tut and not self.tut:done()) then
         love.graphics.setColor(0.6, 0.65, 0.7)
         local hint = self:isButtonStage()
-            and "숫자키 버튼 실행 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
-            or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+L 비우기 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
+            and "숫자키 버튼 실행 · Ctrl+5/1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
+            or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+L 비우기 · Ctrl+5/1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
         love.graphics.printf(hint, 0, 620, 1280, "center")
     end
 
@@ -802,8 +851,8 @@ function play:keypressed(key)
         Gamestate.switch(require("states.play"), self.d, self.stageId, self.p)
         return
     end
-    if ctrl and (key == "1" or key == "2" or key == "4") then
-        self.speed = tonumber(key)
+    if ctrl and (key == "1" or key == "2" or key == "4" or key == "5") then
+        self.speed = (key == "5") and 0.5 or tonumber(key)
         if self.tut then self.tut:notify("speed_changed") end
         return
     end

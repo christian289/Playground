@@ -2,8 +2,33 @@ local Gamestate = require("lib.hump.gamestate")
 local fonts = require("src.fonts")
 local progress = require("src.progress")
 local art = require("src.art")
+local stars = require("src.stars")
 
 local result = {}
+
+local STAR_FULL, STAR_EMPTY = "★", "☆" -- stageselect.lua와 동일 글리프 — 스크린샷 확인 결과 정상 렌더
+
+-- 패배 코칭: ctx.reached(battle.reachedByType)에서 가장 많이 도달한 적 종류 1개를 고른다.
+-- 동률이면 스테이지 타임라인에서 더 먼저 스폰된 종을 우선한다(ctx.d.timeline이 at 오름차순 정렬).
+local function topReached(ctx)
+    local reached = ctx.reached
+    if not reached then return nil end
+    local order, seen = {}, {}
+    for _, ev in ipairs(ctx.d.timeline(ctx.stageId)) do
+        if not seen[ev.spawn] then
+            seen[ev.spawn] = true
+            order[#order + 1] = ev.spawn
+        end
+    end
+    local bestId, bestN
+    for _, id in ipairs(order) do
+        local n = reached[id] or 0
+        if n > 0 and (not bestN or n > bestN) then
+            bestId, bestN = id, n
+        end
+    end
+    return bestId, bestN
+end
 
 -- 설계서 §4.3 여운 문구
 local AFTERWORD = {
@@ -70,6 +95,16 @@ function result:draw()
             love.graphics.setColor(1, 0.85, 0.3)
             love.graphics.printf("아이템 획득: " .. self.ctx.d.items[reward].name, 0, 300, W, "center")
         end
+        -- 별점: 이번 판(ctx.serverHP)과 이 스테이지 최고 기록(rec.bestHP, 이번 판 반영 후) 둘 다 표기
+        if self.rec then
+            local nowN = stars.of(self.ctx.serverHP or 0)
+            local bestN = stars.of(self.rec.bestHP or 0)
+            local nowStr = STAR_FULL:rep(nowN) .. STAR_EMPTY:rep(3 - nowN)
+            local bestStr = STAR_FULL:rep(bestN) .. STAR_EMPTY:rep(3 - bestN)
+            love.graphics.setFont(fonts.ui)
+            love.graphics.setColor(1, 0.85, 0.3)
+            love.graphics.printf(("이번 %s (최고 %s)"):format(nowStr, bestStr), 0, 325, W, "center")
+        end
     else
         love.graphics.setColor(0.95, 0.4, 0.35)
         love.graphics.printf("서버 다운...", 0, 230, W, "center")
@@ -80,6 +115,14 @@ function result:draw()
             love.graphics.setColor(0.85, 0.7, 0.4)
             love.graphics.printf(("버틴 시간 %d초 / 300초"):format(math.max(0, self.ctx.clock)),
                 0, 300, W, "center")
+        end
+        -- 패배 코칭: 가장 많이 뚫린 적 종류 1개(도달 0이면 생략) — 다음 시도의 우선 방어 대상 힌트
+        local topId, topN = topReached(self.ctx)
+        if topId and topN and topN > 0 then
+            local name = self.ctx.d.enemies[topId] and self.ctx.d.enemies[topId].name or topId
+            love.graphics.setFont(fonts.ui)
+            love.graphics.setColor(0.85, 0.5, 0.45)
+            love.graphics.printf(("가장 많이 도달: %s %d기"):format(name, topN), 0, 325, W, "center")
         end
     end
 
