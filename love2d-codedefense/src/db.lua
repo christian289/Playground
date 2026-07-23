@@ -122,7 +122,7 @@ function db.load(root)
                 errs[#errs + 1] = ("stages %s: 순진 배치 파일 없음 %s"):format(id, s.naive_file)
             end
             if s.lore_file and s.lore_file ~= "" and not fileExists(s.lore_file) then
-                errs[#errs + 1] = ("stages %s: lore 파일 없음 %s"):format(id, s.lore_file)
+                errs[#errs + 1] = ("stages %s: 로어 파일 없음 %s"):format(id, s.lore_file)
             end
         end
         for id, tw in pairs(d.towers) do

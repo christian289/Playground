@@ -37,10 +37,10 @@ return function(t)
     t.ok(table.concat(baderrs, "/"):find("튜토리얼"), "없는 tutorial_file 감지")
     t.ok(table.concat(baderrs, " / "):find("240초"), "마지막 스폰 종료 240초 미만 감지")
     t.ok(table.concat(baderrs, " / "):find("공백"), "스폰 공백 40초 초과 감지")
-    t.ok(table.concat(baderrs, " / "):find("lore 파일 없음"), "없는 lore_file 감지")
+    t.ok(table.concat(baderrs, " / "):find("로어 파일 없음"), "없는 lore_file 감지")
     local loreErrCount = 0
     for _, e in ipairs(baderrs) do
-        if e:find("lore 파일 없음") then loreErrCount = loreErrCount + 1 end
+        if e:find("로어 파일 없음") then loreErrCount = loreErrCount + 1 end
     end
     t.eq(loreErrCount, 1, "lore_file 빈 칼럼(스테이지 2·3)은 통과, 값 있는 스테이지 1만 오류")
 end
