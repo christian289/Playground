@@ -79,15 +79,17 @@ local function buildSheet(name, nFrames, drawFn, mono)
 end
 
 -- 시트 프레임을 화면에 그린다. logicalPx = 논리 픽셀 1개의 화면 크기(px).
--- 이미지 1논리픽셀 = PX(2)이므로 imageScale = logicalPx / PX.
-local function drawSheet(name, frame, screenX, screenY, logicalPx)
+-- 이미지 1논리픽셀 = PX(2)이므로 imageScale = logicalPx / PX. alpha(선택, 기본1)는 하이젠버그
+-- 은신 깜빡임처럼 스프라이트 전체를 반투명하게 찍어야 할 때만 넘긴다(호출부가 없으면 기존과
+-- 동일하게 완전 불투명).
+local function drawSheet(name, frame, screenX, screenY, logicalPx, alpha)
     local img = art._img[name]
     if not img then return end
     local nF = art._nframes[name]
     if frame > nF then frame = nF end
     if frame < 1 then frame = 1 end
     local s = logicalPx / PX
-    setCol(art.pal.white)
+    setCol(art.pal.white, alpha)
     love.graphics.draw(img, art._q[name][frame], screenX, screenY, 0, s, s)
 end
 
@@ -630,12 +632,13 @@ local ENEMY = {
     ["ddos-bot"] = "enemy_ddos", ["kernel-panic"] = "enemy_kernelpanic",
 }
 
-function art.drawEnemy(id, x, y, t, hit)
+-- alpha(선택, 기본1): 하이젠버그 은신 중 스프라이트를 반투명(0.25)으로 깜빡이는 용도.
+function art.drawEnemy(id, x, y, t, hit, alpha)
     local base = ENEMY[id]
     if not base then return end
     local name = hit and (base .. "_white") or base
     local frame = (math.floor(t * 6) % 2) + 1
-    drawSheet(name, frame, x - 16, y - 16, 2) -- 32px, 중심 정렬
+    drawSheet(name, frame, x - 16, y - 16, 2, alpha) -- 32px, 중심 정렬
     love.graphics.setColor(1, 1, 1)
 end
 

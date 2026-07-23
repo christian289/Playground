@@ -185,7 +185,11 @@ function Battle:runTick()
     local snapshot = {}
     for i, tw in ipairs(self.towers) do snapshot[i] = tw end
     for _, tw in ipairs(snapshot) do
-        if not tw.demolished and self.env and self.env.on_tick and tw.crashed <= 0 and not tw.disabled then
+        -- slowfield(디버거)는 공격하지 않는 순수 필드 타워다. damage가 0이라 결과적으로
+        -- 피해가 안 나가는 것과는 무관하게, ability로 직접 분기해 타겟팅·on_tick 호출·명령
+        -- 예산 소비 자체를 건너뛴다(우연히 0 데미지라서가 아니라 의도적으로 발사 루프 제외).
+        if not tw.demolished and self.env and self.env.on_tick and tw.crashed <= 0 and not tw.disabled
+            and tw.def.ability ~= "slowfield" then
             self.setTower(tw)
             local selfApi, world = api.refresh(self.env, tw, self.enemies, self.clock)
             tw.pendingTarget = nil
@@ -238,7 +242,7 @@ function Battle:resolveAttack(tw)
         dmg = math.max(1, math.floor(dmg * 0.4))
     end
     self.projectiles[#self.projectiles + 1] =
-        Projectile(tw.x, tw.y, target, dmg, tw.def.bullet_speed, 4 * mult)
+        Projectile(tw.x, tw.y, target, dmg, tw.def.bullet_speed, 4 * mult, tw.def.ability == "splash")
     tw.charge = 0
     tw.cd = tw:effectiveCooldown()
 end
@@ -275,10 +279,23 @@ function Battle:update(dt)
     end
 
     for _, e in ipairs(self.enemies) do
-        if not e.dead and not e.reached then e:update(dt, self.grid, self.clock) end
+        if not e.dead and not e.reached then
+            -- slowfield: 디버거(ability="slowfield") 사거리 안이면 감속. 여러 디버거가 겹쳐도
+            -- 불리언 OR 판정이라 배율은 한 번만 적용되고(중첩 불가), 사거리를 벗어나면 다음
+            -- 프레임 즉시 원복된다(상태를 누적 저장하지 않고 매 프레임 다시 판정하므로).
+            local slowed = false
+            for _, tw in ipairs(self.towers) do
+                if tw.def.ability == "slowfield" then
+                    local dx, dy = e.x - tw.x, e.y - tw.y
+                    if dx * dx + dy * dy <= tw.def.range * tw.def.range then slowed = true break end
+                end
+            end
+            e.slowed = slowed
+            e:update(dt, self.grid, self.clock)
+        end
     end
     for _, p in ipairs(self.projectiles) do
-        if not p.done then p:update(dt, self.clock) end
+        if not p.done then p:update(dt, self.clock, self.enemies) end
     end
 
     -- 정리: 죽음/도달 처리

@@ -423,4 +423,149 @@ end
     for k in pairs(rtKeys) do
         t.eq(rt1[k], rt2[k], ("결정론: reachedByType[%s] 값 일치"):format(tostring(k)))
     end
+
+    ------------------------------------------------------------------
+    -- ⑩ splash(gc-collector): 명중점 기준 반경 60px 선형 낙폭(중심100%→가장자리50%,
+    --    floor·min1), 61px 밖 0, 은신 피해자 면제, 주 타겟 자신은 이중 타격 없음.
+    --    ability="splash" 분기로 실제 tower.buildTower→resolveAttack 경로에서 생성됨을
+    --    확인(합성 데이터가 아니라 실제 발동 경로).
+    ------------------------------------------------------------------
+    local bsp = Battle(d, 6, {})
+    bsp:start()
+    t.ok(bsp:buildTower("compiler", 2, 2, "c"), "splash: 컴파일러 건설(gc-collector 선행 조건)")
+    t.ok(bsp:buildTower("gc-collector", 4, 2, "gc"), "splash: GC 수집기 건설")
+    local twGC = bsp.towersByName["gc"]
+    bsp.clock = 4.0   -- heisenbug(spawnedAt=0) age4.0 → 은신 구간(§⑦과 동일한 산술)
+
+    local mainT = Enemy(d.enemies["bug"], twGC.r, twGC.c)
+    mainT.id, mainT.hp, mainT.spawnedAt = 8001, 100, bsp.clock
+    mainT.x, mainT.y = twGC.x, twGC.y                      -- 명중점(거리0, 사거리 안 · 주 타겟)
+    local near = Enemy(d.enemies["bug"], twGC.r, twGC.c)
+    near.id, near.hp, near.spawnedAt = 8002, 100, bsp.clock
+    near.x, near.y = twGC.x + 30, twGC.y                   -- 명중점에서 30px
+    local far = Enemy(d.enemies["bug"], twGC.r, twGC.c)
+    far.id, far.hp, far.spawnedAt = 8003, 100, bsp.clock
+    far.x, far.y = twGC.x + 61, twGC.y                     -- 명중점에서 61px(반경 밖)
+    local hiddenV = Enemy(d.enemies["heisenbug"], twGC.r, twGC.c)  -- phase 능력
+    hiddenV.id, hiddenV.hp, hiddenV.spawnedAt = 8004, 100, 0        -- age4.0 → 은신 중
+    hiddenV.x, hiddenV.y = twGC.x + 20, twGC.y             -- 사거리 안이지만 은신(면제 대상)
+    t.ok(hiddenV:isPhased(bsp.clock), "splash 게이트 자가검증: hiddenV가 이 시각 실제로 은신 중")
+
+    bsp.enemies = { mainT, near, far, hiddenV }
+    twGC.pendingTarget = mainT.id
+    bsp:resolveAttack(twGC)
+    local proj = bsp.projectiles[#bsp.projectiles]
+    t.eq(proj.splash, true, "splash: gc-collector 투사체는 splash=true(ability 분기로 실제 세팅됨)")
+    t.eq(proj.damage, d.towers["gc-collector"].damage,
+        "splash 게이트 자가검증: 주 타겟 데미지=기준값(charge0·dan없음 → mult1)")
+
+    t.ok(bsp:buildTower("printer", 7, 2, "pchk"), "splash 대조군: 프린터 건설")
+    local twP2 = bsp.towersByName["pchk"]
+    local decoy = Enemy(d.enemies["bug"], twP2.r, twP2.c)
+    decoy.id, decoy.hp, decoy.spawnedAt = 8005, 100, bsp.clock
+    decoy.x, decoy.y = twP2.x, twP2.y
+    bsp.enemies[#bsp.enemies + 1] = decoy
+    twP2.pendingTarget = decoy.id
+    bsp:resolveAttack(twP2)
+    t.eq(bsp.projectiles[#bsp.projectiles].splash, false,
+        "splash 대조군: printer(ability 무관) 투사체는 splash=false")
+
+    proj:update(1000, bsp.clock, bsp.enemies)   -- 큰 dt로 명중 처리(거리0 → 어차피 이번 프레임 명중)
+    t.eq(proj.done, true, "splash: 명중 처리 완료")
+    t.eq(proj.splashHit, true, "splash: 폭발 발생 플래그(뷰 관측용) true")
+    t.eq(mainT.hp, 100 - d.towers["gc-collector"].damage,
+        "splash: 주 타겟은 정상 데미지만 받음(스플래시로 이중 타격 없음)")
+    local expectedNear = math.max(1, math.floor(d.towers["gc-collector"].damage * (1 - 0.5 * 30 / 60)))
+    t.eq(expectedNear, 4, "splash 산술 자가검증: 6×0.75=4.5 → floor=4(비정수 결과로 floor 구별 확인)")
+    t.eq(near.hp, 100 - expectedNear, "splash: 명중점 30px 옆 적은 ×0.75 floor 데미지")
+    t.eq(far.hp, 100, "splash: 61px 밖은 데미지 0(반경 제외)")
+    t.eq(hiddenV.hp, 100, "splash: 은신 중인 피해자는 면제(0)")
+    t.eq(decoy.hp, 100, "splash: printer 대조군 명중과 무관 — decoy는 gc 폭발 범위 밖(별개 타워)")
+
+    ------------------------------------------------------------------
+    -- ⑪ slowfield(디버거): 사거리 내 실효 speed ×0.6, 2기 겹쳐도 ×0.6 한 번만,
+    --    사거리 밖 즉시 원복, dash와 겹치면 ×3×0.6 복합. 디버거는 무발사(투사체 0,
+    --    ability 분기 확인 — cd/overclock도 갱신 안 됨). limit 2 초과는 기존 경로로 실패.
+    ------------------------------------------------------------------
+    -- (a) 훅 단위: e.slowed 플래그만으로 effectiveSpeed 배율 확인(dash 훅과 동일 지점 재사용)
+    local esOff = Enemy(d.enemies["bug"], 1, 1)
+    esOff.spawnedAt = 0
+    esOff:updateStats(0)
+    t.eq(esOff.speed, esOff.def.speed, "slowfield 훅: slowed=false(기본)면 실효 speed 그대로")
+
+    local esOn = Enemy(d.enemies["bug"], 1, 1)
+    esOn.spawnedAt = 0
+    esOn.slowed = true
+    esOn:updateStats(0)
+    t.eq(esOn.speed, esOn.def.speed * 0.6, "slowfield 훅: slowed=true면 실효 speed ×0.6")
+
+    local esDash = Enemy(d.enemies["race-cond"], 1, 1)   -- dash 능력
+    esDash.spawnedAt = 0
+    esDash.slowed = true
+    esDash:updateStats(0.1)   -- 대시 창 안(0.1s < DASH_LEN 0.3s) — 게이트 자가검증
+    t.ok((esDash.age % 1.5) < 0.3, "slowfield 복합 게이트 자가검증: 이 age는 실제 대시 창 안")
+    t.eq(esDash.speed, esDash.def.speed * 3 * 0.6, "slowfield 훅: dash 중 겹치면 ×3×0.6 복합")
+
+    -- (b) Battle 레벨 자동 판정: 디버거 사거리 안/밖 실측, 2기 중첩 시에도 ×0.6 한 번만
+    local bsf = Battle(d, 6, {})
+    bsf:start()
+    bsf.clock = 0
+    bsf.timeline, bsf.spawned = {}, {}   -- 실제 스테이지6 스폰 유입을 차단해 순수 관측 유지
+    t.ok(bsf:buildTower("debugger", 2, 2, "d1"), "slowfield: 디버거1 건설")
+    t.ok(bsf:buildTower("debugger", 4, 2, "d2"), "slowfield: 디버거2 건설(사거리 겹치는 위치)")
+    local twD1, twD2 = bsf.towersByName["d1"], bsf.towersByName["d2"]
+
+    local eSF = Enemy(d.enemies["bug"], twD1.r, twD1.c)
+    eSF.id, eSF.spawnedAt = 9201, 0
+    eSF.x, eSF.y = twD1.x, twD1.y + 32   -- d1 사거리 32 안, d2와도 32 거리(둘 다 range132 안)
+    bsf.enemies = { eSF }
+    local dToD1 = math.sqrt((eSF.x - twD1.x) ^ 2 + (eSF.y - twD1.y) ^ 2)
+    local dToD2 = math.sqrt((eSF.x - twD2.x) ^ 2 + (eSF.y - twD2.y) ^ 2)
+    t.ok(dToD1 <= twD1.def.range and dToD2 <= twD2.def.range,
+        "slowfield 게이트 자가검증: eSF는 실제로 디버거 두 대 사거리 안(중첩 상황)")
+    bsf:update(1 / 60)
+    t.eq(eSF.slowed, true, "slowfield: 사거리 안 → slowed=true")
+    t.eq(eSF.speed, eSF.def.speed * 0.6, "slowfield: 디버거 2기 겹쳐도 ×0.6 한 번만(중첩 아님)")
+
+    eSF.x, eSF.y = twD1.x + 100000, twD1.y   -- 사거리 훨씬 밖으로 이동
+    bsf:update(1 / 60)
+    t.eq(eSF.slowed, false, "slowfield: 사거리 밖으로 나가면 slowed=false")
+    t.eq(eSF.speed, eSF.def.speed, "slowfield: 사거리 밖 → 실효 speed 즉시 원복")
+
+    -- (c) 디버거 무발사: 공통 on_tick이 있어도 ability 분기로 on_tick 자체가 스킵됨을 확인
+    --     (damage=0 우연이 아니라는 근거로 cd·overclock도 전혀 갱신되지 않는지까지 확인)
+    local bd = Battle(d, 6, {})
+    bd:start()
+    bd.timeline, bd.spawned = {}, {}
+    t.ok(bd:buildTower("debugger", 2, 2, "dbg"), "무발사 테스트: 디버거 건설")
+    local twDbg = bd.towersByName["dbg"]
+    local target = Enemy(d.enemies["bug"], twDbg.r, twDbg.c)
+    target.id, target.hp, target.spawnedAt = 9301, 100, 0
+    target.x, target.y = twDbg.x, twDbg.y   -- 사거리 안(거리0) — 항상 타겟 존재
+    bd.enemies = { target }
+    local ATTACK_SCRIPT = [[
+function on_tick(self, world)
+  if world.nearest() then self:attack(world.nearest()) end
+end
+]]
+    t.ok(bd:setScript(ATTACK_SCRIPT), "무발사 테스트: 공용 on_tick 스크립트 컴파일")
+    -- Battle:update 전체(이동·정리)가 아니라 runTick()만 여러 번 직접 호출한다 — 그래야
+    -- "우연히 데미지가 0이라 해가 없다"가 아니라 "on_tick 호출·투사체 생성 자체가 없다"를
+    -- 정확히 관찰할 수 있다(update()를 쓰면 debugger의 bullet_speed=0·거리0 조합 때문에
+    -- 설령 예외적으로 투사체가 생겨도 그 프레임 안에서 즉시 명중·정리되어 이 부분이 헛단언이
+    -- 되는 함정이 있었다 — RED 확인 과정에서 실제로 겪은 문제라 runTick 직접 호출로 바꿨다).
+    for _ = 1, 5 do bd:runTick() end
+    t.eq(#bd.projectiles, 0, "디버거: 발사 없음(투사체 0) — ability 분기가 실제로 on_tick을 건너뜀")
+    t.eq(twDbg.cd, 0, "디버거: cd 갱신 없음(resolveAttack 자체가 호출된 적 없다는 근거)")
+    t.eq(twDbg.overclock, 0, "디버거: overclock 갱신 없음(on_tick 성공 경로를 탄 적이 없다는 근거)")
+
+    -- (d) limit 2 초과 build 실패(기존 limit 경로 — 한글 실패 로그 확인, 코어 변경 없음)
+    local bl = Battle(d, 6, {})
+    bl:start()
+    t.ok(bl:buildTower("debugger", 2, 2, "l1"), "limit: 디버거 1번째(한도 내)")
+    t.ok(bl:buildTower("debugger", 4, 2, "l2"), "limit: 디버거 2번째(한도 내)")
+    local ok3, err3 = bl:buildTower("debugger", 7, 2, "l3")
+    t.eq(ok3, false, "limit: 디버거 3번째는 실패(false)")
+    t.eq(err3, ("%s는 스테이지당 %d개뿐입니다"):format(d.towers.debugger.name, d.towers.debugger.limit),
+        "limit: 실패 메시지가 기존 한글 limit 경로 그대로")
 end

@@ -53,6 +53,14 @@ local BUILTIN_DOCS = {
         },
         example = 'demolish("a")',
     },
+    ["world.oldest"] = {
+        sig = "world.oldest()",
+        lines = {
+            "필드에서 가장 오래 버틴 적의 스냅샷을 반환한다(없으면 nil).",
+            "메모리 릭처럼 시간이 지날수록 강해지는 적은 오래된 것부터 끊어야 싸다.",
+        },
+        example = "local e = world.oldest()",
+    },
 }
 
 local DICT_ROW_H = 16 -- fonts.small(14px) 기준 줄 높이
@@ -178,6 +186,7 @@ local function drawFuncDict(self, x, y, w)
 
     addRow("build", "> build")
     addRow("demolish", "> demolish")
+    addRow("world.oldest", "> world.oldest")
     local funcs = self.battle.userFuncs
     if #funcs == 0 then
         love.graphics.setColor(0.7, 0.75, 0.8)
@@ -260,6 +269,7 @@ function play:enter(_, d, stageId, p)
         prevCd = {}, firedTimer = {}, smokeAcc = {}, hitTimer = {},
         guguFx = 0, guguSeen = false,    -- 구구 클래스 소환 연출 타이머(§6.6) — 원시 dt 감쇠
         crisisTimer = 0,                 -- 위기 경고 비네트 사인 펄스용 누적 타이머 — 원시 dt(배속 무관)
+        prevPhased = {},                 -- 하이젠버그 은신→재출현 전환 감지(프레임-diff)용
     }
 
     if self.stage.tutorial_file ~= "" and not p.tutorial_done[stageId] then
@@ -325,6 +335,16 @@ function play:update(dt)
         end
     end
 
+    -- 스플래시 명중 감지 준비(프레임-diff): battle:update가 죽거나 소멸한 투사체를 배열에서
+    -- 즉시 제거해 버리므로, 아직 안 끝난 splash 투사체 "참조"를 미리 붙잡아 둔다 — 같은
+    -- 오브젝트이므로 update 후 splashHit(코어가 명중 순간 직접 세팅한 순수 관측 필드)만
+    -- 읽으면 이번 프레임에 실제 폭발이 있었는지 정확히 알 수 있다(배열 소멸 여부로 추측하는
+    -- 방식은 target이 다른 이유로 먼저 사라진 경우와 구별이 안 돼 오탐할 수 있었다).
+    local splashWatch = {}
+    for _, p in ipairs(self.battle.projectiles) do
+        if p.splash and not p.done then splashWatch[#splashWatch + 1] = p end
+    end
+
     self.battle:update(dt * self.speed)
     if self.tut and self.tut:done() and not self.tutSaved then
         self.tutSaved = true
@@ -366,6 +386,31 @@ function play:update(dt)
             fx.smokeAcc[tw] = 0
         end
         fx.prevCrashed[tw] = crashedNow
+    end
+
+    -- 스플래시 명중 링: 위에서 붙잡아 둔 splashWatch 중 이번 프레임에 실제로 폭발한
+    -- (splashHit) 투사체만 명중 좌표(hitX,hitY)에 gc-collector 색 링을 띄운다. 반경을
+    -- 60px 스케일로 보이게 하려고 burst의 기본 ttl(0.5·speed60→반경30)만 1.0으로 늘려
+    -- speed60×ttl1.0=반경60에 맞춘다(파티클 로직 자체는 손대지 않는다).
+    do
+        local gcColor = parseColor(self.d.towers["gc-collector"] and self.d.towers["gc-collector"].color)
+        for _, p in ipairs(splashWatch) do
+            if p.splashHit then
+                particles.spawn("burst", p.hitX, p.hitY, { count = 12, ttl = 1.0, color = gcColor })
+            end
+        end
+    end
+
+    -- 하이젠버그 은신→재출현 전환 감지: 이전 프레임엔 은신, 이번 프레임엔 가시로 바뀐
+    -- 순간에만 짧은 재출현 플래시를 띄운다(phase 없는 적은 항상 false라 무시된다).
+    for _, e in ipairs(b.enemies) do
+        if e.abilities.phase then
+            local nowPhased = e:isPhased(b.clock)
+            if fx.prevPhased[e.id] and not nowPhased then
+                particles.spawn("flash", e.x, e.y, { ttl = 0.2, color = art.pal.purple })
+            end
+            fx.prevPhased[e.id] = nowPhased
+        end
     end
 
     -- 적 사망/도달 감지 + 피격 점멸
@@ -535,15 +580,21 @@ function play:draw()
         love.graphics.setColor(art.pal.white[1], art.pal.white[2], art.pal.white[3])
         love.graphics.print(tw.name or "", cx - 10, cy - 26)
     end
-    -- 적 (hit 점멸 — 흰 실루엣 시트)
+    -- 적 (hit 점멸 — 흰 실루엣 시트, 하이젠버그 은신 중엔 알파 0.25로 깜빡임)
     for _, e in ipairs(b.enemies) do
         local ex, ey = GRID_X + shakeX + e.x, GRID_Y + shakeY + e.y
         local hit = (fx.hitTimer[e.id] or 0) > 0
-        art.drawEnemy(e.def.id, ex, ey, t, hit)
+        local phased = e.abilities.phase and e:isPhased(b.clock)
+        art.drawEnemy(e.def.id, ex, ey, t, hit, phased and 0.25 or nil)
         love.graphics.setColor(0.1, 0.1, 0.1)
         love.graphics.rectangle("fill", ex - 10, ey - 16, 20, 3)
         love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
         love.graphics.rectangle("fill", ex - 10, ey - 16, 20 * e.hp / e.max_hp, 3)
+        -- slowfield: 감속 중인 적 하단에 작은 파란 점(2px, cyan) — 디버거 사거리 안 표시
+        if e.slowed then
+            love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
+            love.graphics.rectangle("fill", ex - 1, ey + 14, 2, 2)
+        end
     end
     love.graphics.setColor(1, 1, 1)
     -- 총알: 글로우(알파0.3·2배 크기) + 본체 — 차지 총알(size>4)은 마젠타, 일반은 흰색

@@ -12,8 +12,10 @@ local DASH_LEN = 0.3       -- dash: 대시 창의 길이(초)
 local DASH_MULT = 3        -- dash: 창 안에서의 속도 배율
 local PHASE_VISIBLE = 3.0  -- phase: 이 길이(초)만큼 가시 상태
 local PHASE_HIDDEN = 2.0   -- phase: 이어서 이 길이(초)만큼 은신 상태(가시→은신 반복)
+local SLOW_MULT = 0.6      -- slowfield: 디버거 사거리 안이면 실효 speed에 이 배율(비중첩)
 
 Enemy.PHASE_VISIBLE, Enemy.PHASE_HIDDEN = PHASE_VISIBLE, PHASE_HIDDEN
+Enemy.SLOW_MULT = SLOW_MULT
 
 -- abilities 문자열("a;b:arg;c")을 세미콜론으로 분리해 토큰 "완전 일치"로 파싱한다.
 -- 반환: { [능력이름] = 인자문자열(콜론 뒤) 또는 true(인자 없음), ... }
@@ -43,6 +45,7 @@ function Enemy:new(def, r, c)
     self.age = 0               -- 스폰 후 경과 초(battle clock 기반), 스냅샷 필드로도 노출
     self.growApplied = 0       -- grow: 이미 적용된 성장 횟수(중복 적용 방지)
     self.speed = def.speed     -- 실효 속도(px/s) — 스냅샷/월드가 참조, 매 프레임 갱신
+    self.slowed = false        -- slowfield: battle이 매 프레임 갱신(디버거 사거리 내 여부, 중첩 불가)
 end
 
 -- grow 능력: 스폰 후 GROW_EVERY마다 maxHP/HP를 GROW_AMOUNT만큼 증가시킨다. age(경과초)로부터
@@ -60,13 +63,15 @@ function Enemy:applyGrowth()
     self.max_hp = newMax
 end
 
--- 실효 속도 계산 훅(단일 지점) — dash 배율을 여기서 곱한다. Task 4의 slowfield도 같은 훅에
--- 배율을 곱해 넣는다(감속 등 추가 배율은 이 함수 안에서 mult에 곱하는 방식으로 확장).
+-- 실효 속도 계산 훅(단일 지점) — dash 배율을 여기서 곱한다. slowfield(Task 4)도 같은 훅에
+-- 배율을 곱해 넣는다 — self.slowed는 battle이 매 프레임(디버거 사거리 내 여부, 중첩 불가·OR
+-- 판정)로 갱신하는 순수 불리언이라, dash와 겹치면 그대로 곱해져 3×0.6처럼 복합된다.
 function Enemy:effectiveSpeed()
     local mult = 1
     if self.abilities.dash then
         if (self.age % DASH_PERIOD) < DASH_LEN then mult = mult * DASH_MULT end
     end
+    if self.slowed then mult = mult * SLOW_MULT end
     return self.def.speed * mult
 end
 
