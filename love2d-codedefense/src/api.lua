@@ -53,11 +53,15 @@ function api.buildEnv(battle)
     return env, setTower
 end
 
--- 틱 직전: env.self/world를 현재 타워 기준으로 갱신
-function api.refresh(env, tower, enemies)
+-- 틱 직전: env.self/world를 현재 타워 기준으로 갱신. clock은 phase(은신) 판정에 쓰인다 —
+-- 은신 중인 적은 world.enemies()/nearest()/weakest()/fastest()/oldest() 전부에서 제외된다
+-- (아래 snaps 하나를 모든 world 함수가 공유하므로 필터는 이 한 곳에만 있으면 된다).
+function api.refresh(env, tower, enemies, clock)
     local snaps = {}
     for _, e in ipairs(enemies) do
-        if not e.dead and not e.reached then snaps[#snaps + 1] = snapshot(e, tower) end
+        if not e.dead and not e.reached and not e:isPhased(clock) then
+            snaps[#snaps + 1] = snapshot(e, tower)
+        end
     end
     table.sort(snaps, function(a, b) return a.dist < b.dist end)
     local world = {}
@@ -74,7 +78,7 @@ function api.refresh(env, tower, enemies)
         return best
     end
     -- 가장 먼저 스폰된(age 최대) 적. 동률이면 더 먼저 스폰된(=낮은 id) 쪽. 적이 없으면 nil.
-    -- 은신(phase) 등 필터링은 Task 3의 몫 — 여기서는 world.enemies()와 동일하게 전 적 대상.
+    -- snaps가 이미 은신(phase) 적을 제외한 목록이므로 world.enemies()와 동일 기준으로 필터된다.
     function world.oldest()
         local best
         for _, s in ipairs(snaps) do

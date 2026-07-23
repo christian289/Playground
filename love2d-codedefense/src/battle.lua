@@ -32,6 +32,7 @@ function Battle:new(d, stageId, opts)
     self.enemies, self.towers, self.projectiles, self.log = {}, {}, {}, {}
     self.towersByName = {}
     self.reachedByType = {}
+    self.pairPending = {}      -- pair: 타임라인 이벤트 인덱스별 "짝을 기다리는 중"인 적(홀짝 매칭용)
     self.nextEnemyId = 1
     self.env = nil
     self.setTower = nil
@@ -150,6 +151,18 @@ function Battle:spawnFromTimeline()
             e.id = self.nextEnemyId
             e.spawnedAt = self.clock          -- 결정론: 스폰 시각(clock) 기준 산술만 사용
             self.nextEnemyId = self.nextEnemyId + 1
+            -- pair 능력: 같은 타임라인 이벤트(i) 안에서 스폰 순서(홀짝)로 둘씩 짝짓는다.
+            -- 홀수 스폰의 마지막 1기는 짝이 없어 pairId/pairAlive가 끝까지 nil로 남는다.
+            if e.abilities.pair then
+                local pending = self.pairPending[i]
+                if pending then
+                    e.pairId, e.pairAlive = pending.id, true
+                    pending.pairId, pending.pairAlive = e.id, true
+                    self.pairPending[i] = nil
+                else
+                    self.pairPending[i] = e
+                end
+            end
             self.enemies[#self.enemies + 1] = e
             n = n + 1
             if self.env and self.env._spawnFn then
@@ -174,7 +187,7 @@ function Battle:runTick()
     for _, tw in ipairs(snapshot) do
         if not tw.demolished and self.env and self.env.on_tick and tw.crashed <= 0 and not tw.disabled then
             self.setTower(tw)
-            local selfApi, world = api.refresh(self.env, tw, self.enemies)
+            local selfApi, world = api.refresh(self.env, tw, self.enemies, self.clock)
             tw.pendingTarget = nil
             local ok, err, used = sandbox.call(self.env.on_tick, BUDGET, selfApi, world)
             if not ok then
@@ -219,6 +232,11 @@ function Battle:resolveAttack(tw)
     if target.abilities.resist == tw.def.id then
         dmg = math.max(1, math.floor(dmg * 0.5))
     end
+    -- pair 능력: 짝(pairId)이 아직 생존해 있는 동안(pairAlive)은 받는 데미지가 ×0.4(내림,
+    -- 최소 1) — 신규 능력 경로라 floor·min1을 적용한다(기존 파이프라인은 그대로 둔다).
+    if target.abilities.pair and target.pairAlive then
+        dmg = math.max(1, math.floor(dmg * 0.4))
+    end
     self.projectiles[#self.projectiles + 1] =
         Projectile(tw.x, tw.y, target, dmg, tw.def.bullet_speed, 4 * mult)
     tw.charge = 0
@@ -260,7 +278,7 @@ function Battle:update(dt)
         if not e.dead and not e.reached then e:update(dt, self.grid, self.clock) end
     end
     for _, p in ipairs(self.projectiles) do
-        if not p.done then p:update(dt) end
+        if not p.done then p:update(dt, self.clock) end
     end
 
     -- 정리: 죽음/도달 처리
@@ -269,18 +287,34 @@ function Battle:update(dt)
         if e.hp <= 0 and not e.dead then
             e.dead = true
             self.money = self.money + (e.def.reward or 0)
-            -- split 능력: 죽으면 절반 체력 둘로 (토큰 완전 일치 — "split2"는 오탐되지 않는다)
-            if e.abilities.split and not e.isSplit then
-                for k = -1, 1, 2 do
-                    local child = Enemy(e.def, e.r, e.c)
-                    child.hp = math.floor(e.max_hp / 2)
-                    child.max_hp = child.hp
-                    child.x = e.x + k * 8
-                    child.isSplit = true
-                    child.id = self.nextEnemyId
-                    child.spawnedAt = self.clock
-                    self.nextEnemyId = self.nextEnemyId + 1
-                    self.enemies[#self.enemies + 1] = child
+            -- pair 능력: 짝이 죽으면 남은 쪽의 pairAlive를 즉시 false로 내려 데미지 경감을 해제한다.
+            if e.abilities.pair and e.pairId then
+                for _, other in ipairs(self.enemies) do
+                    if other.id == e.pairId then other.pairAlive = false break end
+                end
+            end
+            -- split/split2 능력: 죽으면 절반 체력 둘로 분열한다. split=최대 깊이 1(기존
+            -- concat-nil 동작, 바이트 동일), split2=최대 깊이 2(깊이1 자식이 죽으면 한 번 더
+            -- 분열, 깊이2는 분열하지 않음). 자식은 splitDepth를 상속해 깊이를 추적한다.
+            -- (토큰 완전 일치이므로 "split2"가 "split" 판정에 오탐되지 않는다)
+            local splitMaxDepth
+            if e.abilities.split2 then splitMaxDepth = 2
+            elseif e.abilities.split then splitMaxDepth = 1 end
+            if splitMaxDepth then
+                local depth = e.splitDepth or 0
+                if depth < splitMaxDepth then
+                    for k = -1, 1, 2 do
+                        local child = Enemy(e.def, e.r, e.c)
+                        child.hp = math.floor(e.max_hp / 2)
+                        child.max_hp = child.hp
+                        child.x = e.x + k * 8
+                        child.isSplit = true
+                        child.splitDepth = depth + 1
+                        child.id = self.nextEnemyId
+                        child.spawnedAt = self.clock
+                        self.nextEnemyId = self.nextEnemyId + 1
+                        self.enemies[#self.enemies + 1] = child
+                    end
                 end
             end
         end

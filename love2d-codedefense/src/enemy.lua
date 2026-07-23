@@ -10,6 +10,10 @@ local GROW_CAP_MULT = 5    -- grow: 상한 = 기본(CSV) maxHP × 이 배수
 local DASH_PERIOD = 1.5    -- dash: 이 주기(초)마다 대시 창이 돌아옴
 local DASH_LEN = 0.3       -- dash: 대시 창의 길이(초)
 local DASH_MULT = 3        -- dash: 창 안에서의 속도 배율
+local PHASE_VISIBLE = 3.0  -- phase: 이 길이(초)만큼 가시 상태
+local PHASE_HIDDEN = 2.0   -- phase: 이어서 이 길이(초)만큼 은신 상태(가시→은신 반복)
+
+Enemy.PHASE_VISIBLE, Enemy.PHASE_HIDDEN = PHASE_VISIBLE, PHASE_HIDDEN
 
 -- abilities 문자열("a;b:arg;c")을 세미콜론으로 분리해 토큰 "완전 일치"로 파싱한다.
 -- 반환: { [능력이름] = 인자문자열(콜론 뒤) 또는 true(인자 없음), ... }
@@ -64,6 +68,18 @@ function Enemy:effectiveSpeed()
         if (self.age % DASH_PERIOD) < DASH_LEN then mult = mult * DASH_MULT end
     end
     return self.def.speed * mult
+end
+
+-- phase 능력: 스폰 시각 기준 순수 산술로만 은신 여부를 판정한다(grow/dash와 같은 방식의
+-- recomputation — 은신 여부를 별도 필드로 저장하지 않으므로 매 호출 결정론이 보장된다).
+-- 가시(PHASE_VISIBLE)·은신(PHASE_HIDDEN) 구간이 스폰 시각부터 번갈아 반복되며, 은신 구간의
+-- 시작 경계는 포함(>=)이고 재출현 경계는 배타(< 다음 주기 시작 전까지)다.
+function Enemy:isPhased(clock)
+    if not self.abilities.phase then return false end
+    local age = (clock or 0) - self.spawnedAt
+    if age < 0 then return false end
+    local cycle = PHASE_VISIBLE + PHASE_HIDDEN
+    return (age % cycle) >= PHASE_VISIBLE
 end
 
 -- 스폰 이후 경과(age)를 battle clock 기준으로 갱신하고, grow/실효 속도를 계산한다.
