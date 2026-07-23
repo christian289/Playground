@@ -30,6 +30,7 @@ return function(t)
     clock = clock + 100
     eg:updateStats(clock)
     t.eq(eg.max_hp, capSnapshot, "grow: 상한 도달 후 추가 성장 없음(불변)")
+    t.eq(eg.hp, capSnapshot, "grow: 상한 도달 후 hp도 max_hp와 일치")
 
     ------------------------------------------------------------------
     -- ② dash: age 0.1s(대시 창 DASH_LEN=0.3 안)에서 실효 speed=기본×3,
@@ -45,6 +46,9 @@ return function(t)
     for _ = 1, 4 do c2 = c2 + 0.1 end   -- 추가 0.4s → 총 age 0.5s(대시 창 밖)
     ed:updateStats(c2)
     t.eq(ed.speed, dashDef.speed, "dash: 창 밖(age 0.5s) 실효 speed 기본값")
+    local c3 = 0.3   -- age 정확히 0.3s(DASH_LEN 경계, 배타적 끝)
+    ed:updateStats(c3)
+    t.eq(ed.speed, dashDef.speed, "dash: 경계 age 0.3s(DASH_LEN)에서 NOT 대시")
 
     ------------------------------------------------------------------
     -- ③ resist:printer — 프린터 데미지는 절반(floor·min1), 스나이퍼 데미지는 그대로
@@ -80,6 +84,46 @@ return function(t)
     b:resolveAttack(twS)
     local dmgS = b.projectiles[#b.projectiles].damage
     t.eq(dmgS, d.towers.sniper.damage, "resist:printer — 스나이퍼 데미지는 그대로(무관계 타워는 감쇄 없음)")
+
+    -- resist 소수 데미지 내림(5.25→5): charge=0.1 → 10×1.05=10.5 → resist 5.25 → floor → 5
+    local eFrac = targetFor(twP, 9003)
+    b.enemies = { eFrac }
+    twP.cd = 0   -- 쿨다운 리셋
+    twP.pendingTarget = eFrac.id
+    twP.charge = 0.1   -- mult = 1 + 0.1*0.5 = 1.05
+    b:resolveAttack(twP)
+    local dmgFrac = b.projectiles[#b.projectiles].damage
+    t.eq(dmgFrac, 5, "resist 소수 데미지 내림(5.25→5)")
+
+    -- resist 최소값 1: damage=1 → 1×0.5=0.5 → floor→0 → max(1,0)=1
+    -- 합성 타워 정의로 테스트 (실제 CSV 타워로는 damage가 충분히 낮지 않음)
+    local syntheticDef = {
+        id = "test-low-dmg",
+        name = "Test Low Dmg",
+        damage = 1,
+        range = 200,
+        cooldown = 1,
+        bullet_speed = 100,
+        color = "1;1;1"
+    }
+    local twSynth = {
+        def = syntheticDef,
+        x = 0, y = 0, r = 1, c = 1,
+        charge = 0,
+        cd = 0,
+        pendingTarget = nil,
+        dan = nil,
+        effectiveCooldown = function() return 1 end
+    }
+    local eMin = Enemy(legacyDef, 1, 1)
+    eMin.id = 9004
+    eMin.spawnedAt = b.clock
+    eMin.x, eMin.y = 0, 0
+    b.enemies = { eMin }
+    twSynth.pendingTarget = eMin.id
+    b:resolveAttack(twSynth)
+    local dmgMin = b.projectiles[#b.projectiles].damage
+    t.eq(dmgMin, 1, "resist 최소값 1(0.5→floor→0 → max(1,0)=1)")
 
     ------------------------------------------------------------------
     -- ④ 스냅샷 age/speed: world.enemies()가 실제 e.age/e.speed(실효)와 일치
