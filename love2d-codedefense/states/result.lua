@@ -73,6 +73,14 @@ function result:draw()
     else
         love.graphics.setColor(0.95, 0.4, 0.35)
         love.graphics.printf("서버 다운...", 0, 230, W, "center")
+        -- 클리어 타임은 300초 고정이라 무의미하지만, 패배 시 버틴 시간은 다음 시도의
+        -- 기준점이 된다 (어디까지 막았는지 = 어떤 웨이브에서 뚫렸는지).
+        if self.ctx.clock then
+            love.graphics.setFont(fonts.ui)
+            love.graphics.setColor(0.85, 0.7, 0.4)
+            love.graphics.printf(("버틴 시간 %d초 / 300초"):format(math.max(0, self.ctx.clock)),
+                0, 300, W, "center")
+        end
     end
 
     -- 배포 로그 줄 (§6.7, 여운 문구 위)
@@ -91,13 +99,16 @@ function result:draw()
 
     love.graphics.setFont(fonts.ui)
     love.graphics.setColor(0.85, 0.88, 0.92)
-    love.graphics.printf("Enter/클릭 스테이지 선택으로", 0, 500, W, "center")
+    love.graphics.printf("R 재도전 · Enter/클릭 스테이지 선택으로", 0, 500, W, "center")
     love.graphics.setColor(1, 1, 1)
 end
 
 function result:keypressed(key)
     if key == "return" or key == "escape" then
         Gamestate.switch(require("states.stageselect"), self.ctx.d, self.ctx.p)
+    elseif key == "r" then
+        -- 반복 숙달이 목표인 게임이라 재도전 루프를 최단으로: 스테이지 선택 왕복 없이 즉시.
+        Gamestate.switch(require("states.play"), self.ctx.d, self.ctx.stageId, self.ctx.p)
     end
 end
 

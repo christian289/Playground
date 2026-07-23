@@ -169,6 +169,8 @@ function play:enter(_, d, stageId, p)
     self.stage = d.stages[stageId]
     self.battle = Battle(d, stageId, { items = p.items })
     self.speed = 1
+    self.mx, self.my = -100, -100 -- 마우스 이동 전 호버 오탐 방지
+    self.escArmed = 0
     self.tut = nil
     self.tutSaved = false
     self.dictOpen = nil     -- 함수 사전 펼침 상태: nil | "build" | 함수명
@@ -242,6 +244,11 @@ function play:save()
         self.fx.devAnim.pose = "typing"; self.fx.devAnim.timer = 1.0  -- 저장 성공 → 타이핑 1초
         if #self.battle.towers > before and self.tut then self.tut:notify("built") end
         if self.tut then self.tut:notify("saved") end
+    else
+        -- 저장 실패는 하단 빨간 한 줄뿐이라 전투에 집중하면 놓친다 — 아바타 알람 +
+        -- 에디터 테두리 플래시로 배포 실패를 몸으로 느끼게 한다.
+        self.fx.devAnim.pose = "alarm"; self.fx.devAnim.timer = 1.0
+        self.fx.saveErrFlash = 0.7
     end
     return ok
 end
@@ -285,7 +292,7 @@ function play:update(dt)
         Gamestate.switch(require("states.result"), self.battle.status,
             { d = self.d, stageId = self.stageId, p = self.p,
               guguUsed = self.fx.guguSeen or false, towerCount = #self.battle.towers,
-              serverHP = self.battle.serverHP })
+              serverHP = self.battle.serverHP, clock = self.battle.clock })
     end
 
     -- 뷰 전용 프레임-diff 이펙트 발동 (battle 코어 상태는 읽기만 한다)
@@ -385,6 +392,10 @@ function play:update(dt)
         fx.devAnim.timer = fx.devAnim.timer - dt
         if fx.devAnim.timer <= 0 then fx.devAnim.pose = "idle" end
     end
+    -- ESC 포기 확인 대기 시간 감쇠 (원시 dt — 배속 무관하게 3초 유지)
+    if (self.escArmed or 0) > 0 then self.escArmed = self.escArmed - dt end
+    -- 저장 실패 테두리 플래시 감쇠 (원시 dt)
+    if (fx.saveErrFlash or 0) > 0 then fx.saveErrFlash = fx.saveErrFlash - dt end
     particles.update(dt)
 end
 
@@ -482,6 +493,27 @@ function play:draw()
     love.graphics.setColor(1, 1, 1)
     -- 파티클 (사망 burst/보상 float/설치 flash/크래시 smoke/spark)
     particles.draw(GRID_X + shakeX, GRID_Y + shakeY)
+
+    -- 타워 호버: 사거리 원(전장 안으로 클리핑) — 코드로 (행,열)을 지정하는 게임이라
+    -- 사거리 감각이 배치 판단의 핵심인데 지금까지 시각화가 없었다. 툴팁은 draw 끝에서
+    -- (문제 카드 위 z순서로) 그리도록 hoverTower만 여기서 확정한다.
+    self.hoverTower = nil
+    for _, tw in ipairs(b.towers) do
+        local hx, hy = GRID_X + shakeX + tw.x, GRID_Y + shakeY + tw.y
+        if math.abs((self.mx or -100) - hx) <= 16 and math.abs((self.my or -100) - hy) <= 16 then
+            self.hoverTower = tw
+            if (tw.def.range or 0) > 0 then
+                love.graphics.setScissor(GRID_X, GRID_Y, FIELD_W, FIELD_H)
+                love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3], 0.08)
+                love.graphics.circle("fill", hx, hy, tw.def.range)
+                love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3], 0.45)
+                love.graphics.circle("line", hx, hy, tw.def.range)
+                love.graphics.setScissor()
+                love.graphics.setColor(1, 1, 1)
+            end
+            break
+        end
+    end
 
     -- 정보 칼럼 (전장과 에디터 사이, x=400 y=48 w=240 h=512 — 전장과 바닥이 나란하다):
     -- ① 문제 요약 ② 적 구성(구 전장 오버레이 흡수) ③ 함수 사전 자리(Task 3 스텁)
@@ -614,12 +646,21 @@ function play:draw()
         love.graphics.setColor(1, 0.45, 0.4)
         love.graphics.printf("저장 실패 — " .. b.scriptError, self.editor.x, 545, self.editor.w, "left")
     end
+    -- 저장 실패 직후 에디터 테두리 플래시 (놓치기 쉬운 하단 한 줄을 보강)
+    if (fx.saveErrFlash or 0) > 0 then
+        love.graphics.setColor(1, 0.35, 0.3, math.min(1, fx.saveErrFlash * 1.4))
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", self.editor.x - 4, self.editor.y - 4,
+            self.editor.w + 8, self.editor.h + 8)
+        love.graphics.setLineWidth(1)
+        love.graphics.setColor(1, 1, 1)
+    end
     -- 힌트바 (튜토리얼 말풍선이 대신 안내하는 동안은 겹치지 않도록 숨긴다)
     if not (self.tut and not self.tut:done()) then
         love.graphics.setColor(0.6, 0.65, 0.7)
         local hint = self:isButtonStage()
-            and "숫자키 버튼 실행 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · ESC 나가기"
-            or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · ESC 나가기"
+            and "숫자키 버튼 실행 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
+            or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+L 비우기 · Ctrl+1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
         love.graphics.printf(hint, 0, 620, 1280, "center")
     end
 
@@ -689,6 +730,44 @@ function play:draw()
         love.graphics.setColor(1, 1, 1)
     end
 
+    -- 타워 호버 툴팁 (문제 카드보다 위, 튜토리얼 말풍선보다 아래 z순서)
+    if self.hoverTower then
+        local tw = self.hoverTower
+        local dmg = (tw.def.damage or 0) * (tw.dan or 1)
+        local lines = {
+            tw.def.name .. (tw.dan and (" %d단"):format(tw.dan) or "")
+                .. (tw.name and tw.name ~= "" and (" [" .. tw.name .. "]") or ""),
+            ("데미지 %d · 사거리 %d · 쿨다운 %.1f초"):format(dmg, tw.def.range or 0, tw.def.cooldown or 0),
+        }
+        if tw.crashed > 0 or tw.disabled then lines[#lines + 1] = "상태: 크래시 — F5 재배포로 복구" end
+        love.graphics.setFont(fonts.small)
+        local wMax = 0
+        for _, s in ipairs(lines) do wMax = math.max(wMax, fonts.small:getWidth(s)) end
+        local bw, bh = wMax + 16, #lines * 16 + 12
+        local bx = math.min((self.mx or 0) + 14, love.graphics.getWidth() - bw - 4)
+        local by = math.min((self.my or 0) + 14, love.graphics.getHeight() - bh - 4)
+        love.graphics.setColor(0.05, 0.07, 0.12, 0.93)
+        love.graphics.rectangle("fill", bx, by, bw, bh, 4, 4)
+        love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3], 0.4)
+        love.graphics.rectangle("line", bx, by, bw, bh, 4, 4)
+        love.graphics.setColor(0.85, 0.88, 0.92)
+        for i, s in ipairs(lines) do love.graphics.print(s, bx + 8, by + 6 + (i - 1) * 16) end
+        love.graphics.setColor(1, 1, 1)
+    end
+
+    -- ESC 포기 확인 토스트
+    if (self.escArmed or 0) > 0 then
+        local W = love.graphics.getWidth()
+        local msg = "한 번 더 ESC를 누르면 전투를 포기합니다 · Ctrl+R 즉시 재시작"
+        love.graphics.setFont(fonts.ui)
+        local mw = fonts.ui:getWidth(msg) + 28
+        love.graphics.setColor(0.05, 0.05, 0.08, 0.85)
+        love.graphics.rectangle("fill", (W - mw) / 2, 296, mw, 36, 6, 6)
+        love.graphics.setColor(1, 0.75, 0.4)
+        love.graphics.printf(msg, 0, 304, W, "center")
+        love.graphics.setColor(1, 1, 1)
+    end
+
     if self.tut then self.tut:draw(fonts, GRID_X, GRID_Y) end
 end
 
@@ -711,7 +790,16 @@ function play:keypressed(key)
         return
     end
     if key == "escape" then
-        Gamestate.switch(require("states.stageselect"), self.d, self.p)
+        -- 5분짜리 판이 오타 한 번에 날아가지 않도록 2단 확인: 3초 안에 한 번 더 누르면 포기.
+        if (self.escArmed or 0) > 0 then
+            Gamestate.switch(require("states.stageselect"), self.d, self.p)
+        else
+            self.escArmed = 3
+        end
+        return
+    end
+    if ctrl and key == "r" then
+        Gamestate.switch(require("states.play"), self.d, self.stageId, self.p)
         return
     end
     if ctrl and (key == "1" or key == "2" or key == "4") then
@@ -722,6 +810,11 @@ function play:keypressed(key)
     if self:isButtonStage() then
         local i = tonumber(key)
         if i and self.buttons[i] and not self.autotype then self:pressButton(i) end
+        return
+    end
+    if ctrl and key == "l" then
+        -- 힌트 템플릿을 버리고 처음부터 짤 때 지우기 수단이 Backspace 연타뿐이었다.
+        self.editor:setText("")
         return
     end
     if key == "f5" then self:save() return end
@@ -738,6 +831,10 @@ end
 -- 함수 사전 클릭 연동: 에디터에서 build/유저 함수 식별자를 클릭하거나, 정보 칼럼의
 -- 사전 목록 항목을 직접 클릭하면 dictOpen을 토글(같은 항목 재클릭 시 닫힘)/교체한다.
 -- 그 외 클릭(빈 곳, 다른 식별자, 우클릭 등)은 무시한다.
+function play:mousemoved(x, y)
+    self.mx, self.my = x, y
+end
+
 function play:mousepressed(x, y, button)
     if button ~= 1 then return end
     -- 문제 카드가 열려 있으면 좌클릭은 카드 닫기로만 소비한다(Enter 닫기와 대칭) — 그렇지
