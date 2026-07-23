@@ -96,9 +96,9 @@ return function(t)
     t.eq(dmgFrac, 5, "resist 소수 데미지 내림(5.25→5)")
 
     -- resist 최소값 1: damage=1 → 1×0.5=0.5 → floor→0 → max(1,0)=1
-    -- 합성 타워 정의로 테스트 (실제 CSV 타워로는 damage가 충분히 낮지 않음)
+    -- 합성 타워 정의로 테스트 (id="printer"로 설정해 target.abilities.resist와 매칭)
     local syntheticDef = {
-        id = "test-low-dmg",
+        id = "printer",
         name = "Test Low Dmg",
         damage = 1,
         range = 200,
