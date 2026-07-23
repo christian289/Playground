@@ -12,6 +12,7 @@ function sel:enter(_, d, p)
     end
     table.sort(self.ids)
     self.cursor = 1
+    self.scroll = 0 -- 목록 스크롤 오프셋(0-indexed, 화면 첫 줄에 보이는 항목 = ids[scroll+1])
 end
 
 function sel:unlocked(id)
@@ -28,21 +29,41 @@ function sel:draw()
     local OX = (W - 960) / 2 -- 960 기준 좌표(패널·목록)를 창 폭 중앙에 배치하는 오프셋
     love.graphics.setColor(P.bg[1], P.bg[2], P.bg[3])
     love.graphics.rectangle("fill", 0, 0, W, 640)
-    -- 목록 패널
+
+    -- 목록 패널 지오메트리 (스크롤 계산의 기준) — rowLeft/rowW는 커서 하이라이트·기록 텍스트
+    -- 정렬에도 재사용해 항상 패널 안쪽에 들어가게 한다.
+    local panelX, panelY, panelW, panelH = OX + 200, 96, 560, 470
+    local rowLeft, rowW = OX + 220, 520
+    local rowRight = rowLeft + rowW
+    local rowSpacing = 40
+    local topPad, bottomPad = 26, 26 -- "↑/↓ 더 있음" 표시용 여백(스크롤 여부와 무관하게 항상 예약해 목록 위치가 흔들리지 않게 함)
+    local listTop = panelY + topPad
+    local listBottom = panelY + panelH - bottomPad
+    local visibleRows = math.max(1, math.floor((listBottom - listTop) / rowSpacing))
+
+    -- 스크롤 오프셋: 커서가 화면 위/아래를 벗어나면 따라가게 클램프
+    if self.cursor - 1 < self.scroll then self.scroll = self.cursor - 1 end
+    if self.cursor - 1 > self.scroll + visibleRows - 1 then self.scroll = self.cursor - visibleRows end
+    local maxScroll = math.max(0, #self.ids - visibleRows)
+    self.scroll = math.max(0, math.min(self.scroll, maxScroll))
+
     love.graphics.setColor(P.panel[1], P.panel[2], P.panel[3], 0.85)
-    love.graphics.rectangle("fill", OX + 200, 96, 560, 470, 10, 10)
+    love.graphics.rectangle("fill", panelX, panelY, panelW, panelH, 10, 10)
 
     love.graphics.setFont(fonts.big)
     love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3])
     love.graphics.printf("스테이지 선택", 0, 40, W, "center")
     love.graphics.setFont(fonts.ui)
-    for i, id in ipairs(self.ids) do
+    for j = 1, visibleRows do
+        local i = self.scroll + j
+        local id = self.ids[i]
+        if not id then break end
         local s = self.d.stages[id]
-        local y = 118 + (i - 1) * 40
+        local y = listTop + (j - 1) * rowSpacing
         local locked = not self:unlocked(id)
         if i == self.cursor then
             love.graphics.setColor(P.green[1], P.green[2], P.green[3], 0.14)
-            love.graphics.rectangle("fill", OX + 220, y - 4, 520, 32, 5, 5)
+            love.graphics.rectangle("fill", rowLeft, y - 4, rowW, 32, 5, 5)
             love.graphics.setColor(P.green[1], P.green[2], P.green[3])
         elseif locked then love.graphics.setColor(0.35, 0.38, 0.42)
         else love.graphics.setColor(0.85, 0.88, 0.92) end
@@ -50,7 +71,8 @@ function sel:draw()
         local prefix = (i == self.cursor) and "> " or "   "
         love.graphics.printf(("%s%d. %s%s"):format(prefix, id, s.concept, mark), 0, y, W, "center")
 
-        -- 배포 기록 표기 (§6.7)
+        -- 배포 기록 표기 (§6.7) — 행(rowLeft~rowRight) 안쪽 오른쪽 정렬. 폭을 실측해
+        -- rowRight - width - padding에 그려 행 배경 밖으로 벗어나지 않게 한다.
         local rec = self.p.records and self.p.records[id]
         if rec then
             local recText
@@ -62,10 +84,25 @@ function sel:draw()
             end
             love.graphics.setFont(fonts.small)
             love.graphics.setColor(0.55, 0.58, 0.62)
-            love.graphics.printf(recText, OX + 500, y + 2, 250, "right")
+            local recPad = 14
+            local recW = fonts.small:getWidth(recText)
+            love.graphics.print(recText, rowRight - recPad - recW, y + 2)
             love.graphics.setFont(fonts.ui)
         end
     end
+
+    -- 스크롤 인디케이터: 화면 밖에 항목이 더 있음을 알림(폰트에 없는 글리프 회피 —
+    -- 게임 전반에서 이미 쓰는 "↑↓" 화살표 재사용)
+    love.graphics.setFont(fonts.small)
+    if self.scroll > 0 then
+        love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3])
+        love.graphics.printf("↑ 더 있음", panelX, panelY + 6, panelW, "center")
+    end
+    if self.scroll + visibleRows < #self.ids then
+        love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3])
+        love.graphics.printf("↓ 더 있음", panelX, listBottom + 6, panelW, "center")
+    end
+
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.6, 0.65, 0.7)
     love.graphics.printf("↑↓ 이동 · Enter 선택 · ESC 타이틀", 0, 600, W, "center")

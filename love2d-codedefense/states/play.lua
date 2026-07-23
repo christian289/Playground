@@ -396,18 +396,23 @@ function play:draw()
     local shakeX = fx.shake > 0 and math.sin(t * 60) * 3 or 0
     local shakeY = fx.shake > 0 and math.cos(t * 60) * 3 or 0
 
-    -- 상단 바
+    -- 상단 바: HUD 텍스트 · 진행 바 · 좌표 열 라벨을 창 폭 전체(y=0~GRID_Y)의 불투명 패널
+    -- 위에 그려 전장(GRID_Y=48부터) 및 정보 칼럼/에디터 헤더(둘 다 y=48부터 시작)와 명확히
+    -- 분리한다 — 이 셋 다 y<GRID_Y 안에 들어가도록 y를 조정했다(HUD 6~24, 진행 바 26~30,
+    -- 열 라벨 32~46, 2px 여유를 두고 GRID_Y와 만난다).
+    love.graphics.setColor(art.pal.panel[1], art.pal.panel[2], art.pal.panel[3], 1)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), GRID_Y)
+
     love.graphics.setFont(fonts.ui)
     love.graphics.setColor(0.9, 0.92, 0.95)
     local clockText = b.clock < 0
         and ("전투 시작까지 %d초 — 코드를 준비하세요!"):format(math.ceil(-b.clock))
         or ("%.0f / 300초"):format(b.clock)
-    love.graphics.print(("%s   서버 HP %d   잔액 %d   배속 x%d"):format(clockText, b.serverHP, b.money, self.speed), 8, 12)
+    love.graphics.print(("%s   서버 HP %d   잔액 %d   배속 x%d"):format(clockText, b.serverHP, b.money, self.speed), 8, 6)
 
-    -- 진행 바 (HUD 아래, 300초 대비 현재 시각 + 스폰 이벤트 눈금) — 좌표 라벨(아래에서 y를
-    -- GRID_Y-12로 내림)과 겹치지 않도록 얇게(4px) y=30에 둔다.
+    -- 진행 바 (HUD 아래, 300초 대비 현재 시각 + 스폰 이벤트 눈금)
     do
-        local barX, barY, barW, barH = GRID_X, 30, FIELD_W, 4
+        local barX, barY, barW, barH = GRID_X, 26, FIELD_W, 4
         love.graphics.setColor(art.pal.panel[1], art.pal.panel[2], art.pal.panel[3], 0.9)
         love.graphics.rectangle("fill", barX, barY, barW, barH)
         local frac = math.max(0, math.min(1, b.clock / Battle.TOTAL))
@@ -431,11 +436,12 @@ function play:draw()
             else art.drawFloor(x, y) end
         end
     end
-    -- 행·열 좌표 라벨 (코드로 좌표를 지정하므로 상시 표기) — 진행 바(y=30~34)와 겹치지
-    -- 않도록 열 라벨을 그리드 쪽으로 4px 내려 y=-12 오프셋(=38)에서 그린다.
+    -- 행·열 좌표 라벨 (코드로 좌표를 지정하므로 상시 표기) — 진행 바(y=26~30)와 전장
+    -- 타일(y=GRID_Y=48부터) 사이, 상단 바 안(y=32~46)에 들어가도록 GRID_Y-16 오프셋에서
+    -- 그린다(fonts.small 높이 14 → 46, GRID_Y와 2px 여유).
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.5, 0.55, 0.6)
-    for c = 1, grid.COLS do love.graphics.print(tostring(c), GRID_X + shakeX + (c - 1) * grid.CELL + 10, GRID_Y + shakeY - 12) end
+    for c = 1, grid.COLS do love.graphics.print(tostring(c), GRID_X + shakeX + (c - 1) * grid.CELL + 10, GRID_Y + shakeY - 16) end
     for r = 1, grid.ROWS do love.graphics.print(tostring(r), GRID_X + shakeX - 6 - fonts.small:getWidth(tostring(r)) + 4, GRID_Y + shakeY + (r - 1) * grid.CELL + 8) end
     -- 서버라인
     art.drawServerline(GRID_X + shakeX, GRID_Y + shakeY + grid.ROWS * grid.CELL, grid.COLS * grid.CELL, t)
