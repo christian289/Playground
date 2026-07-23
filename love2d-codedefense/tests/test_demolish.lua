@@ -33,7 +33,8 @@ return function(t)
     t.ok(table.concat(b2.log, "/"):find("철거 실패"), "철거 실패 로그 포함")
     t.eq(b2.log[#b2.log], '[오류] 철거 실패 — "없음" 타워가 없습니다', "철거 실패 로그 형식 정확")
 
-    -- ③ setScript의 on_tick 안에서 demolish 호출: 다음 틱에 반영되고 크래시 없음
+    -- ③ setScript의 on_tick 안에서 demolish 호출: 그 틱 안에서 즉시 반영되고(스냅샷 순회는
+    -- 유지됨) 크래시 없음
     local DEMO_SCRIPT = [[
 build("printer", 3, 10, "a")
 function on_tick(self, world)
@@ -46,7 +47,7 @@ end
     local tw3 = b3.towers[1]
     b3:start()
     run(b3, 0.3)
-    t.eq(#b3.towers, 0, "on_tick의 demolish 호출로 다음 틱에 제거")
+    t.eq(#b3.towers, 0, "on_tick의 demolish 호출로 그 틱 안에서 즉시 제거")
     t.eq(tw3.crashed, 0, "demolish 호출 자체는 크래시를 유발하지 않음")
 
     -- ④ demolish 후 같은 이름으로 build: 멱등 캐시가 막지 않고 재생성됨

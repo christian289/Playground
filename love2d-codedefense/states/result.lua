@@ -122,7 +122,11 @@ local function drawPostmortemCard(self)
     love.graphics.printf(self.postmortem, cardX + pad, cardY + titleH, cardW - pad * 2, "left")
 
     love.graphics.setColor(0.6, 0.65, 0.7)
-    love.graphics.printf("Enter 닫기", cardX, cardY + cardH - 26, cardW, "center")
+    -- §8 재클리어 힌트: 이번 결과가 이 스테이지의 첫 클리어면 "Enter 닫기", 재클리어(rec.clears
+    -- 는 result:enter가 이미 이번 판을 반영한 뒤 값이므로 >1이면 재클리어)면 "Enter 건너뛰기".
+    local isReclear = self.rec and self.rec.clears and self.rec.clears > 1
+    love.graphics.printf(isReclear and "Enter 건너뛰기" or "Enter 닫기",
+        cardX, cardY + cardH - 26, cardW, "center")
     love.graphics.setColor(1, 1, 1)
 end
 
@@ -173,13 +177,16 @@ function result:draw()
             love.graphics.printf(("버틴 시간 %d초 / 300초"):format(math.max(0, self.ctx.clock)),
                 0, 300, W, "center")
         end
-        -- 패배 코칭: 가장 많이 뚫린 적 종류 1개(도달 0이면 생략) — 다음 시도의 우선 방어 대상 힌트
+        -- 패배 코칭(§7): 가장 많이 뚫린 적 종류 1개(도달 0이면 생략) — 다음 시도의 우선 방어
+        -- 대상 힌트 + 조언 꼬리(스펙 원문 그대로). concat-nil의 표시명(영문 에러 문구 그대로)이
+        -- 섞이면 fonts.ui로는 600px 패널 폭을 넘기므로(측정: 711px) fonts.small로 렌더링한다.
         local topId, topN = topReached(self.ctx)
         if topId and topN and topN > 0 then
             local name = self.ctx.d.enemies[topId] and self.ctx.d.enemies[topId].name or topId
-            love.graphics.setFont(fonts.ui)
+            love.graphics.setFont(fonts.small)
             love.graphics.setColor(0.85, 0.5, 0.45)
-            love.graphics.printf(("가장 많이 도달: %s %d기"):format(name, topN), 0, 325, W, "center")
+            love.graphics.printf(("가장 많이 도달: %s %d기 — 사거리와 화력 배치를 다시 보라"):format(name, topN),
+                0, 325, W, "center")
         end
     end
 

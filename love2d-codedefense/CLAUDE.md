@@ -81,7 +81,7 @@ love2d-codedefense/
 │                               "...", postmortem = "..." }` 스키마. `stages.csv`의 `lore_file`이
 │                               가리키며, 비어 있으면 해당 스테이지는 브리핑/포스트모템 표시를
 │                               조용히 생략한다(§ "스테이지 네러티브" 참고)
-├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (251개, 13개 스위트:
+├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (316개, 13개 스위트:
 │                               csv/grid/sandbox/battle/data/editor/progress/tutorial/particles/
 │                               cutscene/stageinfo/demolish/stars)
 ├─ lib/                    ← 외부 라이브러리 (직접 수정 금지)
@@ -264,7 +264,9 @@ love2d-codedefense/
     "a"가 다시 지어진다 — 버그가 아니라 실시간 스크립트 재실행 규칙의 자연스러운 결과다(카드에
     이 함정을 명시). `runTick`은 이번 틱 타워 목록을 미리 스냅샷해 두므로, 어떤 타워의
     `on_tick`이 아직 차례가 안 온 다른 타워를 `demolish`해도 그 틱에서 스킵되지 않는다
-    (`tests/test_demolish.lua`).
+    (`tests/test_demolish.lua`). 같은 스냅샷 메커니즘의 반대쪽 효과도 있다 — `on_tick` 안에서
+    `build()`로 새로 지은 타워는 이번 틱 스냅샷에 없으므로 그 타워의 `on_tick`은 이번 틱에는
+    실행되지 않고 다음 틱부터 반영된다.
   - **funcbook 영구 수집** (`src/progress.lua`의 `p.funcbook`, `play:save`): F5 저장이 성공할
     때마다 `battle.userFuncs`를 훑어 판당(전투당) 이름별로 **한 번만**(`self.funcCounted` 가드)
     `p.funcbook[name] = { first = stageId, count = 0 }`를 만들고 `count`를 1 증가시켜
@@ -380,8 +382,10 @@ love2d-codedefense/
 - **패배 코칭**: `src/battle.lua`가 적이 서버라인에 도달할 때마다(카운트 시점 1회)
   `self.reachedByType[enemyId]`를 증가시킨다(순수 집계, 시뮬 로직에는 영향 없음). 패배 결과
   화면(`states/result.lua`의 `topReached`)은 가장 많이 도달한 적 종류 1개를 "가장 많이 도달:
-  <이름> n기"로 보여준다(도달 0이면 생략, 동률이면 스테이지 타임라인상 더 먼저 스폰된 종
-  우선) — "버틴 시간 N초 / 300초" 바로 아래에 붙는다.
+  <이름> n기 — 사거리와 화력 배치를 다시 보라"로 보여준다(도달 0이면 생략, 동률이면 스테이지
+  타임라인상 더 먼저 스폰된 종 우선) — "버틴 시간 N초 / 300초" 바로 아래에 붙는다. concat-nil의
+  표시명(영문 에러 문구 그대로)이 섞이면 `fonts.ui`로는 결과 패널 폭(600px)을 넘겨(측정
+  711px) `fonts.small`로 렌더링한다.
 - **도감 프로필 탭** (`states/codex.lua`, 4번째 탭 — 전부 기존 저장 데이터 파생, 새 필드 없음):
   좌측 패널은 요약 집계(총 배포 횟수 = 모든 `records.tries` 합 / 클리어 스테이지 수 / 별
   합계 / 등록 함수 수(`funcbook`) / 구구 클래스 발견 여부), 우측 패널은 스테이지별 한 줄
@@ -399,12 +403,14 @@ love2d-codedefense/
     `cardH`가 기존 190 그대로), 12편 중 가장 긴 브리핑(스테이지 6, 약 90자)도 카드 안에 온전히
     들어간다.
   - **포스트모템**: 클리어 결과 화면 진입 시 lore의 `postmortem`이 있으면 `self.pmCard = true`로
-    오버레이 카드("포스트모템 #스테이지번호" + 본문 + "Enter 닫기", 배경을 살짝 어둡게 깔아
-    초점을 모음)가 자동으로 뜬다. Enter/좌클릭 **1회차**는 카드만 닫고(`self.pmCard = false`),
-    카드가 이미 닫혀 있는 **2회차**부터 기존 동작(스테이지 선택으로 이동)을 한다. 패배 시에는
-    카드가 뜨지 않는다(교육 보상은 클리어의 몫). **`R` 재도전은 카드가 열려 있든 아니든 항상
-    즉시 동작**한다 — 반복 숙달 루프를 카드 유무로 막지 않기 위해 `keypressed`에서 `r`을 카드
-    분기보다 먼저 처리한다.
+    오버레이 카드("포스트모템 #스테이지번호" + 본문 + 힌트 줄, 배경을 살짝 어둡게 깔아 초점을
+    모음)가 자동으로 뜬다. 힌트 줄은 이 스테이지의 **첫 클리어**면 "Enter 닫기", 이미 한 번 이상
+    클리어한 뒤의 **재클리어**면 "Enter 건너뛰기"로 바뀐다(`rec.clears`는 `result:enter`가 이번
+    판 기록을 이미 반영한 뒤 값이므로, `clears > 1`이면 재클리어로 판정). Enter/좌클릭
+    **1회차**는 카드만 닫고(`self.pmCard = false`), 카드가 이미 닫혀 있는 **2회차**부터 기존
+    동작(스테이지 선택으로 이동)을 한다. 패배 시에는 카드가 뜨지 않는다(교육 보상은 클리어의
+    몫). **`R` 재도전은 카드가 열려 있든 아니든 항상 즉시 동작**한다 — 반복 숙달 루프를 카드
+    유무로 막지 않기 위해 `keypressed`에서 `r`을 카드 분기보다 먼저 처리한다.
   - **도감 origin**: `enemies.csv`의 `origin` 칼럼(이름의 유래 1~2문장)이 `codex`의 몬스터
     카드에서 desc 바로 아래 "유래: ..." 줄(회색, `printf` 줄바꿈)로 나온다. 값이 비어 있으면
     그 줄 자체가 그려지지 않는다.
@@ -454,14 +460,18 @@ v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스
 ```
 
 `tests/main.lua`가 `tests/test_*.lua` 스위트를 전부 실행하고 `RESULT pass=N fail=N`을 출력한다
-(현재 251개, 전부 PASS — 13개 스위트: `test_csv`·`test_grid`·`test_sandbox`·`test_battle`·
+(현재 316개, 전부 PASS — 13개 스위트: `test_csv`·`test_grid`·`test_sandbox`·`test_battle`·
 `test_data`·`test_editor`·`test_progress`·`test_tutorial`·`test_particles`·`test_cutscene`·
 `test_stageinfo`·`test_demolish`·`test_stars`. `test_particles.lua`·`test_cutscene.lua`가 뷰
 전용 이펙트/컷신 로직을, `test_stageinfo.lua`가 적 구성 패널 집계 유틸을, `test_demolish.lua`가
 `Battle:demolishTower`(환불·재사용·틱 중 철거 스킵 방지)를, `test_stars.lua`가 `stars.of`의
-HP→별점 경계값을 다룬다. 브리핑/포스트모템/도감 origin처럼 `states/*.lua`에만 있는 순수 뷰
-표시는 헤드리스 스위트로 검증되지 않으므로, 오토플레이 하네스로 스크린샷을 찍어 육안 확인한다
-(§ "구현된 규칙"의 관련 항목 참고). 실패가 있으면 콘솔 종료 코드도 0이 아니게 된다.
+HP→별점 경계값을 다룬다. `test_data.lua`는 `d.validate()`가 보지 못하는 lore 파일 "내용"
+회귀도 잡는다 — `lore_file`이 있는 모든 스테이지를 `io.open`+`loadstring`으로 직접 로드·실행해
+`briefing`/`postmortem`이 비어있지 않은 문자열을 반환하는지 확인한다(구문 오류나 스키마 누락은
+파일 존재 검사만으로는 잡히지 않기 때문). 브리핑/포스트모템 카드·도감 origin의 실제 렌더링처럼
+`states/*.lua`에만 있는 순수 뷰 표시는 헤드리스 스위트로 검증되지 않으므로, 오토플레이
+하네스로 스크린샷을 찍어 육안 확인한다(§ "구현된 규칙"의 관련 항목 참고). 실패가 있으면 콘솔
+종료 코드도 0이 아니게 된다.
 
 스테이지를 추가할 때는 `data/curriculum/<n>_solution.lua`를 **반드시** 함께 추가해야 한다 —
 `tests/test_battle.lua`가 CSV에 등록된 모든 스테이지를 순회하며 `solution_file`의 코드로 실제

@@ -21,6 +21,47 @@ return function(t)
     t.eq(d.enemies.bug.origin,
         "1947년 그레이스 호퍼의 팀이 Mark II 릴레이에서 진짜 나방을 꺼내 로그에 붙였다 — \"버그가 실제로 발견된 최초의 사례\"",
         "enemies.csv origin 로드")
+    -- origin 단언 보강: null-ptr(콤마 포함 따옴표 CSV 값)·concat-nil도 비어있지 않고
+    -- enemies.csv 원문의 기대 문구를 포함하는지 확인한다.
+    t.ok(type(d.enemies["null-ptr"].origin) == "string" and d.enemies["null-ptr"].origin ~= "",
+        "null-ptr origin 비어있지 않은 문자열")
+    t.ok(d.enemies["null-ptr"].origin:find("토니 호어", 1, true) ~= nil,
+        "null-ptr origin에 기대 문구(토니 호어) 포함")
+    t.ok(type(d.enemies["concat-nil"].origin) == "string" and d.enemies["concat-nil"].origin ~= "",
+        "concat-nil origin 비어있지 않은 문자열")
+    t.ok(d.enemies["concat-nil"].origin:find("Lua 런타임 오류 메시지", 1, true) ~= nil,
+        "concat-nil origin에 기대 문구(Lua 런타임 오류 메시지) 포함")
+
+    -- lore 콘텐츠 회귀: d.validate()는 lore_file "존재"만 검증하므로, 파일 안 문법 오류나
+    -- briefing/postmortem 누락은 잡아내지 못한다. db.lua/states 쪽과 동일한 io.open+loadstring
+    -- 패턴으로 각 스테이지의 lore 파일을 실제로 로드·실행해 스키마를 검증한다.
+    local loreCount = 0
+    for id, stage in pairs(d.stages) do
+        if stage.lore_file and stage.lore_file ~= "" then
+            loreCount = loreCount + 1
+            local f = io.open(d.root .. "/data/" .. stage.lore_file, "rb")
+            t.ok(f ~= nil, ("스테이지 %s lore 파일 열기(%s)"):format(id, stage.lore_file))
+            if f then
+                local src = f:read("*a")
+                f:close()
+                local chunk, cerr = loadstring(src, stage.lore_file)
+                t.ok(chunk ~= nil,
+                    ("스테이지 %s lore 파일 컴파일(%s): %s"):format(id, stage.lore_file, tostring(cerr)))
+                if chunk then
+                    local ok, lore = pcall(chunk)
+                    t.ok(ok and type(lore) == "table",
+                        ("스테이지 %s lore 파일 실행 → 테이블 반환(%s)"):format(id, stage.lore_file))
+                    if ok and type(lore) == "table" then
+                        t.ok(type(lore.briefing) == "string" and lore.briefing ~= "",
+                            ("스테이지 %s lore.briefing 비어있지 않은 문자열"):format(id))
+                        t.ok(type(lore.postmortem) == "string" and lore.postmortem ~= "",
+                            ("스테이지 %s lore.postmortem 비어있지 않은 문자열"):format(id))
+                    end
+                end
+            end
+        end
+    end
+    t.ok(loreCount >= 12, ("lore_file이 채워진 스테이지 수 확인: %d개 검사"):format(loreCount))
 
     local tl = d.timeline(1)
     t.ok(#tl >= 4, "타임라인 이벤트 존재")
