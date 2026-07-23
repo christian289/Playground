@@ -1,4 +1,4 @@
-id,name,hp,speed,reward,abilities,color,desc
-bug,버그,30,40,10,,0.9;0.3;0.3,평범한 버그. 어디에나 있다
-null-ptr,널 포인터,20,60,15,crash_tower,0.6;0.3;0.9,맞은 타워의 다음 판단을 nil로 만든다
-concat-nil,attempt to concatenate a nil value,50,30,20,split,0.9;0.6;0.2,죽으면 둘로 이어붙는다..
+id,name,hp,speed,reward,abilities,color,desc,origin
+bug,버그,30,40,10,,0.9;0.3;0.3,평범한 버그. 어디에나 있다,"1947년 그레이스 호퍼의 팀이 Mark II 릴레이에서 진짜 나방을 꺼내 로그에 붙였다 — ""버그가 실제로 발견된 최초의 사례"""
+null-ptr,널 포인터,20,60,15,crash_tower,0.6;0.3;0.9,맞은 타워의 다음 판단을 nil로 만든다,"1965년 토니 호어가 ALGOL W에 널 참조를 넣었고, 훗날 스스로 ""10억 달러짜리 실수""라 사과했다"
+concat-nil,attempt to concatenate a nil value,50,30,20,split,0.9;0.6;0.2,죽으면 둘로 이어붙는다..,Lua 런타임 오류 메시지 그대로다. 모든 Lua 개발자가 반드시 한 번은 만난다

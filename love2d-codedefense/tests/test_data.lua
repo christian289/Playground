@@ -16,6 +16,11 @@ return function(t)
     t.eq(d.stages[1].wave_clock, nil, "빈 셀은 nil로 변환")
     t.eq(d.towers["gugu-class"].limit, 1, "gugu-class limit 숫자 변환")
     t.eq(d.towers.printer.limit, nil, "빈 limit은 nil")
+    t.eq(d.stages[1].lore_file, "lore/001.lua", "stages.csv lore_file 값 로드")
+    t.eq(d.stages[12].lore_file, "lore/012.lua", "stages.csv 마지막 스테이지 lore_file")
+    t.eq(d.enemies.bug.origin,
+        "1947년 그레이스 호퍼의 팀이 Mark II 릴레이에서 진짜 나방을 꺼내 로그에 붙였다 — \"버그가 실제로 발견된 최초의 사례\"",
+        "enemies.csv origin 로드")
 
     local tl = d.timeline(1)
     t.ok(#tl >= 4, "타임라인 이벤트 존재")
@@ -32,4 +37,10 @@ return function(t)
     t.ok(table.concat(baderrs, "/"):find("튜토리얼"), "없는 tutorial_file 감지")
     t.ok(table.concat(baderrs, " / "):find("240초"), "마지막 스폰 종료 240초 미만 감지")
     t.ok(table.concat(baderrs, " / "):find("공백"), "스폰 공백 40초 초과 감지")
+    t.ok(table.concat(baderrs, " / "):find("lore 파일 없음"), "없는 lore_file 감지")
+    local loreErrCount = 0
+    for _, e in ipairs(baderrs) do
+        if e:find("lore 파일 없음") then loreErrCount = loreErrCount + 1 end
+    end
+    t.eq(loreErrCount, 1, "lore_file 빈 칼럼(스테이지 2·3)은 통과, 값 있는 스테이지 1만 오류")
 end
