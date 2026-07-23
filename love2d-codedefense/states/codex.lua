@@ -232,6 +232,9 @@ local function drawEnemyCard(self, id, t)
     local nameFont = fonts.big:getWidth(def.name) <= textW and fonts.big or fonts.ui
     y = stackText(nameFont, def.name, textX, y, textW, P.magenta, 10)
     y = stackText(fonts.small, def.desc, textX, y, textW, { 0.78, 0.82, 0.88 }, 20)
+    if def.origin and def.origin ~= "" then
+        y = stackText(fonts.small, "유래: " .. def.origin, textX, y, textW, { 0.55, 0.6, 0.65 }, 20)
+    end
 
     local abilityY = math.max(y, CARD_Y + 130)
     love.graphics.setFont(fonts.ui)

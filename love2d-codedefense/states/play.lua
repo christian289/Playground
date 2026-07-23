@@ -41,6 +41,18 @@ local BUILTIN_DOCS = {
         },
         example = 'build("printer", 3, 10, "a")',
     },
+    demolish = {
+        sig = 'demolish("이름")',
+        lines = {
+            "이름으로 타워를 철거하는 수단",
+            "환불: 철거 시점 비용의 50%(내림)",
+            "없는 이름이면 실패(false) + 오류 로그",
+            "크래시·비활성 타워도 철거 가능",
+            '함정: build("이름")가 스크립트에',
+            "남아 있으면 다음 저장(F5) 때 재건설됨",
+        },
+        example = 'demolish("a")',
+    },
 }
 
 local DICT_ROW_H = 16 -- fonts.small(14px) 기준 줄 높이
@@ -78,9 +90,19 @@ end
 local function drawDictCard(self, x, y, w, name)
     local pad = 6
     love.graphics.setFont(fonts.small)
-    if name == "build" then
-        local doc = BUILTIN_DOCS.build
-        local n = 1 + #doc.lines + 1
+    if BUILTIN_DOCS[name] then
+        local doc = BUILTIN_DOCS[name]
+        local innerW = w - pad * 2
+        -- 설명 줄이 카드 폭을 넘으면(demolish의 함정 설명처럼 길 수 있음) printf로 줄바꿈해
+        -- 카드 밖으로 잘리지 않게 한다. 높이는 실제 래핑된 줄 수 합으로 계산한다(build처럼
+        -- 짧은 줄은 그대로 1줄).
+        local function wrapRows(s)
+            local _, wrapped = fonts.small:getWrap(s, innerW)
+            return math.max(1, #wrapped)
+        end
+        local descRows = 0
+        for _, l in ipairs(doc.lines) do descRows = descRows + wrapRows("· " .. l) end
+        local n = 1 + descRows + 1
         local h = pad * 2 + n * DICT_ROW_H
         love.graphics.setColor(art.pal.panelLight[1], art.pal.panelLight[2], art.pal.panelLight[3])
         love.graphics.rectangle("fill", x, y, w, h, 4)
@@ -90,8 +112,9 @@ local function drawDictCard(self, x, y, w, name)
         cy = cy + DICT_ROW_H
         love.graphics.setColor(0.85, 0.88, 0.92)
         for _, l in ipairs(doc.lines) do
-            love.graphics.print("· " .. l, x + pad, cy)
-            cy = cy + DICT_ROW_H
+            local text = "· " .. l
+            love.graphics.printf(text, x + pad, cy, innerW, "left")
+            cy = cy + wrapRows(text) * DICT_ROW_H
         end
         love.graphics.setColor(0.6, 0.9, 0.7)
         love.graphics.print(doc.example, x + pad, cy)
@@ -154,6 +177,7 @@ local function drawFuncDict(self, x, y, w)
     end
 
     addRow("build", "> build")
+    addRow("demolish", "> demolish")
     local funcs = self.battle.userFuncs
     if #funcs == 0 then
         love.graphics.setColor(0.7, 0.75, 0.8)
@@ -188,6 +212,13 @@ function play:enter(_, d, stageId, p)
     if self.stage.buttons_file ~= "" then
         local chunk = loadstring(loadText(d.root, self.stage.buttons_file) or "")
         if chunk then self.buttons = chunk() or {} end
+    end
+    -- 로어(브리핑/포스트모템): db.lua와 동일하게 io 기반 로드(순수 Lua, love API 미사용).
+    -- lore_file이 비어 있으면 self.lore는 nil로 남아 브리핑 문단이 조용히 생략된다.
+    self.lore = nil
+    if self.stage.lore_file and self.stage.lore_file ~= "" then
+        local chunk = loadstring(loadText(d.root, self.stage.lore_file) or "")
+        if chunk then self.lore = chunk() end
     end
     self.editor = Editor(656, 48, 610, 470)
     self.editor:setQuickbar({
@@ -755,21 +786,37 @@ function play:draw()
         local cardW = 360
         local combinedW = (INFO_X + INFO_W) - GRID_X -- 전장+정보 칼럼 기준 중앙(x≈320)
         local cardX = GRID_X + (combinedW - cardW) / 2
-        local cardH = 190
+        local pad = 14
+        -- 브리핑 문단(Task 5, §8): 문제 서술(problem) 위에 서사체 도입부를 얹는다.
+        -- lore 파일이 없거나 briefing이 비어 있으면 briefH=0이라 카드가 기존 그대로 190 높이.
+        love.graphics.setFont(fonts.small)
+        local briefing = self.lore and self.lore.briefing
+        local briefLines = 0
+        if briefing and briefing ~= "" then
+            local _, wrapped = fonts.small:getWrap(briefing, cardW - pad * 2)
+            briefLines = math.max(1, #wrapped)
+        end
+        local briefH = briefLines > 0 and (briefLines * fonts.small:getHeight() + 10) or 0
+        local cardH = 190 + briefH
         local cardY = GRID_Y + (grid.ROWS * grid.CELL - cardH) / 2
         love.graphics.setColor(art.pal.panel[1], art.pal.panel[2], art.pal.panel[3], 0.94)
         love.graphics.rectangle("fill", cardX, cardY, cardW, cardH, 6)
         love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3], 0.8)
         love.graphics.rectangle("line", cardX, cardY, cardW, cardH, 6)
-        local pad = 14
         love.graphics.setFont(fonts.ui)
         love.graphics.setColor(art.pal.white[1], art.pal.white[2], art.pal.white[3])
         love.graphics.printf(("[문제 %d] %s"):format(self.stageId, stage.concept), cardX + pad, cardY + pad, cardW - pad * 2, "left")
         love.graphics.setFont(fonts.small)
         love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
         love.graphics.printf("메모리 영역: " .. stage.theme, cardX + pad, cardY + pad + 24, cardW - pad * 2, "left")
+        local textY = cardY + pad + 46
+        if briefLines > 0 then
+            love.graphics.setColor(0.6, 0.63, 0.68) -- 회색 서사체 — 문제 서술(흰색)과 톤 구분
+            love.graphics.printf(briefing, cardX + pad, textY, cardW - pad * 2, "left")
+            textY = textY + briefH
+        end
         love.graphics.setColor(0.85, 0.88, 0.92)
-        love.graphics.printf(stage.problem, cardX + pad, cardY + pad + 46, cardW - pad * 2, "left")
+        love.graphics.printf(stage.problem, cardX + pad, textY, cardW - pad * 2, "left")
         love.graphics.setColor(0.7, 0.75, 0.8)
         love.graphics.printf(("제한: 예산 %d · 유입 예정 %d기"):format(stage.budget, self.info.total),
             cardX + pad, cardY + cardH - 58, cardW - pad * 2, "left")
@@ -897,7 +944,7 @@ function play:mousepressed(x, y, button)
         if not li then return end
         local tok = Editor.tokenAt(editor.lines[li], ci)
         if not tok then return end
-        local isDict = tok == "build"
+        local isDict = BUILTIN_DOCS[tok] ~= nil
         if not isDict then
             for _, name in ipairs(self.battle.userFuncs) do
                 if name == tok then isDict = true break end

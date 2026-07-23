@@ -8,6 +8,14 @@ local result = {}
 
 local STAR_FULL, STAR_EMPTY = "★", "☆" -- stageselect.lua와 동일 글리프 — 스크린샷 확인 결과 정상 렌더
 
+-- 로어(포스트모템) io 기반 로드 — db.lua/play.lua와 동일 패턴(love API 미사용, 순수 Lua)
+local function loadText(root, rel)
+    local f = io.open(root .. "/data/" .. rel, "rb")
+    if not f then return nil end
+    local s = f:read("*a"); f:close()
+    return s
+end
+
 -- 패배 코칭: ctx.reached(battle.reachedByType)에서 가장 많이 도달한 적 종류 1개를 고른다.
 -- 동률이면 스테이지 타임라인에서 더 먼저 스폰된 종을 우선한다(ctx.d.timeline이 at 오름차순 정렬).
 local function topReached(ctx)
@@ -38,6 +46,10 @@ local AFTERWORD = {
 
 function result:enter(_, status, ctx)
     self.status, self.ctx = status, ctx
+    -- 포스트모템 카드(§8): 클리어 시에만, lore_file이 있고 postmortem이 채워져 있을 때만 연다.
+    -- 패배거나 lore가 없으면 pmCard는 false로 남아 draw/keypressed가 곧바로 기존 동작을 한다.
+    self.pmCard = false
+    self.postmortem = nil
     if status == "clear" then
         ctx.p.cleared[ctx.stageId] = true
         local reward = ctx.d.stages[ctx.stageId].reward_item
@@ -45,6 +57,16 @@ function result:enter(_, status, ctx)
             local owned = false
             for _, it in ipairs(ctx.p.items) do if it == reward then owned = true end end
             if not owned then ctx.p.items[#ctx.p.items + 1] = reward end
+        end
+
+        local stage = ctx.d.stages[ctx.stageId]
+        if stage.lore_file and stage.lore_file ~= "" then
+            local chunk = loadstring(loadText(ctx.d.root, stage.lore_file) or "")
+            local lore = chunk and chunk()
+            if lore and lore.postmortem and lore.postmortem ~= "" then
+                self.postmortem = lore.postmortem
+                self.pmCard = true
+            end
         end
     end
 
@@ -67,6 +89,41 @@ function result:enter(_, status, ctx)
         self.rec = rec
         progress.save(ctx.p)
     end
+end
+
+-- 포스트모템 카드(§8): 결과 화면 위에 뜨는 오버레이. 배경을 어둡게 깔아 초점을 카드로
+-- 모으고, 본문 길이에 맞춰 카드 높이를 동적으로 늘린다(문제 카드의 briefing과 동일 원리).
+local function drawPostmortemCard(self)
+    local P = art.pal
+    local W, H = love.graphics.getWidth(), 640
+    local cardW, pad = 640, 24
+    love.graphics.setFont(fonts.small)
+    local _, wrapped = fonts.small:getWrap(self.postmortem, cardW - pad * 2)
+    local bodyLines = math.max(1, #wrapped)
+    local titleH, footerH = 46, 40
+    local cardH = titleH + bodyLines * fonts.small:getHeight() + footerH
+    local cardX, cardY = (W - cardW) / 2, (H - cardH) / 2
+
+    love.graphics.setColor(0, 0, 0, 0.55)
+    love.graphics.rectangle("fill", 0, 0, W, H)
+    love.graphics.setColor(P.panel[1], P.panel[2], P.panel[3], 0.97)
+    love.graphics.rectangle("fill", cardX, cardY, cardW, cardH, 10, 10)
+    love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3], 0.85)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", cardX, cardY, cardW, cardH, 10, 10)
+    love.graphics.setLineWidth(1)
+
+    love.graphics.setFont(fonts.ui)
+    love.graphics.setColor(P.green[1], P.green[2], P.green[3])
+    love.graphics.printf(("포스트모템 #%d"):format(self.ctx.stageId), cardX, cardY + 16, cardW, "center")
+
+    love.graphics.setFont(fonts.small)
+    love.graphics.setColor(0.85, 0.88, 0.92)
+    love.graphics.printf(self.postmortem, cardX + pad, cardY + titleH, cardW - pad * 2, "left")
+
+    love.graphics.setColor(0.6, 0.65, 0.7)
+    love.graphics.printf("Enter 닫기", cardX, cardY + cardH - 26, cardW, "center")
+    love.graphics.setColor(1, 1, 1)
 end
 
 function result:draw()
@@ -144,19 +201,34 @@ function result:draw()
     love.graphics.setColor(0.85, 0.88, 0.92)
     love.graphics.printf("R 재도전 · Enter/클릭 스테이지 선택으로", 0, 500, W, "center")
     love.graphics.setColor(1, 1, 1)
+
+    if self.pmCard then drawPostmortemCard(self) end
 end
 
 function result:keypressed(key)
-    if key == "return" or key == "escape" then
-        Gamestate.switch(require("states.stageselect"), self.ctx.d, self.ctx.p)
-    elseif key == "r" then
+    -- R 재도전은 포스트모템 카드가 열려 있어도 그대로 동작한다(카드 상태와 무관).
+    if key == "r" then
         -- 반복 숙달이 목표인 게임이라 재도전 루프를 최단으로: 스테이지 선택 왕복 없이 즉시.
         Gamestate.switch(require("states.play"), self.ctx.d, self.ctx.stageId, self.ctx.p)
+        return
+    end
+    if key == "return" or key == "escape" then
+        -- Enter 1회차: 카드만 닫는다. 2회차(카드가 이미 닫혀 있을 때): 기존 동작.
+        if self.pmCard then
+            self.pmCard = false
+            return
+        end
+        Gamestate.switch(require("states.stageselect"), self.ctx.d, self.ctx.p)
     end
 end
 
 function result:mousepressed(_, _, button)
     if button ~= 1 then return end
+    -- Enter와 대칭: 카드가 열려 있으면 좌클릭도 카드 닫기로만 소비한다.
+    if self.pmCard then
+        self.pmCard = false
+        return
+    end
     Gamestate.switch(require("states.stageselect"), self.ctx.d, self.ctx.p)
 end
 
