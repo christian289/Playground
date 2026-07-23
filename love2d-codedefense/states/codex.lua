@@ -2,12 +2,16 @@ local Gamestate = require("lib.hump.gamestate")
 local fonts = require("src.fonts")
 local art = require("src.art")
 local csv = require("src.csv")
+local stars = require("src.stars")
 local utf8 = require("utf8")
 
 local codex = {}
 
-local TABS = { "타워", "몬스터", "내 함수" }
+local TABS = { "타워", "몬스터", "내 함수", "프로필" }
 local NO_FUNCS_MSG = "아직 수집된 함수가 없습니다. 전투 중 F5로 저장하면 기록됩니다."
+
+-- ★/☆ 글리프: stageselect.lua/result.lua와 동일 — NanumGothic 정상 렌더 확인됨(스크린샷 검증 완료)
+local STAR_FULL, STAR_EMPTY = "★", "☆"
 
 -- 몬스터 abilities 키워드 → 한글 설명 (§3/설계서)
 local ABILITY_KO = {
@@ -71,6 +75,18 @@ local function enemyOrder(d)
     return ids
 end
 
+-- d.stages는 배열이 아니라 id→row 해시라 순서가 없다. stageselect.lua와 동일한 순서
+-- 소스(mode=="normal" 필터 + id 오름차순 정렬)를 그대로 재사용해 프로필 탭의 스테이지
+-- 순서를 스테이지 선택 화면과 일치시킨다.
+local function stageOrder(d)
+    local ids = {}
+    for id, s in pairs(d.stages) do
+        if s.mode == "normal" then ids[#ids + 1] = id end
+    end
+    table.sort(ids)
+    return ids
+end
+
 local function isHiddenTower(def, p)
     return def.hidden == 1 and not p.gugu_found
 end
@@ -87,7 +103,8 @@ function codex:enter(_, d, p)
     self.d, self.p = d, p
     self.tab = 1
     self.cursor = 1
-    self.lists = { towerOrder(d), enemyOrder(d), funcNameOrder(p) }
+    self.profileScroll = 0 -- [프로필] 탭 스테이지 목록 스크롤(다른 탭의 cursor 스크롤과 별도 관리)
+    self.lists = { towerOrder(d), enemyOrder(d), funcNameOrder(p), stageOrder(d) }
 end
 
 function codex:currentList()
@@ -250,6 +267,109 @@ local function drawFuncCard(self, name)
     stackText(fonts.ui, detail, textX, y, textW, { 0.85, 0.88, 0.92 }, 0)
 end
 
+-- [프로필] 탭 — 전부 기존 저장 데이터(records/funcbook/gugu_found)에서 파생, 새 필드 없음.
+-- 좌측 패널: 요약 집계. 우측 패널: 스테이지별 한 줄 기록(스크롤 가능).
+local function computeProfileSummary(d, p, stageIds)
+    local totalTries, clearedCount, starSum = 0, 0, 0
+    for _, id in ipairs(stageIds) do
+        local rec = p.records and p.records[id]
+        if rec then totalTries = totalTries + (rec.tries or 0) end
+        if p.cleared[id] then
+            clearedCount = clearedCount + 1
+            starSum = starSum + stars.of(rec and rec.bestHP or 0)
+        end
+    end
+    local funcCount = 0
+    for _ in pairs(p.funcbook or {}) do funcCount = funcCount + 1 end
+    return totalTries, clearedCount, starSum, funcCount
+end
+
+local function drawProfileSummary(self, x, y, w)
+    local P = art.pal
+    local d, p = self.d, self.p
+    local stageIds = self.lists[4]
+    local totalTries, clearedCount, starSum, funcCount = computeProfileSummary(d, p, stageIds)
+
+    love.graphics.setFont(fonts.ui)
+    love.graphics.setColor(P.green[1], P.green[2], P.green[3])
+    love.graphics.print("요약", x + 16, y + 14)
+
+    local rows = {
+        { "총 배포", ("%d회"):format(totalTries) },
+        { "클리어", ("%d / %d"):format(clearedCount, #stageIds) },
+        { "별 합계", ("%d★"):format(starSum) },
+        { "등록 함수", ("%d개"):format(funcCount) },
+        { "구구 클래스", p.gugu_found and "발견" or "???" },
+    }
+    local ry = y + 56
+    for _, row in ipairs(rows) do
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(0.6, 0.66, 0.74)
+        love.graphics.print(row[1], x + 16, ry)
+        love.graphics.setFont(fonts.ui)
+        love.graphics.setColor(0.9, 0.92, 0.96)
+        love.graphics.print(row[2], x + 16, ry + 22)
+        ry = ry + 58
+    end
+    love.graphics.setColor(1, 1, 1)
+end
+
+-- 스테이지 한 줄: 클리어면 "N. 이름 — 시도 n · ★★☆", 미클리어는 "N. 이름 — 미클리어"
+-- (시도 기록이 있으면 "N. 이름 — 시도 n · 미클리어").
+local function profileStageLine(d, p, id)
+    local s = d.stages[id]
+    local rec = p.records and p.records[id]
+    if p.cleared[id] then
+        local n = stars.of(rec and rec.bestHP or 0)
+        local starText = STAR_FULL:rep(n) .. STAR_EMPTY:rep(3 - n)
+        return ("%d. %s — 시도 %d · %s"):format(id, s.concept, rec and rec.tries or 0, starText)
+    elseif rec and (rec.tries or 0) > 0 then
+        return ("%d. %s — 시도 %d · 미클리어"):format(id, s.concept, rec.tries)
+    end
+    return ("%d. %s — 미클리어"):format(id, s.concept)
+end
+
+-- 스크롤 지오메트리는 stageselect.lua의 목록 스크롤 패턴을 그대로 재사용한다.
+-- 클램프된 최대 스크롤 값을 self.profileMaxScroll에 저장해 keypressed가 참조한다.
+local function drawProfileStages(self, x, y, w, h)
+    local P = art.pal
+    local d, p = self.d, self.p
+    local stageIds = self.lists[4]
+
+    love.graphics.setFont(fonts.ui)
+    love.graphics.setColor(P.green[1], P.green[2], P.green[3])
+    love.graphics.print("스테이지 기록", x + 24, y + 16)
+
+    local rowSpacing = 30
+    local listTop, listBottom = y + 60, y + h - 20
+    local visibleRows = math.max(1, math.floor((listBottom - listTop) / rowSpacing))
+    local maxScroll = math.max(0, #stageIds - visibleRows)
+    self.profileScroll = math.max(0, math.min(self.profileScroll, maxScroll))
+    self.profileMaxScroll = maxScroll
+
+    love.graphics.setFont(fonts.small)
+    for j = 1, visibleRows do
+        local i = self.profileScroll + j
+        local id = stageIds[i]
+        if not id then break end
+        local ry = listTop + (j - 1) * rowSpacing
+        local col = p.cleared[id] and P.green or { 0.75, 0.78, 0.82 }
+        love.graphics.setColor(col[1], col[2], col[3])
+        love.graphics.print(profileStageLine(d, p, id), x + 24, ry)
+    end
+
+    if self.profileScroll > 0 then
+        love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3])
+        love.graphics.printf("↑ 더 있음", x, y + 6, w, "center")
+    end
+    if self.profileScroll + visibleRows < #stageIds then
+        love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3])
+        love.graphics.printf("↓ 더 있음", x, listBottom + 4, w, "center")
+    end
+
+    love.graphics.setColor(1, 1, 1)
+end
+
 function codex:draw()
     local t = love.timer.getTime()
     local P = art.pal
@@ -285,51 +405,58 @@ function codex:draw()
     love.graphics.setColor(P.panel[1], P.panel[2], P.panel[3], 0.85)
     love.graphics.rectangle("fill", listX, listY, listW, listH, 8, 8)
 
-    local list = self:currentList()
-    love.graphics.setFont(fonts.ui)
-    local labelMaxW = listW - 42 -- "> " 접두 폭 + 좌우 여백
-    for i, id in ipairs(list) do
-        local y = listY + 14 + (i - 1) * 34
-        local label
-        if self.tab == 1 then
-            local def = self.d.towers[id]
-            label = isHiddenTower(def, self.p) and "???" or def.name
-        elseif self.tab == 2 then
-            label = self.d.enemies[id].name
-        else
-            label = id -- 내 함수 탭: id 자체가 함수 이름 문자열
-        end
-        label = truncate(fonts.ui, label, labelMaxW)
-        if i == self.cursor then
-            love.graphics.setColor(P.green[1], P.green[2], P.green[3], 0.14)
-            love.graphics.rectangle("fill", listX + 8, y - 4, listW - 16, 28, 5, 5)
-            love.graphics.setColor(P.green[1], P.green[2], P.green[3])
-        else
-            love.graphics.setColor(0.82, 0.85, 0.9)
-        end
-        local prefix = (i == self.cursor) and "> " or "   "
-        love.graphics.print(prefix .. label, listX + 14, y)
-    end
-
     -- 우측 카드 패널
     love.graphics.setColor(P.panel[1], P.panel[2], P.panel[3], 0.85)
     love.graphics.rectangle("fill", CARD_X, CARD_Y, CARD_W, CARD_H, 8, 8)
 
-    local id = list[self.cursor]
-    if self.tab == 3 then
-        if id then
-            drawFuncCard(self, id)
-        else
-            love.graphics.setFont(fonts.ui)
-            love.graphics.setColor(0.6, 0.65, 0.7)
-            love.graphics.printf(NO_FUNCS_MSG, CARD_X + 40, CARD_Y + CARD_H / 2 - 20, CARD_W - 80, "center")
-            love.graphics.setColor(1, 1, 1)
+    if self.tab == 4 then
+        -- [프로필] 탭: 좌측=요약 집계, 우측=스테이지별 한 줄 기록(스크롤) — 다른 탭의
+        -- 커서 기반 목록/카드 패턴 대신 두 패널을 요약/기록 뷰로 재활용한다.
+        drawProfileSummary(self, listX, listY, listW)
+        drawProfileStages(self, CARD_X, CARD_Y, CARD_W, CARD_H)
+    else
+        local list = self:currentList()
+        love.graphics.setFont(fonts.ui)
+        local labelMaxW = listW - 42 -- "> " 접두 폭 + 좌우 여백
+        for i, id in ipairs(list) do
+            local y = listY + 14 + (i - 1) * 34
+            local label
+            if self.tab == 1 then
+                local def = self.d.towers[id]
+                label = isHiddenTower(def, self.p) and "???" or def.name
+            elseif self.tab == 2 then
+                label = self.d.enemies[id].name
+            else
+                label = id -- 내 함수 탭: id 자체가 함수 이름 문자열
+            end
+            label = truncate(fonts.ui, label, labelMaxW)
+            if i == self.cursor then
+                love.graphics.setColor(P.green[1], P.green[2], P.green[3], 0.14)
+                love.graphics.rectangle("fill", listX + 8, y - 4, listW - 16, 28, 5, 5)
+                love.graphics.setColor(P.green[1], P.green[2], P.green[3])
+            else
+                love.graphics.setColor(0.82, 0.85, 0.9)
+            end
+            local prefix = (i == self.cursor) and "> " or "   "
+            love.graphics.print(prefix .. label, listX + 14, y)
         end
-    elseif id then
-        if self.tab == 1 then
-            drawTowerCard(self, id, t)
-        else
-            drawEnemyCard(self, id, t)
+
+        local id = list[self.cursor]
+        if self.tab == 3 then
+            if id then
+                drawFuncCard(self, id)
+            else
+                love.graphics.setFont(fonts.ui)
+                love.graphics.setColor(0.6, 0.65, 0.7)
+                love.graphics.printf(NO_FUNCS_MSG, CARD_X + 40, CARD_Y + CARD_H / 2 - 20, CARD_W - 80, "center")
+                love.graphics.setColor(1, 1, 1)
+            end
+        elseif id then
+            if self.tab == 1 then
+                drawTowerCard(self, id, t)
+            else
+                drawEnemyCard(self, id, t)
+            end
         end
     end
 
@@ -342,17 +469,27 @@ function codex:draw()
 end
 
 function codex:keypressed(key)
-    local list = self:currentList()
     if key == "up" then
-        self.cursor = math.max(1, self.cursor - 1)
+        if self.tab == 4 then
+            self.profileScroll = math.max(0, self.profileScroll - 1)
+        else
+            self.cursor = math.max(1, self.cursor - 1)
+        end
     elseif key == "down" then
-        self.cursor = math.min(#list, self.cursor + 1)
+        if self.tab == 4 then
+            self.profileScroll = math.min(self.profileMaxScroll or 0, self.profileScroll + 1)
+        else
+            local list = self:currentList()
+            self.cursor = math.min(#list, self.cursor + 1)
+        end
     elseif key == "left" then
         self.tab = self.tab == 1 and #TABS or self.tab - 1
         self.cursor = 1
+        self.profileScroll = 0
     elseif key == "right" then
         self.tab = self.tab % #TABS + 1
         self.cursor = 1
+        self.profileScroll = 0
     elseif key == "escape" then
         Gamestate.switch(require("states.title"), self.d, self.p)
     end
