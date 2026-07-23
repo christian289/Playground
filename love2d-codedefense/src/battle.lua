@@ -31,6 +31,7 @@ function Battle:new(d, stageId, opts)
     self.status = "prep"       -- start() 전 상태 (테스트 호환)
     self.enemies, self.towers, self.projectiles, self.log = {}, {}, {}, {}
     self.towersByName = {}
+    self.reachedByType = {}
     self.nextEnemyId = 1
     self.env = nil
     self.setTower = nil
@@ -91,6 +92,25 @@ function Battle:buildTower(typeId, r, c, name)
     self.towersByName[name] = tw
     self.towers[#self.towers + 1] = tw
     self:say(("[설치] %s → \"%s\" (%d,%d)"):format(def.name, name, r, c))
+    return true
+end
+
+-- 이름으로 타워를 철거한다. 성공 시 towers/점유/멱등 빌드 캐시에서 제거하고 환불(cost의 절반,
+-- 내림)을 money에 가산한다. 유저 스크립트(env.demolish)가 호출할 때만 상태가 바뀐다.
+function Battle:demolishTower(name)
+    local idx, tw
+    for i, t in ipairs(self.towers) do
+        if t.name == name then idx, tw = i, t break end
+    end
+    if not tw then
+        self:say(("[오류] 철거 실패 — \"%s\" 타워가 없습니다"):format(tostring(name)))
+        return false
+    end
+    table.remove(self.towers, idx)
+    self.towersByName[name] = nil
+    local refund = math.floor(tw.def.cost * 0.5)
+    self.money = self.money + refund
+    self:say(("[철거] %s → \"%s\" · +%d 환불"):format(tw.def.name, name, refund))
     return true
 end
 
@@ -251,6 +271,7 @@ function Battle:update(dt)
         if e.reached and not e.counted then
             e.counted = true
             self.serverHP = self.serverHP - 1
+            self.reachedByType[e.def.id] = (self.reachedByType[e.def.id] or 0) + 1
             -- crash_tower 능력: 도달 시 최근접 타워 크래시
             if (e.def.abilities or ""):find("crash_tower") then
                 local best, bd

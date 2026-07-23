@@ -29,6 +29,9 @@ function api.buildEnv(battle)
         if not ok then battle:say("[설치 실패] " .. tostring(err)) end
         return ok
     end
+    env.demolish = function(name)
+        return battle:demolishTower(name)
+    end
     for _, it in ipairs(battle.items) do
         if it == "cache" then
             local store = {}
