@@ -429,7 +429,7 @@ function play:enter(_, d, stageId, p)
     if self.stage.ui == "shell" then battleOpts.autoAttack = true end
     self.battle = Battle(d, stageId, battleOpts)
     self.shell = self:isShellStage() and Shell.new(self.battle) or nil
-    self.termBuffer = self:isShellStage() and { "ThisFar 터미널 — 명령을 모르면 man <명령>" } or {}
+    self.termBuffer = self:isShellStage() and { "터미널 — 명령을 모르면 man <명령>" } or {}
     self.termScroll = 0        -- 버퍼 스크롤(0=최신 줄이 보이는 하단 고정)
     self.termHistoryIdx = nil  -- ↑↓ 이력 탐색 중 shell.history 인덱스(nil=탐색 중 아님)
     self.termSavedInput = nil  -- 이력 탐색 시작 시점에 입력 중이던 줄(↓로 끝까지 내려가면 복원)

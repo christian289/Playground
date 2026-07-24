@@ -13,7 +13,10 @@ Lua 코드(`on_tick(self, world)`, `build(type, r, c, name)`)를 작성해 타�
 설계서(Wave A): `docs/superpowers/specs/2026-07-23-codedefense-playability-design.md`(슬로우
 모드·`demolish`·별점·위기 경고·도감 프로필 탭·패배 코칭·스테이지 네러티브), 신규 적·타워
 설계서(Wave B): `docs/superpowers/specs/2026-07-23-codedefense-new-enemies-design.md`(IT
-업계 유명 문제를 밈으로 삼은 신규 적 7종+보스·신규 타워 2종·스테이지 13~20·world API 확장).
+업계 유명 문제를 밈으로 삼은 신규 적 7종+보스·신규 타워 2종·스테이지 13~20·world API 확장),
+셸 진영 설계서(Wave D): `docs/superpowers/specs/2026-07-23-codedefense-shell-mode-design.md`
+(Lua 스크립트 대신 게임 내 터미널에 명령을 쳐서 방어하는 별도 진영 — 스테이지 101~106,
+`src/shell.lua`).
 
 ## 실행 방법
 
@@ -53,19 +56,27 @@ love2d-thisfar/
 │  ├─ stageinfo.lua         ← 적 구성 패널·문제 카드용 순수 집계(전체 수/종류별 수/마지막 스폰
 │  │                            종료 시각/처리 수) — battle의 timeline/spawned/enemies를 읽기만
 │  │                            한다. 뷰 비의존, 헤드리스 테스트 가능(`tests/test_stageinfo.lua`)
-│  └─ stars.lua             ← 별점 산식(순수 함수, `stars.of(hp)`) — 클리어 시 잔존 HP로
-│                               ★1~3 결정. result/stageselect/codex(프로필 탭)가 공유
+│  ├─ stars.lua             ← 별점 산식(순수 함수, `stars.of(hp)`) — 클리어 시 잔존 HP로
+│  │                            ★1~3 결정. result/stageselect/codex(프로필 탭)가 공유
+│  ├─ factions.lua          ← 진영(Lua/Shell) 필터·언락 순수 로직(Wave D) — love API 비참조,
+│  │                            헤드리스 테스트 가능(`tests/test_factions.lua`)
+│  └─ shell.lua             ← 셸 진영 명령 파서(Wave D, 순수 모듈) — `Shell.new(battle)` →
+│                               `shell:exec(line)`/`shell:tick(clock)`. § "Wave D — 셸 진영" 참고
 ├─ states/                ← hump Gamestate 화면들 (뷰 전담, 로직은 src/battle.lua·src/tutorial.lua에 위임)
 │  ├─ intro.lua             ← 인트로 컷신 4장면 (첫 실행 1회 자동 재생, 타이틀 "세계관" 메뉴로 재생)
 │  ├─ title.lua             ← 타이틀 메뉴 4항목(게임 시작/세계관/도감/종료), 룩(Rook) 심볼 +
 │  │                            폰트 렌더 문장형 게임명 2줄, ↑↓+Enter 및 마우스(호버 이동·
 │  │                            좌클릭 선택) 겸용
-│  ├─ stageselect.lua       ← 스테이지 목록 + 배포 기록 표기(`[★★☆ · HP n · 구]`/`[시도 n]`)
+│  ├─ faction.lua           ← 진영 선택 화면(Wave D, 신규) — 타이틀 "게임 시작" 다음. Lua/Shell
+│  │                            2항목, 셸 스테이지가 0개면 "(준비 중)"으로 진입 차단
+│  ├─ stageselect.lua       ← 스테이지 목록(진영별 필터) + 배포 기록 표기(`[★★☆ · HP n · 구]`/`[시도 n]`)
 │  ├─ play.lua              ← 3칼럼(전장 384 / 정보 칼럼 240 / 에디터 610): 그리드 + 코드
 │  │                            에디터 + 실시간 전투 + 정보 칼럼(문제 요약·적 구성·함수 사전·
 │  │                            전투 로그)·진행 바·문제 카드(+lore 브리핑 문단)·구구 클래스
 │  │                            소환 연출·위기 경고 비네트를 한 화면에서 진행 (구 prep/battle
-│  │                            통합, 전장 오버레이는 정보 칼럼으로 이동)
+│  │                            통합, 전장 오버레이는 정보 칼럼으로 이동). `ui=="shell"`
+│  │                            스테이지는 에디터 자리에 터미널 패널이 대신 뜬다(Wave D, § "Wave D
+│  │                            — 셸 진영" 참고)
 │  ├─ result.lua            ← 클리어/패배 결과 + 배포 로그 한 줄(§6.7) + 별점 + 패배 코칭 줄 +
 │  │                            여운 문구 + 포스트모템 카드(클리어 전용, lore가 있을 때만),
 │  │                            Enter/좌클릭 공용
@@ -77,25 +88,30 @@ love2d-thisfar/
 ├─ data/
 │  ├─ towers.csv, enemies.csv(origin 칼럼 포함), items.csv, stages.csv(lore_file 칼럼 포함),
 │  │  timelines.csv
-│  ├─ mazes/                ← 스테이지별 미로 텍스트(#=벽, .=통로, B=건설칸), 20개(001~020),
-│  │                            12×16 규격, 테마별 형태(§ "메모리 테마 미로"·"스테이지 13~20"
-│  │                            참고 — 13~20은 메모리 영역이 아니라 스레드/프로세스/네트워크)
-│  ├─ curriculum/            ← 스테이지별 solution(정답)·hints(따라치기/빈칸)·tutorial(가이드)·
-│  │                            buttons(생성기)·naive(퍼즐 스테이지 순진 배치, 반드시 패배해야 함) Lua 파일
-│  └─ lore/                  ← 스테이지별 서사 데이터 `<n>.lua`(001~020), `return { briefing =
-│                               "...", postmortem = "..." }` 스키마. `stages.csv`의 `lore_file`이
-│                               가리키며, 비어 있으면 해당 스테이지는 브리핑/포스트모템 표시를
-│                               조용히 생략한다(§ "스테이지 네러티브" 참고)
-├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (495개, 14개 스위트:
+│  ├─ mazes/                ← 스테이지별 미로 텍스트(#=벽, .=통로, B=건설칸), 26개(001~020 Lua
+│  │                            진영 + 101~106 Shell 진영), 12×16 규격, 테마별 형태(§ "메모리
+│  │                            테마 미로"·"스테이지 13~20" 참고 — 13~20은 메모리 영역이 아니라
+│  │                            스레드/프로세스/네트워크, 101~106은 "터미널"/"파이프라인")
+│  ├─ curriculum/            ← 스테이지별 solution(정답, Lua 진영은 `.lua`·Shell 진영은
+│  │                            `<n>_solution.sh` 명령 시퀀스)·hints(따라치기/빈칸)·
+│  │                            tutorial(가이드)·buttons(생성기)·naive(퍼즐 스테이지 순진 배치,
+│  │                            반드시 패배해야 함) 파일
+│  └─ lore/                  ← 스테이지별 서사 데이터 `<n>.lua`(001~020, 101~106), `return {
+│                               briefing = "...", postmortem = "..." }` 스키마. `stages.csv`의
+│                               `lore_file`이 가리키며, 비어 있으면 해당 스테이지는 브리핑/
+│                               포스트모템 표시를 조용히 생략한다(§ "스테이지 네러티브" 참고)
+├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (814개, 16개 스위트:
 │                               csv/grid/sandbox/battle/data/editor/progress/tutorial/particles/
-│                               cutscene/stageinfo/demolish/stars/abilities)
+│                               cutscene/stageinfo/demolish/stars/abilities/shell/factions —
+│                               뒤 2개가 Wave D 셸 진영, § "테스트" 참고)
 ├─ lib/                    ← 외부 라이브러리 (직접 수정 금지)
 │  ├─ classic.lua           ← rxi/classic: 경량 OOP
 │  └─ hump/                  ← vrld/hump: gamestate, timer, vector, signal, camera
 └─ assets/fonts/            ← 나눔고딕(OFL)
 ```
 
-상태 흐름은 기본적으로 `title → stageselect → play → result` 네 가지입니다. 구 `prep`/`battle`
+상태 흐름은 기본적으로 `title → faction → stageselect → play → result` 다섯 가지입니다(Wave D에서
+타이틀과 스테이지 선택 사이에 진영 선택(`faction`)이 신설됨 — 아래 "Wave D — 셸 진영" 참고). 구 `prep`/`battle`
 상태는 `play` 하나로 통합되어 삭제되었습니다 — 준비 단계가 없어졌고, 배치와 코딩과 전투가 같은
 화면에서 동시에 진행됩니다. 여기에 세계관 도입부인 `intro` 상태가 더해졌습니다: 첫 실행 시
 (`progress.intro_seen`이 없으면) `main.lua`가 `title` 대신 `intro`로 곧장 진입해 4장면을 자동
@@ -111,7 +127,7 @@ love2d-thisfar/
   넣지 않는다. 튜토리얼 진행 로직(스텝 전환, 허용 키 판정)도 마찬가지로 `src/tutorial.lua`에
   두고 `states/play.lua`는 그리기와 키 라우팅만 한다.
 - `lib/` 아래 파일은 수정하지 않는다 (업스트림 원본 유지).
-- 화면 전환은 hump의 `Gamestate` 사용 (intro / title / stageselect / play / result / codex).
+- 화면 전환은 hump의 `Gamestate` 사용 (intro / title / faction / stageselect / play / result / codex).
 - 스테이지 추가는 코드가 아니라 **데이터로만** 한다 — `data/stages.csv`(+ 필요 시
   `timelines.csv`)에 행을 추가하고, `data/mazes/<n>.txt` 미로와
   `data/curriculum/<n>_solution.lua`(필수)·`<n>_hints.lua`(hint 모드일 때)를 함께 둔다.
@@ -120,7 +136,10 @@ love2d-thisfar/
   (`data/curriculum/tutorial_<n>.lua`)를 함께 등록한다. `countdown`(15~30초 권장)도 스테이지마다
   지정해야 한다. `solution_file`은 필수 — 회귀 테스트(`tests/test_battle.lua`)가 각 스테이지의
   정답 코드로 실제 클리어가 되는지 자동 검증하므로, 정답 없이 스테이지를 추가하면 테스트가
-  실패한다.
+  실패한다. `ui=="shell"`(Shell 진영, id 101번대)인 스테이지는 규칙이 다르다 — `solution_file`이
+  Lua가 아니라 `.sh` 확장자의 명령 시퀀스 파일이어야 하며 세부 규칙은 § "Wave D — 셸 진영"에
+  모아 뒀다(진영별로 규칙이 갈리므로 이 절의 "코드 스테이지" 서술은 기본적으로 Lua 진영
+  기준이다).
   - **문제 브리핑 열**: `theme`(스테이지 1~12는 메모리 영역명 "코드 영역"/"데이터 영역"/
     "스택"/"힙", 13~20은 실행 테마 "스레드"/"프로세스"/"네트워크" — 문제 카드에 "영역: X"로
     표기. 과거엔 "메모리 영역: X"로 고정 표기했으나 13~20이 메모리 영역이 아니어서 범주
@@ -507,6 +526,154 @@ love2d-thisfar/
     카드에서 desc 바로 아래 "유래: ..." 줄(회색, `printf` 줄바꿈)로 나온다. 값이 비어 있으면
     그 줄 자체가 그려지지 않는다.
 
+## Wave D — 셸 진영 (Shell Mode)
+
+설계서: `docs/superpowers/specs/2026-07-23-codedefense-shell-mode-design.md`. "타이핑 → 매크로 →
+AI 에이전트가 대신 플레이"라는 게임의 최종 비전 중 두 번째 단계 — 모든 조작을 "한 줄 텍스트
+명령"으로 통일해, 다음 회차의 외부 제어 어댑터가 그대로 올라탈 수 있게 준비한다.
+
+- **진영 구조**: 타이틀 "게임 시작" → **진영 선택**(`states/faction.lua`, 신규) — `Lua 진영`
+  (스크립트로 방어)과 `Shell 진영`(명령줄로 방어) 2항목을 ↑↓/마우스+Enter/클릭으로 고른다.
+  셸 스테이지가 0개면(데이터 미도입 상태) Shell 항목이 "(준비 중)"으로 표시되며 진입이 막힌다
+  (`faction:blocked`). 선택 결과("lua"|"shell")는 `stageselect`에 그대로 전달된다.
+  - **데이터 축**: `stages.csv`의 `languages` 칼럼(빈 값="lua", "shell") + `ui` 칼럼("shell"이면
+    에디터 대신 터미널 패널)이 진영을 가른다. 셸 스테이지 id는 전역과 겹치지 않게 **101번대**
+    (101~106)를 쓴다 — Lua 진영(1~20)과 물리적으로 분리해 두면 이후 다른 언어 진영을 추가할 때도
+    번호대만 새로 배정하면 된다. `progress`(cleared/records/codes)는 스테이지 id를 키로 그대로
+    공유하므로 별도 마이그레이션이 필요 없다.
+  - **진영 내 언락** (`src/factions.lua`, 순수 로직·love API 비참조·`tests/test_factions.lua`):
+    `factions.idsFor(stages, faction)`가 해당 진영(`languageOf` 판정, mode=="normal")의 id를
+    오름차순으로 뽑고, `factions.unlocked(ids, cleared, id)`가 "그 **목록 안에서** 바로 이전
+    항목이 클리어됐는가"로 언락을 판정한다. 과거(Wave A 이전) 방식은 전역 id 오름차순 목록에서
+    "리스트상 이전 항목"을 봤는데, 이게 우연히 진영 경계와 일치하던 것뿐이라 셸 스테이지 101이
+    도입되자 "101의 이전 항목=Lua 20"이 되어버려 20을 클리어해야 101이 풀리는 오판정이 있었다
+    (수정 완료, `test_factions.lua`가 "Lua 20 전부 클리어해도 셸 102는 안 풀림" 등으로 회귀 방지).
+  - `states/stageselect.lua`는 `faction` 파라미터를 받아 `factions.idsFor`로 목록을 구성하고,
+    제목에 진영명을 붙인다(`스테이지 선택 — Shell 진영`). ESC는 진영 선택으로 돌아간다. `play`
+    화면의 ESC(2단 확인 후 나가기)도 `factions.languageOf(stage)`로 스테이지 자신의 진영을
+    파생해 항상 올바른 진영의 stageselect로 복귀한다(별도 상태 전달 불필요).
+
+- **`src/shell.lua` 계약** (순수 모듈, love API/`love.timer` 금지 — 헤드리스 테스트 대상):
+  `Shell.new(battle)`이 셸 인스턴스를 만든다. 유일한 실행 진입점은
+  `shell:exec(line, opts)` → `{ ok, output(문자열 배열), [open], [clear] }`이며, 실행한 원문을
+  `shell.history`(문자열 배열, ↑↓ 이력 네비게이션이 참조)에 남긴다. `shell:tick(clock)`은
+  battle의 시계값만 받아 `shell.cronJobs`(`{ id, interval, line, nextAt }` 배열) 중 due한 예약을
+  id 순으로 실행하고 그 출력을 반환한다 — 셸 자신은 시계를 갖지 않는다(등록 시각 기준
+  `nextAt += interval` 산술이라 드리프트 없는 결정론). `man`/`clear`는 뷰를 직접 호출하지 않고
+  신호 필드만 돌려준다 — `open = "<명령>"`(뷰가 `dictOpen` 토글), `clear = true`(뷰가 출력 버퍼를
+  비움). 이 "문자열 in → 문자열 out" 경계를 지키는 이유가 바로 다음 회차 외부 제어 어댑터
+  준비다(아래 참고). `Shell.expectedTotal(battle)`은 "처치 k/N"의 N을 계산하는 순수 함수 —
+  아래 battle.kills 절 참고.
+
+- **명령 9종** (`src/shell.lua`의 `COMMANDS` 테이블, `name → run` 형태):
+
+  | 명령 | 문법 | 출력(성공 시) |
+  |---|---|---|
+  | `build` | `build <타워> <행> <열> <이름>` | `Battle:buildTower`의 기존 한글 로그 그대로(설치/멱등/오류 공유) |
+  | `rm` | `rm <이름>` | `Battle:demolishTower`(Wave A `demolish`)와 동일 코어 — 철거+환불 50% |
+  | `ls` | `ls` / `ls enemies` | 무인자: `"<이름>" <타워명> (r,c) · 전략 <strat>` 목록(빈 목록 `배치된 타워가 없습니다`). `enemies`: `<적명> HP <n> (r,c)` 스폰 순 목록(은신 제외, 빈 목록 `필드에 적이 없습니다`) |
+  | `top` | `top` | `서버 HP <n> · 잔액 $<m> · 처치 <k>/<total>`(배속은 `exec`의 `opts.speed`가 있을 때만 ` · 배속 x<%g>` 추가 — battle은 배속을 모른다) |
+  | `target` | `target <타워> <전략>` | `Battle:setTargetStrategy` 성공 시 `전략 변경 — "<이름>" → <전략>`, 실패(없는 타워/전략)는 battle의 한글 오류 로그 재사용 |
+  | `cron` | `cron <초> "<명령>"` / `cron -l` / `cron -r <id>` | 등록 `cron#<id> 등록 · <n>초마다 · "<명령>"`, 목록/삭제 각 1줄. 간격 1초 미만은 거부 |
+  | `man` | `man <명령>` | 출력 없이 `{ open = "<명령>" }` 신호만 반환(뷰가 `BUILTIN_DOCS` 카드를 연다) |
+  | `history` | `history` | `<번호>  <원문>` 번호 매김 목록(exec 자신의 호출도 포함) |
+  | `clear` | `clear` | 출력 없이 `{ clear = true }` 신호만 반환(뷰가 버퍼를 비움) |
+
+  - **ps1 별칭** 4종(`PS1_ALIASES`): `Remove-Item`→`rm`, `Get-Process`→`ls enemies`,
+    `Get-Content`→`man`, `dir`→`ls` — 첫 토큰만 치환하고 나머지 인자는 그대로 이어붙여, 별칭이
+    원 명령과 **완전히 동일한 코드 경로**(`COMMANDS` 조회)를 타게 한다(별도 분기 없음). 최초
+    1회 별칭을 쓰면 결과 앞에 `PowerShell 사용자를 환영합니다` 한 줄이 덧붙는다(세션당 1회,
+    `shell.ps1WelcomeShown`).
+  - **오타 제안**: 명령어 토큰에만 레벤슈타인 거리를 적용한다(인자는 검사 대상 아님). 거리
+    1 이내 후보가 있으면 `command not found: <입력> — '<후보>'를 의미했나요?`, 2 이상이면 제안
+    없이 그대로 `command not found: <입력>`.
+  - **cron 결정론**: 같은 시각에 등록하고 같은 간격이면 실행 시각열이 항상 동일하다(등록 시각
+    기준 `nextAt` 누적 산술이라 프레임 레이트·호출 빈도에 무관). 한 번의 `tick` 호출에서 여러
+    간격을 건너뛴 경우(큰 clock 점프)는 그만큼 반복 실행해 캐치업한다 — 그래서 회귀 러너는
+    반드시 작은 dt로 자주 tick해야 한다(아래 ".sh 솔루션 러너" 참고). cron 실행 출력은
+    `[cron#<id>] <명령>` 접두로 버퍼에 남아 수동 입력과 구분된다.
+  - **출력 절단**: 한 명령의 출력이 20줄을 넘으면 20줄 + `…외 n건` 한 줄로 잘린다
+    (`MAX_OUTPUT_LINES = 20`, `history`처럼 누적형 명령에서 특히 발생).
+
+- **전략 4종** (`Battle:selectTarget`, `src/battle.lua`) — `Battle:setTargetStrategy(name, strat)`로
+  타워별 `tw.strategy`를 바꾼다(기본값 `"nearest"`, 유효값 아니면 `false` + 한글 오류 로그).
+  **네 전략 모두 이 타워의 사거리 안(`dist² <= range²`) + 은신(`isPhased`) 제외** 후보 중에서만
+  고른다는 점이 공통이며(전역 판정 아님 — `world.oldest()` 같은 스크립트 API와는 다른 축),
+  그 안에서 비교 기준만 다르다: `nearest`=거리 최소, `oldest`=`age` 최대(스폰이 가장 오래된),
+  `strongest`=현재 hp 최대, `first`=서버라인까지 잔여 거리(`grid.dist`) 최소. **동률이면 항상
+  먼저 스폰된(낮은 `id`) 적**을 고른다(네 전략 공통 타이브레이크). 구현은 "key가 더 크면 승리"
+  형태로 통일해 네 비교를 한 분기에서 다룬다(`nearest`/`first`는 값의 부호를 뒤집어 "최대화"
+  형태로 맞춘 것뿐 — 셋 다 실질은 최소화 지표다).
+
+- **autoAttack** (`opts.autoAttack = true`, `states/play.lua`가 `ui=="shell"`일 때만 켠다):
+  스크립트(`on_tick`) 없이 매 틱 `tw.strategy`대로 기본 공격만 수행하는 경로 —
+  `Battle:runTick`에서 스크립트 경로와 **배타적**이다(`self.env.on_tick`이 있으면 항상 스크립트
+  경로 우선). 쿨다운·투사체 생성은 기존 `resolveAttack`을 그대로 재사용해 Lua 진영과 동일한
+  판정을 받는다. **오버클럭이 갱신되지 않는다** — 오버클럭은 `on_tick` 호출에 쓴 명령 예산으로
+  계산되는데(`tw.overclock = 1 - used/(BUDGET/2)`), autoAttack은 그 호출 자체가 없으므로
+  `tw.overclock`이 항상 초기값 그대로다. **밸런스 함의**: 데미지 배율에 오버클럭이 관여하지
+  않으므로 셸 진영 타워는 "예산을 아주 적게 쓰는 최적화된 Lua 스크립트"가 낼 수 있는 최고
+  발사 속도보다 항상 불리한 하한(배율이 사실상 고정)에 머문다 — 셸 스테이지 101~106의 예산/적
+  구성은 전부 이 전제로 튜닝됐다(더 유리한 셈은 하지 않았다).
+
+- **`battle.kills`**(`src/battle.lua`, 셸 `top` 명령 전용 집계): 적이 **사망**(hp 0)할 때만
+  증가한다 — 서버라인 **도달**은 별개(`reachedByType`가 담당)이며 kills에 포함되지 않는다.
+  `Shell.expectedTotal(battle)`이 "처치 k/N"의 N을 계산하는데, `split`/`split2` 능력을 가진 적은
+  죽을 때마다 자식으로 갈라져(`split`은 자식 2, `split2`는 자식 2+손자 4) `kills`가 원래
+  스폰 수보다 훨씬 커질 수 있다(실측: 스테이지 104의 concat-nil로 k=90 > 스폰 수 N=61). 이걸
+  방치하면 "k/N"에서 k가 N을 넘는 모순 표기가 나오므로, N을 "모든 분열 자손까지 처치했을 때의
+  최대 가능 처치 수"로 보정한다(`ev.count * 2`(split)/`ev.count * 6`(split2)를 원래 스폰 수에
+  더함). split이 없는 스테이지는 보정량이 0이라 기존 "스폰 수 그대로" 표기와 완전히 같다.
+
+- **.sh 솔루션 러너** (`tests/test_battle.lua`의 `runShellSolution`, 회귀 자동 검증): `ui=="shell"`
+  스테이지는 스크립트 대신 `opts.autoAttack=true`인 `Battle` + `Shell.new(battle)`을 만들고,
+  `solution_file`(`.sh`)을 줄 단위로 읽어 `battle:start()` **전**(`clock`이 카운트다운 구간,
+  즉 실제 플레이에서 카운트다운 중 명령을 미리 쳐 두는 것과 동일한 타이밍)에 전부
+  `shell:exec`한다 — `target`/`cron`은 등록형 지속 효과라 한꺼번에 실행해도 그 뒤 300초 동안
+  똑같이 작동하므로 이 방식이 성립한다. 이후 시뮬레이션은 Lua 진영 회귀와 동일하게 **작은
+  dt(1/30)** 로 `battle:update(dt)`를 반복 호출하되, **매 스텝 `shell:tick(battle.clock)`을
+  반드시 함께 호출**한다 — 실제 플레이(`states/play.lua`의 `update`)와 동일한 카덴스로 cron이
+  실행되게 하기 위해서다. 큰 dt로 건너뛰면 `tick`의 캐치업 로직(위 "cron 결정론" 참고) 때문에
+  cron이 한꺼번에 몰아서 실행되어 실제 플레이와 다른 타이밍을 관측하게 된다 — 회귀와 실플레이의
+  괴리를 막는 핵심 규칙이다. 106에는 이 러너와 별개로 "화력을 분산 배치하면 반드시 패배"하는
+  반례 시나리오도 자동화돼 있다(같은 예산을 서버라인 앞뒤로 멀리 흩어 지으면 데드락 쌍의
+  절반이 무방비로 뚫린다).
+
+- **셸 스테이지 데이터 규칙** (`src/db.lua`의 `d.validate()` 확장): `ui=="shell"`이면
+  `solution_file`이 **`.sh` 확장자 + 실제 파일 존재**를 요구한다(일반 검사는 `solution_file`이
+  빈 값이면 통과시키므로 셸 진영은 별도 게이트가 필요했다) — 위반 시 한글 오류
+  `솔루션(.sh) 파일 없음`으로 부팅이 즉시 중단된다. lore/미로/타임라인 등 기존 검사(§ "코딩
+  규칙")는 진영 무관하게 그대로 적용된다. 101~106은 테마 "터미널"(101~103)·"파이프라인"
+  (104~106), concept 칼럼에 명령 이름을 그대로 적었다(`ls`/`rm`/`top`/`man·target`/`cron`/
+  `종합 시험`).
+
+- **튜토리얼 배선 갭(알려진 한계)**: 셸 스테이지 101의 튜토리얼(`data/curriculum/tutorial_101.lua`,
+  5스텝)은 **모든 스텝이 `advance={on="enter"}`** 로만 진행된다 — `states/play.lua`의
+  `termExec()`(터미널 Enter 실행)가 `self.tut:notify(...)`를 전혀 호출하지 않기 때문에("build"/
+  "ls" 등 실제 명령 실행을 이벤트로 감지해 자동 전진하는) 이벤트 기반 진행이 배선돼 있지 않다.
+  즉 셸 튜토리얼은 (Lua 진영의 `built`/`saved` 이벤트 자동 전진과 달리) **Enter로 수동
+  진행**해야 한다 — 플레이어가 명령을 실행한 뒤에도 다음 설명으로 안 넘어가면 직접 Enter를
+  한 번 더 눌러야 한다는 뜻. 튜토리얼 자체는 끝까지 진행 가능(막히지 않음)하므로 기능 결함은
+  아니고, 다음 셸 스테이지 튜토리얼을 늘릴 때 이벤트 배선을 추가하려면 `termExec()`에
+  `tut:notify("exec")` 류의 훅을 넣는 지점이 필요하다는 것만 기록해 둔다.
+
+- **106 학습 포인트 정정(집중 사격=희생자 선정)**: 처음 계획 문서에는 "표적을 분산해야
+  데드락 쌍을 각각 끊는다"는 취지가 있었으나, 실측 결과 `pair` 경감은 **짝 중 한쪽이 사망(또는
+  도달)하는 즉시 해제**되는 구조라(§ "몬스터·타워 능력 키워드"의 pair 행 참고) 실제 정답은
+  반대다 — **화력을 한 곳에 모아 한쪽부터 먼저 끊는("희생자(victim) 선정") 것이 정답**이며,
+  타워를 서버라인 앞뒤로 멀리 흩어 지으면 오히려 쌍의 절반이 무방비로 뚫려 패배한다(자동화된
+  반례가 이를 증명, 위 ".sh 솔루션 러너" 참고). 데이터베이스 데드락 해소가 "희생 트랜잭션을
+  골라 강제 종료"하는 것과 같은 비유라 `data/lore/106.lua`의 postmortem에도 이 표현을 그대로
+  반영했다. "분산 필수"라는 원래 가정은 데이터/문서 양쪽에서 이미 정정 완료.
+
+- **외부 제어 어댑터(다음 회차, 설계만 고정)**: `shell:exec`가 "문자열 in → 문자열 out"이므로
+  어댑터는 얇게 붙는다 — 다음 회차에 `--cmdfile <경로>` 기동 옵션 → 그 파일을 tail 폴링 →
+  한 줄씩 `shell:exec` → 결과를 `<경로>.out`에 append하는 구조로 고정했다(이번 회차는 게임 내
+  터미널까지만, 이 어댑터 자체는 구현하지 않음). 목표는 Claude Code 같은 외부 에이전트가 파일에
+  명령을 쓰면 게임이 그대로 실행되는 데모다. 외부 명령도 배포 로그에 동일하게 기록되어야 하고,
+  하드코어 모드에서는 어댑터를 비활성화한다는 방침도 함께 정해 뒀다(둘 다 다음 회차 구현 시
+  적용 — 이번 웨이브에서 이미 만든 부분 아님).
+
 ## 알려진 한계
 
 - 샌드박스의 명령 예산 훅은 C 함수 내부에서는 적용되지 않는다 (`string.rep(1e9)` 같은 호출은
@@ -521,6 +688,8 @@ love2d-thisfar/
   클로저나 외부 변수에 저장해 나중에 참조하면, 그 시점의 타워가 아니라 **가장 최근에 `refresh`된
   타워의 값**을 보게 된다. 타워별 상태를 기억하려면 `self.name`을 키로 `cache`(아이템)나
   스크립트 최상위의 로컬 테이블에 저장해야 한다.
+- **셸 진영 튜토리얼(101)은 이벤트 기반 자동 진행이 없다**(Wave D) — 상세 사유는 § "Wave D —
+  셸 진영"의 "튜토리얼 배선 갭" 항목 참고. Enter로 수동 진행해야 하며 기능 결함은 아니다.
 
 ## 다음 단계 (0.2+)
 
@@ -533,6 +702,10 @@ v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스
 (Wave B, `docs/superpowers/specs/2026-07-23-codedefense-new-enemies-design.md`)에서 신규 적
 7종+보스(커널 패닉)·신규 타워 2종(GC 수집기/디버거)·신규 스테이지 13~20(스레드/프로세스/
 네트워크)·world API 확장(`age`/`speed`/`oldest`)이 추가되어 위 "구현된 규칙"에 반영돼 있다.
+이어진 셸 진영 웨이브(Wave D, `docs/superpowers/specs/2026-07-23-codedefense-shell-mode-design.md`)
+에서 진영 선택 UI·Shell 진영(명령줄 방어, 스테이지 101~106)·전략 4종+autoAttack·게임 내 터미널
+패널이 추가되어 § "Wave D — 셸 진영"에 반영돼 있다(과거 이 절에 있던 "언어 진영 시스템(v1
+프레임워크만)" 계획은 이로써 완료 — Lua 다음의 두 번째 실행 가능 진영이 실제로 붙었다).
 설계서(`docs/superpowers/specs/2026-07-21-love2d-codedefense-design.md` 9장,
 `docs/superpowers/specs/2026-07-22-codedefense-stage-experience-design.md`) 기준으로 다음이
 남아 있다.
@@ -542,8 +715,10 @@ v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스
 - **밈 도감 심화**: 몬스터별 "실제 오류가 언제 나는지 + 어떻게 고치는지" 텍스트 영구 수집
   (현재 도감은 스탯·능력 카드까지만 — 실제 오류 텍스트 확장은 이연)
 - **아이템 확장**: CPU 코어 증설(명령 예산 증가), 공용 라이브러리 탭 등 인벤토리 심화
-- **언어 진영 시스템**: 진영 선택 UI·보너스 데이터·언어별 랭킹 분리는 v1 프레임워크로 넣되,
-  실행 가능한 진영은 Lua 하나로 시작 (Python/JS/C#은 외부 프로세스 어댑터로 v2 확장)
+- **외부 제어 어댑터(Wave D 설계 고정, 미구현)**: `--cmdfile <경로>` 기동 옵션 → 파일 tail
+  폴링 → `shell:exec` → `<경로>.out`에 결과 append. Claude Code 같은 외부 에이전트가 파일에
+  명령을 쓰면 게임이 실행되는 데모가 목표(§ "Wave D — 셸 진영"의 "외부 제어 어댑터" 참고).
+  Python/JS/C# 등 다른 언어 진영을 추가한다면 이 어댑터 패턴이 그대로 재사용 가능한 뼈대다.
 - **타워 매도(sell)**, 진행도 리셋 메뉴: 스펙에서 명시적으로 이연됨
 - **타워 업그레이드 시스템**, 스테이지별 타일 틴트 변주, 도감 코드 예제 실행: 이번 웨이브
   범위 제외로 명문화됨(§8)
@@ -555,29 +730,35 @@ v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스
 ```
 
 `tests/main.lua`가 `tests/test_*.lua` 스위트를 전부 실행하고 `RESULT pass=N fail=N`을 출력한다
-(현재 495개, 전부 PASS — 14개 스위트: `test_csv`·`test_grid`·`test_sandbox`·`test_battle`·
+(현재 814개, 전부 PASS — 16개 스위트: `test_csv`·`test_grid`·`test_sandbox`·`test_battle`·
 `test_data`·`test_editor`·`test_progress`·`test_tutorial`·`test_particles`·`test_cutscene`·
-`test_stageinfo`·`test_demolish`·`test_stars`·`test_abilities`. `test_particles.lua`·
-`test_cutscene.lua`가 뷰 전용 이펙트/컷신 로직을, `test_stageinfo.lua`가 적 구성 패널 집계
-유틸을, `test_demolish.lua`가 `Battle:demolishTower`(환불·재사용·틱 중 철거 스킵 방지)를,
-`test_stars.lua`가 `stars.of`의 HP→별점 경계값을 다룬다. `test_abilities.lua`(Wave B 신규)가
-`grow`/`pair`/`phase`/`split2`/`dash`/`resist`의 능력 6종(상한·경감 해제·주기·깊이 제한 등)과
-`splash`/`slowfield` 타워 능력, `world.oldest()`·스냅샷 `age`/`speed`, 그리고 같은 스크립트를
-2회 실행했을 때 `status`/`serverHP`가 완전히 일치하는 결정론 재현까지 헤드리스로 검증한다.
-`test_data.lua`는 `d.validate()`가 보지 못하는 lore 파일 "내용" 회귀도 잡는다 — `lore_file`이
-있는 모든 스테이지를 `io.open`+`loadstring`으로 직접 로드·실행해 `briefing`/`postmortem`이
-비어있지 않은 문자열을 반환하는지 확인한다(구문 오류나 스키마 누락은 파일 존재 검사만으로는
-잡히지 않기 때문). 브리핑/포스트모템 카드·도감 origin·스플래시 링·감속 점 같은
-`states/*.lua`에만 있는 순수 뷰 표시는 헤드리스 스위트로 검증되지 않으므로, 오토플레이
-하네스로 스크린샷을 찍어 육안 확인한다(§ "구현된 규칙"의 관련 항목 참고). 실패가 있으면 콘솔
-종료 코드도 0이 아니게 된다.
+`test_stageinfo`·`test_demolish`·`test_stars`·`test_abilities`·`test_shell`·`test_factions`.
+`test_particles.lua`·`test_cutscene.lua`가 뷰 전용 이펙트/컷신 로직을, `test_stageinfo.lua`가
+적 구성 패널 집계 유틸을, `test_demolish.lua`가 `Battle:demolishTower`(환불·재사용·틱 중 철거
+스킵 방지)를, `test_stars.lua`가 `stars.of`의 HP→별점 경계값을 다룬다. `test_abilities.lua`
+(Wave B 신규)가 `grow`/`pair`/`phase`/`split2`/`dash`/`resist`의 능력 6종(상한·경감 해제·주기·
+깊이 제한 등)과 `splash`/`slowfield` 타워 능력, `world.oldest()`·스냅샷 `age`/`speed`, 그리고
+같은 스크립트를 2회 실행했을 때 `status`/`serverHP`가 완전히 일치하는 결정론 재현까지
+헤드리스로 검증한다. `test_shell.lua`(Wave D 신규)가 토크나이저·명령 9종·ps1 별칭·오타 제안·
+cron 결정론·출력 절단과 함께 타워 전략 4종(사거리 필터·타이브레이크·은신 제외)을 다룬다.
+`test_factions.lua`(Wave D 신규)가 `languageOf`/`idsFor`/`unlocked`의 진영 분리·진영 내 언락을
+검증한다(특히 "Lua 20 전부 클리어해도 셸 102는 안 풀림"처럼 진영이 섞이지 않는지가 핵심
+단언). `test_data.lua`는 `d.validate()`가 보지 못하는 lore 파일 "내용" 회귀도 잡는다 —
+`lore_file`이 있는 모든 스테이지를 `io.open`+`loadstring`으로 직접 로드·실행해
+`briefing`/`postmortem`이 비어있지 않은 문자열을 반환하는지 확인한다(구문 오류나 스키마
+누락은 파일 존재 검사만으로는 잡히지 않기 때문). 브리핑/포스트모템 카드·도감 origin·스플래시
+링·감속 점·셸 터미널 패널 같은 `states/*.lua`에만 있는 순수 뷰 표시는 헤드리스 스위트로
+검증되지 않으므로, 오토플레이 하네스로 스크린샷을 찍어 육안 확인한다(§ "구현된 규칙"의 관련
+항목 참고). 실패가 있으면 콘솔 종료 코드도 0이 아니게 된다.
 
-스테이지를 추가할 때는 `data/curriculum/<n>_solution.lua`를 **반드시** 함께 추가해야 한다 —
-`tests/test_battle.lua`가 CSV에 등록된 모든 스테이지(현재 1~20)를 순회하며 `solution_file`의
-코드로 실제 전투를 실행해 클리어(300초 서버 생존)까지 확인하는 회귀 테스트이므로, 정답 코드가
-없거나 틀리면 테스트가 실패해 스테이지 추가가 자동으로 검증된다. 회귀 테스트는
-`Battle:setScript`로 정답 스크립트를 주입하는 방식이며, 스크립트 안의 `build()` 좌표는 반드시
-스테이지 예산(`budget`) 안에서 지을 수 있는 조합이어야 한다. 스테이지에 `naive_file`이 등록돼
-있으면(퍼즐 스테이지 6·9·12·16·20) 같은 회귀 루프가 그 스크립트로도 전투를 돌려 **반드시
-defeat**임을 함께 증명한다 — 순진 배치가 실제로 클리어해 버리면 테스트가 실패해 퍼즐 설계가
-깨졌음을 알려준다.
+스테이지를 추가할 때는 `data/curriculum/<n>_solution.lua`(Lua 진영) 또는 `<n>_solution.sh`
+(Shell 진영)를 **반드시** 함께 추가해야 한다 — `tests/test_battle.lua`가 CSV에 등록된 모든
+스테이지(현재 Lua 1~20 + Shell 101~106)를 순회하며, `ui=="shell"`이면 `.sh`를 줄 단위로
+`shell:exec`한 뒤 autoAttack 배틀을 300초 이상 시뮬레이션해(§ "Wave D — 셸 진영"의 ".sh 솔루션
+러너" 참고), 그 외에는 기존처럼 `solution_file`의 Lua 코드로 실제 전투를 실행해 클리어(300초
+서버 생존)까지 확인하는 회귀 테스트이므로, 정답이 없거나 틀리면 테스트가 실패해 스테이지
+추가가 자동으로 검증된다. Lua 진영 회귀는 `Battle:setScript`로 정답 스크립트를 주입하는
+방식이며, 스크립트 안의 `build()` 좌표는 반드시 스테이지 예산(`budget`) 안에서 지을 수 있는
+조합이어야 한다. 스테이지에 `naive_file`이 등록돼 있으면(퍼즐 스테이지 6·9·12·16·20) 같은
+회귀 루프가 그 스크립트로도 전투를 돌려 **반드시 defeat**임을 함께 증명한다 — 순진 배치가
+실제로 클리어해 버리면 테스트가 실패해 퍼즐 설계가 깨졌음을 알려준다.
