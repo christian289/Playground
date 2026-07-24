@@ -5,7 +5,16 @@ local art = require("src.art")
 local title = {}
 
 local ITEMS = { "게임 시작", "세계관", "도감", "종료" }
-local MENU_Y0, MENU_STEP = 160, 48 -- 항목 y 시작·간격(각 항목이 이 간격만큼의 y 밴드를 차지)
+local MENU_STEP = 48 -- 메뉴 항목 y 간격(각 항목이 이 간격만큼의 y 밴드를 차지)
+
+-- 레이아웃 상수 — 모듈 로드 시 1회만 계산(main.lua가 fonts.load()를 먼저 실행하므로 이 시점엔
+-- fonts.title/ui 지표가 이미 확정돼 있다). draw()와 itemAt() 양쪽이 같은 값을 참조해야
+-- 마우스 히트 판정이 실제 그려지는 메뉴 위치와 어긋나지 않는다.
+local ROOK_SCALE = 3.4
+local ROOK_Y = 8
+local TITLE_Y = ROOK_Y + 16 * ROOK_SCALE + 6
+local SUBTITLE_Y = TITLE_Y + art.titleTextHeight(fonts.title) + 10
+local MENU_Y0 = SUBTITLE_Y + fonts.ui:getHeight() + 26
 
 function title:enter(_, d, p)
     self.d, self.p = d, p
@@ -94,15 +103,16 @@ function title:draw()
     local W = love.graphics.getWidth()
     drawBackground(t)
 
-    -- 룩 심볼 (로고 위, scale 4)
-    local rookScale = 4
-    art.drawRook(W / 2 - 8 * rookScale, 10, rookScale, t)
+    -- 룩 심볼 (게임명 위 — 문장형 제목 2줄이 들어갈 자리를 확보하기 위해 픽셀 로고 시절보다
+    -- 살짝 축소)
+    art.drawRook(W / 2 - 8 * ROOK_SCALE, ROOK_Y, ROOK_SCALE, t)
 
-    -- 로고
-    art.drawLogo(W / 2, 76)
+    -- 게임명(문장형 제목, 폰트 렌더 2줄) — 룩 심볼 바로 아래
+    art.drawTitleText(W / 2, TITLE_Y, fonts.title, t)
+
     love.graphics.setFont(fonts.ui)
     love.graphics.setColor(0.7, 0.75, 0.82)
-    love.graphics.printf("코드로 타워를 조종해 서버를 지켜라", 0, 112, W, "center")
+    love.graphics.printf("코드로 타워를 조종해 서버를 지켜라", 0, SUBTITLE_Y, W, "center")
 
     -- 메뉴
     love.graphics.setFont(fonts.big)
@@ -120,7 +130,7 @@ function title:draw()
 
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.55, 0.6, 0.66)
-    love.graphics.printf("↑↓/마우스 이동 · Enter/클릭 선택", 0, 360, W, "center")
+    love.graphics.printf("↑↓/마우스 이동 · Enter/클릭 선택", 0, MENU_Y0 + #ITEMS * MENU_STEP + 8, W, "center")
     love.graphics.setColor(1, 1, 1)
 end
 

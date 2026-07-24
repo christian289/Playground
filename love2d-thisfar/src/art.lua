@@ -725,57 +725,40 @@ function art.rookIconData()
 end
 
 --------------------------------------------------------------------------------
--- 로고 "CODE DEFENSE" (5x7 도트 폰트, cx 중심)
+-- 타이틀 게임명 — 폰트 렌더 기반(문장형 제목이라 5x7 도트 픽셀 레터링 대신 큰 폰트 2줄로 배치).
+-- 룩 심볼과 마찬가지로 love.timer를 직접 부르지 않고 t를 인자로 받아 미세한 발광 펄스만 준다.
 --------------------------------------------------------------------------------
-local GLYPH = {
-    C = { ".###.", "#...#", "#....", "#....", "#....", "#...#", ".###." },
-    O = { ".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###." },
-    D = { "###..", "#..#.", "#...#", "#...#", "#...#", "#..#.", "###.." },
-    E = { "#####", "#....", "#....", "####.", "#....", "#....", "#####" },
-    F = { "#####", "#....", "#....", "####.", "#....", "#....", "#...." },
-    N = { "#...#", "##..#", "#.#.#", "#.#.#", "#..##", "#...#", "#...#" },
-    S = { ".####", "#....", "#....", ".###.", "....#", "....#", "####." },
-    [" "] = { ".....", ".....", ".....", ".....", ".....", ".....", "....." },
-}
+local TITLE_LINE1, TITLE_LINE2 = "정말 이렇게까지", "게임을 해야할까?"
 
-local function glyphW() return 5 end
+-- 2줄 제목 블록의 총 높이(그리지 않고 계산만) — 호출부(title.lua)가 draw 전에 레이아웃을
+-- 잡을 때 drawTitleText와 동일한 lh 공식을 쓰도록 단일 지점으로 뽑아 둔다(드리프트 방지).
+local function titleLineH(font) return font:getHeight() + 4 end
+function art.titleTextHeight(font) return titleLineH(font) * 2 end
 
-local function drawGlyph(ch, px, py, s, col)
-    local g = GLYPH[ch]
-    if not g then return end
-    setCol(col)
-    for row = 1, 7 do
-        local line = g[row]
-        for cx2 = 1, 5 do
-            if line:sub(cx2, cx2) == "#" then
-                love.graphics.rectangle("fill", px + (cx2 - 1) * s, py + (row - 1) * s, s, s)
-            end
-        end
-    end
-end
-
-function art.drawLogo(cx, y)
+-- (cx, y) 상단 중앙 기준으로 title 폰트 2줄을 그린다. 그린→시안 그라데이션 + 옅은 자홍 글로우
+-- 레이어를 살짝 오프셋해 겹쳐 네온 발광 느낌을 낸다(픽셀 시절 CODE=green/DEFENSE=cyan 배색 계승).
+function art.drawTitleText(cx, y, font, t)
     local P = art.pal
-    local s = 3 -- px=3
-    local word1, word2 = "CODE", "DEFENSE"
-    local gap = 1 -- 글자 사이 여백(도트)
-    local spaceGap = 4 -- 단어 사이 여백(도트)
-    local advance = (glyphW() + gap) * s
-    local w1 = #word1 * advance - gap * s
-    local w2 = #word2 * advance - gap * s
-    local total = w1 + spaceGap * s + w2
-    local startX = cx - total / 2
-    local px = startX
-    for i = 1, #word1 do
-        drawGlyph(word1:sub(i, i), px, y, s, P.green)
-        px = px + advance
-    end
-    px = px - gap * s + spaceGap * s
-    for i = 1, #word2 do
-        drawGlyph(word2:sub(i, i), px, y, s, P.cyan)
-        px = px + advance
-    end
+    local W = love.graphics.getWidth()
+    love.graphics.setFont(font)
+    local lh = titleLineH(font)
+    local glow = 0.28 + 0.1 * math.sin((t or 0) * 2)
+
+    -- 글로우 레이어(자홍, 약간의 오프셋으로 번짐 표현)
+    setCol(P.magenta, glow)
+    love.graphics.printf(TITLE_LINE1, cx - W / 2 - 1, y - 1, W, "center")
+    love.graphics.printf(TITLE_LINE2, cx - W / 2 - 1, y + lh - 1, W, "center")
+    setCol(P.magenta, glow)
+    love.graphics.printf(TITLE_LINE1, cx - W / 2 + 1, y + 1, W, "center")
+    love.graphics.printf(TITLE_LINE2, cx - W / 2 + 1, y + lh + 1, W, "center")
+
+    -- 메인 텍스트
+    setCol(P.green)
+    love.graphics.printf(TITLE_LINE1, cx - W / 2, y, W, "center")
+    setCol(P.cyan)
+    love.graphics.printf(TITLE_LINE2, cx - W / 2, y + lh, W, "center")
     love.graphics.setColor(1, 1, 1)
+    return lh * 2 -- 호출부가 다음 요소(부제)를 배치할 때 쓰라고 총 높이를 돌려준다
 end
 
 --------------------------------------------------------------------------------

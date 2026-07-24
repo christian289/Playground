@@ -1,9 +1,11 @@
-# love2d-codedefense
+# 정말 이렇게까지 게임을 해야할까?
 
-LÖVE (Love2D) 11.5로 만드는 코딩 교육용 타워디펜스 《Code Defense》입니다. 준비 시간 없이,
-카운트다운이 끝나는 순간부터 서버가 뚫릴 때까지 **실시간으로 계속 흐르는 전투** 속에서 게임 내
-코드 에디터에 Lua로 `on_tick(self, world)`와 `build(type, r, c, name)`을 작성해 타워를 조종하고,
-위에서 내려오는 밈 몬스터(버그/널 포인터/concat-nil)로부터 서버를 지킵니다.
+*— Do I really have to game this hard?*
+
+LÖVE (Love2D) 11.5로 만드는 코딩 교육용 타워디펜스입니다. 준비 시간 없이, 카운트다운이 끝나는
+순간부터 서버가 뚫릴 때까지 **실시간으로 계속 흐르는 전투** 속에서 게임 내 코드 에디터에 Lua로
+`on_tick(self, world)`와 `build(type, r, c, name)`을 작성해 타워를 조종하고, 위에서 내려오는 밈
+몬스터(버그/널 포인터/concat-nil)로부터 서버를 지킵니다.
 
 ## 세계관
 
@@ -21,7 +23,7 @@ LÖVE (Love2D) 11.5로 만드는 코딩 교육용 타워디펜스 《Code Defens
 ## 실행
 
 ```powershell
-cd love2d-codedefense
+cd love2d-thisfar
 & "C:\Program Files\LOVE\lovec.exe" .
 ```
 
@@ -227,6 +229,6 @@ Enter(또는 좌클릭)로 확정합니다. "세계관"을 고르면 오프닝 �
 powershell -ExecutionPolicy Bypass -File tools\package.ps1
 ```
 
-`dist\CodeDefense\` 폴더가 생성됩니다 — `CodeDefense.exe` 더블클릭으로 실행되며, 폴더째
+`dist\ThisFar\` 폴더가 생성됩니다 — `ThisFar.exe` 더블클릭으로 실행되며, 폴더째
 복사하면 LÖVE가 설치되지 않은 PC에서도 동작합니다. 게임 데이터(`data\`)는 exe 옆에 폴더로
 동봉되므로, CSV·미로·커리큘럼 파일을 수정해 나만의 스테이지를 만들 수 있습니다.
