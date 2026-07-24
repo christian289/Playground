@@ -11,3 +11,7 @@ id,mode,concept,ui,maze_file,budget,languages,countdown,wave_clock,hints_file,so
 10,normal,테이블 활용,free,mazes/010.txt,340,lua,25,,curriculum/010_hints.lua,curriculum/010_solution.lua,,,,힙,테이블로 표적 상태를 기록하며 방어하라.,,,lore/010.lua
 11,normal,종합 연습,free,mazes/011.txt,360,lua,30,,curriculum/011_hints.lua,curriculum/011_solution.lua,,,,힙,지금까지 배운 개념을 종합해 밀려드는 조각을 처리하라.,,,lore/011.lua
 12,normal,최종 시험,free,mazes/012.txt,400,lua,30,,curriculum/012_hints.lua,curriculum/012_solution.lua,,,,힙,분할 지점을 모두 덮어라. 최종 시험이다.,1,curriculum/012_naive.lua,lore/012.lua
+13,normal,정렬 기준,free,mazes/013.txt,300,lua,25,,curriculum/013_hints.lua,curriculum/013_solution.lua,,,,스레드,메모리 릭이 서버라인 앞에서 몸집을 불린다. 가장 오래 살아남은 릭부터 끊어라.,,,lore/013.lua
+14,normal,표적 분산,free,mazes/014.txt,250,lua,25,,,curriculum/014_solution.lua,,,,스레드,두 개씩 짝지어 오는 데드락이 서로를 감싸 피해를 나눈다. 표적을 갈라 동시에 끊어라.,,,lore/014.lua
+15,normal,안전 검사,free,mazes/015.txt,200,lua,25,,,curriculum/015_solution.lua,,,,스레드,하이젠버그가 가시와 은신을 오간다. 보이는 순간에만 안전하게 조준하라.,,,lore/015.lua
+16,normal,광역 방어,free,mazes/016.txt,900,lua,30,,,curriculum/016_solution.lua,,,,프로세스,포크 밤이 죽을 때마다 둘로 분열한다. 단일 표적 화력으로는 물량을 못 이긴다. 광역 화력으로 쓸어담아라.,1,curriculum/016_naive.lua,lore/016.lua
