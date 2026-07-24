@@ -19,3 +19,9 @@ id,mode,concept,ui,maze_file,budget,languages,countdown,wave_clock,hints_file,so
 18,normal,정밀 타격,free,mazes/018.txt,300,lua,25,,,curriculum/018_solution.lua,,,,프로세스,레거시 코드는 프린터 공격에 절반만 다친다. 컴파일러로 스나이퍼를 열어 급소를 저격하라.,,,lore/018.lua
 19,normal,물량 방어,free,mazes/019.txt,450,lua,25,,,curriculum/019_solution.lua,,,,네트워크,DDoS 봇이 초당 몇 기씩 몰려온다. GC 수집기의 광역과 프린터의 연사를 길목에 겹쳐라.,,,lore/019.lua
 20,normal,복합 방어,free,mazes/020.txt,900,lua,30,,,curriculum/020_solution.lua,,,,네트워크,릭이 자라고 데드락이 뭉치고 포크 밤이 갈라진다 — 그리고 커널 패닉이 온다. 배운 전부를 동원하라.,1,curriculum/020_naive.lua,lore/020.lua
+101,normal,ls,shell,mazes/101.txt,220,shell,25,,,curriculum/101_solution.sh,,curriculum/tutorial_101.lua,,터미널,터미널에 처음 앉았다. ls로 지금 배치를 확인하고 build 한 줄로 방어선을 세워라.,,,lore/101.lua
+102,normal,rm,shell,mazes/102.txt,260,shell,25,,,curriculum/102_solution.sh,,,,터미널,어제 세운 타워가 길목을 벗어났다. rm으로 철거하고 더 나은 자리에 다시 세워라.,,,lore/102.lua
+103,normal,top,shell,mazes/103.txt,320,shell,25,,,curriculum/103_solution.sh,,,,터미널,상황판 없는 방어는 감이다. top으로 서버 심박을 확인하며 방어선을 조율하라.,,,lore/103.lua
+104,normal,man·target,shell,mazes/104.txt,320,shell,25,,,curriculum/104_solution.sh,,,,파이프라인,concat-nil이 섞여 온다. man target으로 문법을 확인하고 타워마다 전략을 지정하라.,,,lore/104.lua
+105,normal,cron,shell,mazes/105.txt,320,shell,25,,,curriculum/105_solution.sh,,,,파이프라인,정기 러시가 몰려온다. cron으로 반복 점검을 자동화하고 물량을 받아내라.,,,lore/105.lua
+106,normal,종합 시험,shell,mazes/106.txt,200,shell,25,,,curriculum/106_solution.sh,,,,파이프라인,데드락 쌍이 몰려온다. 화력을 한 곳에 모으지 않으면 반드시 뚫린다 — 지금까지 배운 모든 명령을 동원하라.,,,lore/106.lua

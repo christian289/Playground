@@ -106,6 +106,16 @@ function db.load(root)
             if s.solution_file ~= "" and not fileExists(s.solution_file) then
                 errs[#errs + 1] = ("stages %s: 정답 파일 없음 %s"):format(id, s.solution_file)
             end
+            -- Wave D Task 4: ui=shell 스테이지는 solution_file이 ".sh" 확장자로 실제
+            -- 존재해야 한다(러너가 이 파일을 줄 단위 shell:exec로 읽으므로 .lua 파일이나
+            -- 빈 값이면 안 된다). 위 일반 검사는 solution_file이 빈 값이면 통과시키므로
+            -- (s.solution_file ~= "" 게이트) 셸 스테이지는 별도로 걸러야 한다.
+            if s.ui == "shell" then
+                local sf = s.solution_file or ""
+                if sf == "" or not sf:match("%.sh$") or not fileExists(sf) then
+                    errs[#errs + 1] = ("stages %s: 솔루션(.sh) 파일 없음 %s"):format(id, sf)
+                end
+            end
             if s.hints_file ~= "" and not fileExists(s.hints_file) then
                 errs[#errs + 1] = ("stages %s: 힌트 파일 없음 %s"):format(id, s.hints_file)
             end

@@ -1,6 +1,7 @@
 return function(t)
     local db = require("src.db")
     local Battle = require("src.battle")
+    local Shell = require("src.shell")
     local d = db.load(PROJECT_ROOT)
 
     local ATK = [[
@@ -140,26 +141,78 @@ function on_tick(self, world) self:attack(world.nearest()) end
         local code = f:read("*a"); f:close()
         return code
     end
+    -- 셸 스테이지(ui=="shell")용 러너(Wave D Task 4): 스크립트 대신 opts.autoAttack Battle을
+    -- 만들고, solution_file(.sh)을 줄 단위로 읽어 시작 시 일괄 shell:exec한다(빈 줄·"#" 주석은
+    -- 스킵). target/cron은 지속 효과라 시작 시 한 번에 실행해도 성립한다(계획서 §Task4 Step2).
+    -- 시뮬 루프는 기존 Lua 회귀(run())와 동일하게 작은 dt(1/30)로 battle:update를 돌리되,
+    -- 매 스텝 shell:tick(battle.clock)을 함께 호출해 cron 예약이 실제 플레이(states/play.lua의
+    -- update)와 동일한 카덴스로 실행되게 한다 — 큰 dt로 건너뛰면 cron이 한꺼번에 캐치업
+    -- 실행되어(§Global Constraints) 실제 플레이와 다른 타이밍을 관측하게 된다.
+    local function runShellSolution(stageId, owned)
+        local stage = d.stages[stageId]
+        local b = Battle(d, stageId, { items = owned, autoAttack = true })
+        local shell = Shell.new(b)
+        local code = readCode(stage.solution_file)
+        for line in code:gmatch("[^\n]+") do
+            local trimmed = line:gsub("^%s+", ""):gsub("%s+$", "")
+            if trimmed ~= "" and not trimmed:match("^#") then
+                local res = shell:exec(trimmed)
+                t.ok(res.ok, ("스테이지 %d 셸 솔루션 실행 성공: %s"):format(stageId, trimmed))
+            end
+        end
+        b:start()
+        local dt = 1 / 30
+        for _ = 1, math.floor(420 / dt) do
+            if b.status ~= "running" then break end
+            b:update(dt)
+            shell:tick(b.clock)
+        end
+        return b
+    end
     local stageIds = {}
     for id in pairs(d.stages) do stageIds[#stageIds + 1] = id end
     table.sort(stageIds)
     local owned = {}
     for _, stageId in ipairs(stageIds) do
         local stage = d.stages[stageId]
-        local b = Battle(d, stageId, { items = owned })
-        t.ok(b:setScript(readCode(stage.solution_file)), ("스테이지 %d 정답 컴파일"):format(stageId))
-        b:start()
-        run(b, 420)
-        t.eq(b.status, "clear", ("스테이지 %d 정답 클리어"):format(stageId))
-        if stage.naive_file and stage.naive_file ~= "" then
-            local bn = Battle(d, stageId, { items = owned })
-            t.ok(bn:setScript(readCode(stage.naive_file)), ("스테이지 %d 순진 배치 컴파일"):format(stageId))
-            bn:start()
-            run(bn, 420)
-            t.eq(bn.status, "defeat", ("스테이지 %d 순진 배치는 패배(퍼즐 강제)"):format(stageId))
+        if stage.ui == "shell" then
+            local b = runShellSolution(stageId, owned)
+            t.eq(b.status, "clear", ("스테이지 %d 셸 정답(.sh) 클리어"):format(stageId))
+        else
+            local b = Battle(d, stageId, { items = owned })
+            t.ok(b:setScript(readCode(stage.solution_file)), ("스테이지 %d 정답 컴파일"):format(stageId))
+            b:start()
+            run(b, 420)
+            t.eq(b.status, "clear", ("스테이지 %d 정답 클리어"):format(stageId))
+            if stage.naive_file and stage.naive_file ~= "" then
+                local bn = Battle(d, stageId, { items = owned })
+                t.ok(bn:setScript(readCode(stage.naive_file)), ("스테이지 %d 순진 배치 컴파일"):format(stageId))
+                bn:start()
+                run(bn, 420)
+                t.eq(bn.status, "defeat", ("스테이지 %d 순진 배치는 패배(퍼즐 강제)"):format(stageId))
+            end
         end
         local reward = stage.reward_item
         if reward ~= "" then owned[#owned + 1] = reward end
+    end
+
+    -- 106 반례(Wave D Task 4, 수동 반례 검증의 자동화 버전): 동일 예산을 화력 집중이 아니라
+    -- 서버라인 앞뒤로 멀리 흩어 지으면(예: (4,4)·(14,8)) 데드락 쌍의 절반이 무방비로 뚫려
+    -- 반드시 패배한다 — 표적 전략을 바꾸지 않아도(기본 nearest) 배치만으로 갈리는 실측
+    -- 반례다(자세한 스윕 근거는 태스크 보고서 참고).
+    do
+        local bNaive = Battle(d, 106, { autoAttack = true })
+        local shellNaive = Shell.new(bNaive)
+        shellNaive:exec("build printer 4 4 a")
+        shellNaive:exec("build printer 14 8 b")
+        bNaive:start()
+        local dt = 1 / 30
+        for _ = 1, math.floor(420 / dt) do
+            if bNaive.status ~= "running" then break end
+            bNaive:update(dt)
+            shellNaive:tick(bNaive.clock)
+        end
+        t.eq(bNaive.status, "defeat", "스테이지106 반례(흩어짓기, target 미사용): 반드시 패배")
     end
 
     -- 버튼 스테이지 2: buttons_2의 마지막 버튼 스크립트(전략: 약한 적 우선)로 클리어

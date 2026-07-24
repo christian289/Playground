@@ -422,6 +422,50 @@ return function(t)
     t.eq(resTopNoSpeed.output[1], expectedTopLine, "④-c: opts 없음/opts.speed 미지정 시 배속 부분 생략")
 
     ------------------------------------------------------------------
+    -- ④-c2: top 총량 보정(Wave D Task 4) — split 능력(concat-nil)이 섞인 스테이지(104)는
+    -- 처치 시 자식으로 갈라져 battle.kills가 순수 스폰 수보다 커질 수 있다("처치 k/N"에서
+    -- k가 N을 넘는 모순 표기 — 실측: 보정 전 stage104 정답 실행 시 kills=90 > 순수스폰수=61).
+    -- Shell.expectedTotal이 split 스폰 이벤트마다 count*2(자식 2, 더 분열 없음)를 더해
+    -- N을 "분열 자손까지 포함한 최대 가능 처치 수"로 보정한다(split2였다면 count*6).
+    -- split이 없는 스테이지(위 stage1)는 보정량이 0이라 기존 표기와 완전히 동일하다.
+    ------------------------------------------------------------------
+    local rawTotal104 = stageinfo.totals(d.timeline(104)).total
+    local splitExtra104 = 0
+    for _, ev in ipairs(d.timeline(104)) do
+        if ev.spawn == "concat-nil" then splitExtra104 = splitExtra104 + ev.count * 2 end
+    end
+    t.ok(splitExtra104 > 0, "④-c2게이트: stage104 타임라인에 concat-nil(split) 이벤트가 실제로 있음")
+
+    local b4f = Battle(d, 104, { autoAttack = true })
+    local shell4f = Shell.new(b4f)
+    t.eq(shell4f.totalEnemies, rawTotal104 + splitExtra104,
+        "④-c2: totalEnemies = 순수 스폰 수 + concat-nil 자식 보정분(정확히 일치, 실측)")
+    t.ok(shell4f.totalEnemies > rawTotal104,
+        "④-c2게이트: 보정 후 totalEnemies가 순수 스폰 수보다 실제로 큼(보정이 무의미하지 않음)")
+
+    -- stage104 정답(.sh)을 실제로 끝까지 돌려 kills가 보정된 totalEnemies를 넘지 않는지
+    -- (=top 표기에서 분자가 분모를 넘는 모순이 실제로 재현되지 않는지) 확인한다.
+    do
+        local f = assert(io.open(PROJECT_ROOT .. "/data/curriculum/104_solution.sh", "rb"))
+        local src = f:read("*a"); f:close()
+        for line in src:gmatch("[^\n]+") do
+            local trimmed = line:gsub("^%s+", ""):gsub("%s+$", "")
+            if trimmed ~= "" and not trimmed:match("^#") then shell4f:exec(trimmed) end
+        end
+        b4f:start()
+        local dt = 1 / 30
+        for _ = 1, math.floor(420 / dt) do
+            if b4f.status ~= "running" then break end
+            b4f:update(dt)
+            shell4f:tick(b4f.clock)
+        end
+        t.eq(b4f.status, "clear", "④-c2: stage104 정답 실행 시 실제 클리어(회귀 겸용)")
+        t.ok(b4f.kills <= shell4f.totalEnemies,
+            ("④-c2: 실제 처치 수(%d)가 보정된 totalEnemies(%d)를 넘지 않음(실측 — 분자>분모 모순 미재현)")
+            :format(b4f.kills, shell4f.totalEnemies))
+    end
+
+    ------------------------------------------------------------------
     -- ④-d history: 번호 매김 포맷("N  명령") — history 자기 자신의 실행도 이력에 포함
     ------------------------------------------------------------------
     local b4d = Battle(d, 1, {})

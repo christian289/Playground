@@ -4,6 +4,7 @@
 -- 이후 회차(외부 제어 어댑터)가 이 계약을 그대로 재사용할 예정이므로, 여기서 view(states/*)를
 -- 직접 호출하지 않는다 — man/clear는 신호 필드(open/clear)만 반환해 뷰가 소비하게 한다.
 local stageinfo = require("src.stageinfo")
+local Enemy = require("src.enemy")
 
 local Shell = {}
 Shell.__index = Shell
@@ -256,6 +257,29 @@ local COMMANDS = {
 ----------------------------------------------------------------
 -- Shell 객체
 ----------------------------------------------------------------
+-- "처치 k/N"의 N: 타임라인 스폰 수(stageinfo.totals)가 기본이지만, split/split2 능력을
+-- 지닌 적(예: concat-nil)은 처치될 때마다 자식으로 갈라져 battle.kills를 스폰 수보다 더
+-- 늘릴 수 있다(부모+자식 모두 처치되면 kills가 스폰 1기당 최대 3배(split)·7배(split2)까지
+-- 누적 — src/battle.lua의 분열 처리 참고). 그대로 두면 "처치 k/N"에서 k가 N을 넘어서는
+-- 모순된 표기가 나올 수 있으므로(스테이지 104 concat-nil로 실측 재현, k=90 > N=61),
+-- N을 "모든 분열 자손까지 처치했을 때의 최대 가능 처치 수"로 보정한다. split이 없는
+-- 스테이지는 보정량이 0이라 기존 표기(스폰 수 그대로)와 완전히 동일하다.
+function Shell.expectedTotal(battle)
+    local total = stageinfo.totals(battle.timeline).total
+    for _, ev in ipairs(battle.timeline) do
+        local def = battle.d.enemies[ev.spawn]
+        local abilities = def and Enemy.parseAbilities(def.abilities)
+        if abilities then
+            if abilities.split2 then
+                total = total + ev.count * 6   -- 자식 2(깊이1) + 손자 4(깊이2)
+            elseif abilities.split then
+                total = total + ev.count * 2   -- 자식 2(깊이1, 더 분열하지 않음)
+            end
+        end
+    end
+    return total
+end
+
 function Shell.new(battle)
     local self = setmetatable({}, Shell)
     self.battle = battle
@@ -263,7 +287,7 @@ function Shell.new(battle)
     self.cronJobs = {}
     self.nextCronId = 1
     self.ps1WelcomeShown = false
-    self.totalEnemies = stageinfo.totals(battle.timeline).total
+    self.totalEnemies = Shell.expectedTotal(battle)
     return self
 end
 

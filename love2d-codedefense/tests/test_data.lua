@@ -84,4 +84,10 @@ return function(t)
         if e:find("로어 파일 없음") then loreErrCount = loreErrCount + 1 end
     end
     t.eq(loreErrCount, 1, "lore_file 빈 칼럼(스테이지 2·3)은 통과, 값 있는 스테이지 1만 오류")
+
+    -- Wave D Task 4: ui=shell 스테이지는 solution_file이 ".sh" 확장자로 실제 존재해야
+    -- 한다(기존 solution_file 검사는 빈 값이면 아예 건너뛰므로, 셸 스테이지는 별도 검사가
+    -- 필요하다 — fixtures/baddata의 스테이지4가 ui=shell·solution_file 빈 값으로 이를 재현).
+    t.ok(table.concat(baderrs, " / "):find("솔루션%(%.sh%) 파일 없음"),
+        "ui=shell인데 solution_file(.sh) 없음 감지")
 end
