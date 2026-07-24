@@ -15,3 +15,7 @@ id,mode,concept,ui,maze_file,budget,languages,countdown,wave_clock,hints_file,so
 14,normal,표적 분산,free,mazes/014.txt,250,lua,25,,,curriculum/014_solution.lua,,,,스레드,두 개씩 짝지어 오는 데드락이 서로를 감싸 피해를 나눈다. 표적을 갈라 동시에 끊어라.,,,lore/014.lua
 15,normal,안전 검사,free,mazes/015.txt,200,lua,25,,,curriculum/015_solution.lua,,,,스레드,하이젠버그가 가시와 은신을 오간다. 보이는 순간에만 안전하게 조준하라.,,,lore/015.lua
 16,normal,광역 방어,free,mazes/016.txt,900,lua,30,,,curriculum/016_solution.lua,,,,프로세스,포크 밤이 죽을 때마다 둘로 분열한다. 단일 표적 화력으로는 물량을 못 이긴다. 광역 화력으로 쓸어담아라.,1,curriculum/016_naive.lua,lore/016.lua
+17,normal,브레이크포인트,free,mazes/017.txt,400,lua,25,,curriculum/017_hints.lua,curriculum/017_solution.lua,,,,프로세스,레이스 컨디션이 대시로 사거리를 스쳐 지나간다. 디버거로 발을 묶고 프린터로 끝장내라.,,,lore/017.lua
+18,normal,정밀 타격,free,mazes/018.txt,300,lua,25,,,curriculum/018_solution.lua,,,,프로세스,레거시 코드는 프린터 공격에 절반만 다친다. 컴파일러로 스나이퍼를 열어 급소를 저격하라.,,,lore/018.lua
+19,normal,물량 방어,free,mazes/019.txt,450,lua,25,,,curriculum/019_solution.lua,,,,네트워크,DDoS 봇이 초당 몇 기씩 몰려온다. GC 수집기의 광역과 프린터의 연사를 길목에 겹쳐라.,,,lore/019.lua
+20,normal,복합 방어,free,mazes/020.txt,900,lua,30,,,curriculum/020_solution.lua,,,,네트워크,릭이 자라고 데드락이 뭉치고 포크 밤이 갈라진다 — 그리고 커널 패닉이 온다. 배운 전부를 동원하라.,1,curriculum/020_naive.lua,lore/020.lua
