@@ -127,6 +127,20 @@ local BUILTIN_DOCS = {
     },
 }
 
+-- 셸 진영 전용 문서 오버라이드: `man build`가 열어야 할 카드는 Lua 문법(`build(종류, 행, 열,
+-- "이름")`)이 아니라 셸 문법(`build <타워> <행> <열> <이름>`)이어야 한다 — BUILTIN_DOCS.build는
+-- Lua 진영 것이라 손대지 않고, 셸 진영에서만 이 테이블로 오버라이드한다(drawDictCard 참고).
+local SHELL_DOCS = {
+    build = {
+        sig = "build <타워> <행> <열> <이름>",
+        lines = {
+            "타워를 짓는 명령 — 비용은 즉시 차감된다",
+            "같은 이름 재호출은 무시된다(멱등) — \"이미 존재하는 타워입니다\" 안내",
+        },
+        example = "build printer 4 3 a",
+    },
+}
+
 local DICT_ROW_H = 16 -- fonts.small(14px) 기준 줄 높이
 
 -- 유저 함수 소스 발췌 휴리스틱: `function 이름` 줄부터 키워드 카운팅
@@ -162,8 +176,9 @@ end
 local function drawDictCard(self, x, y, w, name)
     local pad = 6
     love.graphics.setFont(fonts.small)
-    if BUILTIN_DOCS[name] then
-        local doc = BUILTIN_DOCS[name]
+    -- 셸 진영에서는 SHELL_DOCS 오버라이드(현재 build만)를 우선 찾고, 없으면 BUILTIN_DOCS로 폴백한다.
+    local doc = (self:isShellStage() and SHELL_DOCS[name]) or BUILTIN_DOCS[name]
+    if doc then
         local innerW = w - pad * 2
         -- 설명 줄이 카드 폭을 넘으면(demolish의 함정 설명처럼 길 수 있음) printf로 줄바꿈해
         -- 카드 밖으로 잘리지 않게 한다. 높이는 실제 래핑된 줄 수 합으로 계산한다(build처럼
@@ -381,6 +396,9 @@ function play:termExec()
     self.editor:setText("")
     self.termHistoryIdx = nil
     self.termSavedInput = nil
+    -- 빈/공백뿐 입력은 실셸 관례대로 이력 기록·`$ ` 에코 없이 그냥 무시한다(아무 명령도
+    -- 실행되지 않았으므로 shell:exec 자체를 호출하지 않고, 아래 tut:notify("exec")도 태우지 않는다).
+    if line:match("^%s*$") then return end
     local result = self.shell:exec(line, { speed = self.speed })
     if result.clear then
         self.termBuffer = {}
@@ -392,6 +410,10 @@ function play:termExec()
         self.dictOpen = (self.dictOpen == result.open) and nil or result.open
     end
     self.termScroll = 0 -- 새 출력은 항상 최신 줄이 보이도록 하단으로 복귀
+    -- 튜토리얼 이벤트 전진 훅: 명령 실행 성공/실패와 무관하게 "exec" 이벤트를 통지한다
+    -- (F5 저장 경로의 tut:notify("saved")/("built")와 동일 패턴 — src/tutorial.lua의
+    -- advance={on="event", event="exec"} 스텝이 이걸 소비해 진행한다).
+    if self.tut then self.tut:notify("exec") end
 end
 
 -- ↑: 이력을 최신→과거 순으로 훑는다. 이력 탐색을 시작하는 순간 그때까지 입력 중이던 줄을

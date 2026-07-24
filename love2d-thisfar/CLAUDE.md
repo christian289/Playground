@@ -300,6 +300,13 @@ love2d-thisfar/
     추가할 필요는 없다. `lines`의 각 줄은 카드 폭 기준으로 `printf` 줄바꿈되므로(높이도 실제
     래핑된 줄 수로 계산) `build`처럼 짧게 쓸 필요는 없다(`demolish` 항목의 재건설 함정 설명이
     2줄로 자동 줄바꿈되는 것이 예시).
+  - **셸 진영 오버라이드(`SHELL_DOCS`, 최종 리뷰 반영)**: 셸 스테이지(`ui=="shell"`)의 `man
+    build`/명령 사전 `build` 카드는 Lua 문법(`build(종류, 행, 열, "이름")`)이 아니라 셸 문법을
+    보여줘야 한다 — `states/play.lua`에 `BUILTIN_DOCS`와 별도로 `SHELL_DOCS` 테이블(현재
+    `build` 하나만 등록)을 두고, `drawDictCard`가 `self:isShellStage()`이면 `SHELL_DOCS[name]`을
+    먼저 찾은 뒤 없으면 `BUILTIN_DOCS[name]`으로 폴백한다. 이 오버라이드로 셸 진영에서는
+    `sig = "build <타워> <행> <열> <이름>"`, `example = "build printer 4 3 a"` 카드가 뜨고,
+    Lua 진영의 기존 `BUILTIN_DOCS.build`는 그대로다(양쪽 다 손대지 않고 분기만 추가).
   - **`demolish("이름")`**: 이름으로 타워를 철거하는 API(`src/battle.lua`의
     `Battle:demolishTower`, `src/api.lua`의 `env.demolish`). 환불은 `floor(cost * 0.5)`로
     `money`에 가산되고, 로그 `[철거] <타워명> → "<이름>" · +<환불> 환불`이 남는다(없는 이름이면
@@ -569,10 +576,10 @@ AI 에이전트가 대신 플레이"라는 게임의 최종 비전 중 두 번�
 
   | 명령 | 문법 | 출력(성공 시) |
   |---|---|---|
-  | `build` | `build <타워> <행> <열> <이름>` | `Battle:buildTower`의 기존 한글 로그 그대로(설치/멱등/오류 공유) |
+  | `build` | `build <타워> <행> <열> <이름>` | 신규 설치·오류는 `Battle:buildTower`의 기존 한글 로그 그대로 재사용한다. **멱등(이미 존재) 분기는 다르다** — `Battle:buildTower`가 이 경우 로그를 남기지 않으므로, 셸(`src/shell.lua`의 `cmdBuild`)이 직접 `이미 존재하는 타워입니다 — "<이름>"` 문구를 합성해 반환한다(최종 리뷰에서 정정 — 과거 서술 "기존 로그 공유"는 멱등 분기에는 해당하지 않았다) |
   | `rm` | `rm <이름>` | `Battle:demolishTower`(Wave A `demolish`)와 동일 코어 — 철거+환불 50% |
   | `ls` | `ls` / `ls enemies` | 무인자: `"<이름>" <타워명> (r,c) · 전략 <strat>` 목록(빈 목록 `배치된 타워가 없습니다`). `enemies`: `<적명> HP <n> (r,c)` 스폰 순 목록(은신 제외, 빈 목록 `필드에 적이 없습니다`) |
-  | `top` | `top` | `서버 HP <n> · 잔액 $<m> · 처치 <k>/<total>`(배속은 `exec`의 `opts.speed`가 있을 때만 ` · 배속 x<%g>` 추가 — battle은 배속을 모른다) |
+  | `top` | `top` | `서버 HP <n> · 잔액 $<m> · 처치 <k>/<total>`(배속은 `exec`의 `opts.speed`가 있을 때만 ` · 배속 x<%g>` 추가 — battle은 배속을 모른다). **배속 접미어는 비대칭이다**: 터미널에서 수동으로 친 `top`은 `states/play.lua`의 `termExec()`가 항상 `{ speed = self.speed }`를 넘기므로 배속이 x1이어도 ` · 배속 x1`부터 항상 붙지만, `cron`으로 예약되어 `shell:tick`이 대신 실행하는 `top`은 `runLine(job.line, {})`처럼 `opts`에 `speed`가 아예 없어 접미어가 붙지 않는다(의도된 동작 — battle 자체는 배속 개념이 없다) |
   | `target` | `target <타워> <전략>` | `Battle:setTargetStrategy` 성공 시 `전략 변경 — "<이름>" → <전략>`, 실패(없는 타워/전략)는 battle의 한글 오류 로그 재사용 |
   | `cron` | `cron <초> "<명령>"` / `cron -l` / `cron -r <id>` | 등록 `cron#<id> 등록 · <n>초마다 · "<명령>"`, 목록/삭제 각 1줄. 간격 1초 미만은 거부 |
   | `man` | `man <명령>` | 출력 없이 `{ open = "<명령>" }` 신호만 반환(뷰가 `BUILTIN_DOCS` 카드를 연다) |
@@ -647,15 +654,23 @@ AI 에이전트가 대신 플레이"라는 게임의 최종 비전 중 두 번�
   (104~106), concept 칼럼에 명령 이름을 그대로 적었다(`ls`/`rm`/`top`/`man·target`/`cron`/
   `종합 시험`).
 
-- **튜토리얼 배선 갭(알려진 한계)**: 셸 스테이지 101의 튜토리얼(`data/curriculum/tutorial_101.lua`,
-  5스텝)은 **모든 스텝이 `advance={on="enter"}`** 로만 진행된다 — `states/play.lua`의
-  `termExec()`(터미널 Enter 실행)가 `self.tut:notify(...)`를 전혀 호출하지 않기 때문에("build"/
-  "ls" 등 실제 명령 실행을 이벤트로 감지해 자동 전진하는) 이벤트 기반 진행이 배선돼 있지 않다.
-  즉 셸 튜토리얼은 (Lua 진영의 `built`/`saved` 이벤트 자동 전진과 달리) **Enter로 수동
-  진행**해야 한다 — 플레이어가 명령을 실행한 뒤에도 다음 설명으로 안 넘어가면 직접 Enter를
-  한 번 더 눌러야 한다는 뜻. 튜토리얼 자체는 끝까지 진행 가능(막히지 않음)하므로 기능 결함은
-  아니고, 다음 셸 스테이지 튜토리얼을 늘릴 때 이벤트 배선을 추가하려면 `termExec()`에
-  `tut:notify("exec")` 류의 훅을 넣는 지점이 필요하다는 것만 기록해 둔다.
+- **튜토리얼 이벤트 전진 배선(최종 리뷰에서 수정 완료)**: 과거에는 `states/play.lua`의
+  `termExec()`(터미널 Enter 실행)가 `self.tut:notify(...)`를 전혀 호출하지 않아 셸 스테이지
+  101의 튜토리얼(`data/curriculum/tutorial_101.lua`, 5스텝)이 전부 `advance={on="enter"}`로만
+  진행됐다 — 그 결과 명령 실행을 지시하는 스텝에서도 Enter가 늘 튜토리얼 전진에 먼저 소비되어
+  터미널까지 도달하지 못했다(`src/tutorial.lua`의 `Tutorial:keypressed`가 `adv.on=="enter"`인
+  스텝에서 Enter를 무조건 가로채 `true`를 반환하므로, 호출부 `states/play.lua:keypressed`가
+  `isShellStage()` 분기의 `termExec()`까지 내려가지 못했다 — 튜토리얼 중 명령 실행이 0회
+  가능했던 근본 원인). 지금은 `termExec()`가 명령 실행 성공/실패와 무관하게 실행 직후
+  `self.tut:notify("exec")`를 호출한다(F5 저장 경로의 `notify("saved")`/`notify("built")`와
+  동일 패턴). `tutorial_101.lua`도 명령 실행을 지시하는 스텝 ②(`ls`)·③(`build`)·④(`ls
+  enemies`)를 `advance={on="event", event="exec"}`로 바꿨다 — `Tutorial:keypressed`는
+  `adv.on=="event"`인 스텝에서 Enter를 소비하지 않고 그대로 `false`를 반환하므로, Enter가
+  `states/play.lua`의 `isShellStage()` 라우팅까지 흘러가 `termExec()`가 실제로 명령을
+  실행한다. 설명 전용 스텝 ①과 마무리 스텝 ⑤는 여전히 `advance={on="enter"}`(Enter 수동
+  전진)를 유지한다. ②~④는 터미널 타이핑이 필요하므로 `allow`에 `"textinput"` +
+  편집/이력 키(`up`/`down`/`left`/`right`/`home`/`end`/`backspace`/`delete`)를 열어 뒀다
+  (`"return"`은 `Tutorial:allows`가 항상 통과시키므로 목록에 넣지 않아도 된다).
 
 - **106 학습 포인트 정정(집중 사격=희생자 선정)**: 처음 계획 문서에는 "표적을 분산해야
   데드락 쌍을 각각 끊는다"는 취지가 있었으나, 실측 결과 `pair` 경감은 **짝 중 한쪽이 사망(또는
@@ -688,8 +703,9 @@ AI 에이전트가 대신 플레이"라는 게임의 최종 비전 중 두 번�
   클로저나 외부 변수에 저장해 나중에 참조하면, 그 시점의 타워가 아니라 **가장 최근에 `refresh`된
   타워의 값**을 보게 된다. 타워별 상태를 기억하려면 `self.name`을 키로 `cache`(아이템)나
   스크립트 최상위의 로컬 테이블에 저장해야 한다.
-- **셸 진영 튜토리얼(101)은 이벤트 기반 자동 진행이 없다**(Wave D) — 상세 사유는 § "Wave D —
-  셸 진영"의 "튜토리얼 배선 갭" 항목 참고. Enter로 수동 진행해야 하며 기능 결함은 아니다.
+- (해소됨, 최종 리뷰) 과거 "셸 진영 튜토리얼(101)은 이벤트 기반 자동 진행이 없다"는 한계가
+  있었으나 `termExec()`의 `tut:notify("exec")` 배선으로 해소됐다 — 상세는 § "Wave D — 셸 진영"의
+  "튜토리얼 이벤트 전진 배선" 항목 참고.
 
 ## 다음 단계 (0.2+)
 
