@@ -4,11 +4,18 @@ local Projectile = Object:extend()
 
 local SPLASH_RADIUS = 60   -- splash: 명중점 기준 이 반경(px) 안의 다른 적까지 함께 피해
 
-function Projectile:new(x, y, target, damage, speed, size, splash)
+-- towerId: 발사 타워의 def.id(splash 피해자별 resist:<타워id> 판정에 필요 — 직격은
+-- battle.lua:resolveAttack에서 주 타겟 기준으로 이미 판정하므로 towerId가 없어도 무방하다).
+-- resistMult/pairMult: battle.lua의 RESIST_MULT/PAIR_MULT와 동일한 값을 생성 시 주입받아
+-- splash 피해자 경감도 직격과 같은 상수를 쓴다(순환 require를 피하기 위해 생성자 인자로 전달).
+function Projectile:new(x, y, target, damage, speed, size, splash, towerId, resistMult, pairMult)
     self.x, self.y = x, y
     self.target = target       -- Enemy 참조 (죽으면 소멸)
     self.damage, self.speed, self.size = damage, speed, size
     self.splash = splash or false  -- splash: gc-collector 등 ability="splash" 타워가 true로 생성
+    self.towerId = towerId
+    self.resistMult = resistMult or 0.5
+    self.pairMult = pairMult or 0.4
     self.done = false
     -- 뷰 전용 관측 필드(시뮬레이션 결과에는 전혀 영향 없음) — splash 폭발이 실제로 일어난
     -- 순간(주 타겟이 은신 중이 아니어서 데미지가 적용된 순간) true + 명중 좌표를 기록해,
@@ -45,7 +52,17 @@ function Projectile:update(dt, clock, enemies)
                         local ed = math.sqrt(ex * ex + ey * ey)
                         if ed <= SPLASH_RADIUS then
                             local falloff = 1 - 0.5 * (ed / SPLASH_RADIUS)
-                            e.hp = e.hp - math.max(1, math.floor(self.damage * falloff))
+                            local dmg = self.damage * falloff
+                            -- 최종 리뷰 반영: 광역 피해도 피해자 기준으로 resist→pair 순서로
+                            -- 각각 floor·min1 적용한다(직격의 resolveAttack과 동일 순서/상수 —
+                            -- 우회 시 GC+컴파일러 조합이 표적 분산 학습 포인트를 무력화하므로).
+                            if e.abilities.resist == self.towerId then
+                                dmg = math.max(1, math.floor(dmg * self.resistMult))
+                            end
+                            if e.abilities.pair and e.pairAlive then
+                                dmg = math.max(1, math.floor(dmg * self.pairMult))
+                            end
+                            e.hp = e.hp - math.max(1, math.floor(dmg))
                         end
                     end
                 end

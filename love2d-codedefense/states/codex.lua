@@ -17,6 +17,12 @@ local STAR_FULL, STAR_EMPTY = "★", "☆"
 local ABILITY_KO = {
     crash_tower = "도달 시 최근접 타워를 크래시",
     split = "죽으면 둘로 분열",
+    grow = "성장(시간당 체력 증가)",
+    pair = "동반 경감(쌍 생존 시)",
+    phase = "은신 주기(관측 불가)",
+    split2 = "이중 분열",
+    dash = "돌진(주기적 가속)",
+    ["resist:printer"] = "프린터 저항",
 }
 
 -- 히든 타워(§4) 도감 수수께끼 문구 — 스펙 그대로

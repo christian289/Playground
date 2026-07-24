@@ -11,6 +11,8 @@ local BUDGET = 3000         -- 틱당 명령 예산
 local TOTAL = 300           -- 일반 모드 전투 총 시간(초, clock 기준)
 local WATCHDOG = 3          -- 크래시 후 재시작(초)
 local CHARGE_MAX = 3
+local RESIST_MULT = 0.5     -- resist:<타워id> 감쇄 배율(직격·splash 피해자 공통)
+local PAIR_MULT = 0.4       -- pair 동반 경감 배율(직격·splash 피해자 공통)
 
 local Battle = Object:extend()
 Battle.TOTAL = TOTAL
@@ -156,8 +158,10 @@ function Battle:spawnFromTimeline()
             if e.abilities.pair then
                 local pending = self.pairPending[i]
                 if pending then
-                    e.pairId, e.pairAlive = pending.id, true
-                    pending.pairId, pending.pairAlive = e.id, true
+                    if not (pending.dead or pending.reached) then -- 짝이 스폰 전 이미 제거됐으면 죽은 참조로 연결하지 않는다
+                        e.pairId, e.pairAlive = pending.id, true
+                        pending.pairId, pending.pairAlive = e.id, true
+                    end
                     self.pairPending[i] = nil
                 else
                     self.pairPending[i] = e
@@ -234,15 +238,20 @@ function Battle:resolveAttack(tw)
     -- resist:<타워id> 능력: 그 타워 종류의 데미지만 절반으로 감쇄(내림, 최소 1). 무관한
     -- 타워 종류의 데미지는 기존과 동일(반올림 없이) 그대로 적용된다.
     if target.abilities.resist == tw.def.id then
-        dmg = math.max(1, math.floor(dmg * 0.5))
+        dmg = math.max(1, math.floor(dmg * RESIST_MULT))
     end
     -- pair 능력: 짝(pairId)이 아직 생존해 있는 동안(pairAlive)은 받는 데미지가 ×0.4(내림,
     -- 최소 1) — 신규 능력 경로라 floor·min1을 적용한다(기존 파이프라인은 그대로 둔다).
+    -- 복합 시 resist 다음 pair 순서로 각각 floor 적용(순서가 결과를 바꿈).
     if target.abilities.pair and target.pairAlive then
-        dmg = math.max(1, math.floor(dmg * 0.4))
+        dmg = math.max(1, math.floor(dmg * PAIR_MULT))
     end
+    -- splash 피해자별 경감(최종 리뷰 반영): splash 투사체는 명중 시점에 각 피해자마다 이
+    -- 타워 def.id·같은 RESIST_MULT/PAIR_MULT로 resist→pair를 독립 재판정해야 하므로,
+    -- 생성 인자에 tw.def.id와 두 상수를 함께 넘긴다(Projectile:update의 splash 루프 참고).
     self.projectiles[#self.projectiles + 1] =
-        Projectile(tw.x, tw.y, target, dmg, tw.def.bullet_speed, 4 * mult, tw.def.ability == "splash")
+        Projectile(tw.x, tw.y, target, dmg, tw.def.bullet_speed, 4 * mult, tw.def.ability == "splash",
+            tw.def.id, RESIST_MULT, PAIR_MULT)
     tw.charge = 0
     tw.cd = tw:effectiveCooldown()
 end
@@ -339,6 +348,14 @@ function Battle:update(dt)
             e.counted = true
             self.serverHP = self.serverHP - 1
             self.reachedByType[e.def.id] = (self.reachedByType[e.def.id] or 0) + 1
+            -- pair 능력: 짝이 서버라인 도달로 제거될 때도 남은 쪽의 pairAlive를 즉시 false로
+            -- 내려 데미지 경감을 해제한다(원 설계 "쌍이 모두 살아있으면 경감" — 사망뿐 아니라
+            -- 도달로 필드에서 사라지는 경우도 동일하게 취급).
+            if e.abilities.pair and e.pairId then
+                for _, other in ipairs(self.enemies) do
+                    if other.id == e.pairId then other.pairAlive = false break end
+                end
+            end
             -- crash_tower 능력: 도달 시 최근접 타워 크래시 (토큰 완전 일치)
             if e.abilities.crash_tower then
                 local best, bd

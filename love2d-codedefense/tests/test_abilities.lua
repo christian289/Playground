@@ -234,6 +234,75 @@ return function(t)
     t.eq(dmgAfter, rawDmg, "pair: 상대 사망 후 데미지 경감 해제(전체 데미지로 복귀)")
 
     ------------------------------------------------------------------
+    -- ⑥-2 pair 해제를 도달(reached)에도 적용(최종 리뷰 반영): 짝이 서버라인 도달로
+    --    제거될 때도 남은 쪽의 pairAlive가 즉시 해제된다(원 설계 "쌍이 모두 살아있으면
+    --    경감" — 사망뿐 아니라 도달도 "필드에서 사라짐"이므로 동일하게 취급해야 한다).
+    ------------------------------------------------------------------
+    local bpr = Battle(d, 1, {})
+    bpr:start()
+    bpr.timeline = { { at = 0, spawn = "deadlock", count = 2, interval = 0, col = 4 } }
+    bpr.spawned = {}
+    bpr.clock = 0
+    bpr:spawnFromTimeline()
+    local r1, r2 = bpr.enemies[1], bpr.enemies[2]
+    t.eq(r1.pairId, r2.id, "pair 도달 해제 게이트: r1↔r2 실제로 쌍 연결됨")
+    t.eq(r1.pairAlive, true, "pair 도달 해제 게이트: 스폰 직후 r1.pairAlive=true(전제 조건 확인)")
+
+    t.ok(bpr:buildTower("printer", 3, 3, "ppr"), "pair 도달 해제 테스트용 프린터 건설")
+    local twPairR = bpr.towersByName["ppr"]
+    r1.x, r1.y = twPairR.x, twPairR.y
+    r2.x, r2.y = twPairR.x, twPairR.y
+    twPairR.pendingTarget = r1.id
+    bpr:resolveAttack(twPairR)
+    local dmgBeforeReach = bpr.projectiles[#bpr.projectiles].damage
+    local rawDmgR = twPairR.def.damage
+    t.eq(dmgBeforeReach, math.max(1, math.floor(rawDmgR * 0.4)),
+        "pair 도달 해제 게이트: 도달 전에는 여전히 ×0.4 경감 중(비교 기준값)")
+
+    -- r2를 도달 처리(사망이 아니라 reached)로 제거 — 실제 정리 루프 경로
+    r2.reached = true
+    bpr:update(1 / 60)
+    t.ok(r2.counted, "pair 도달 해제: r2가 실제 도달 처리 경로로 counted=true")
+    t.eq(r1.pairAlive, false, "pair 도달 해제: 짝이 도달로 제거되면 남은 쪽 pairAlive 즉시 false")
+
+    twPairR.cd = 0
+    twPairR.pendingTarget = r1.id
+    bpr:resolveAttack(twPairR)
+    local dmgAfterReach = bpr.projectiles[#bpr.projectiles].damage
+    t.eq(dmgAfterReach, rawDmgR, "pair: 짝 도달 제거 후 받는 데미지가 즉시 전액으로 복귀")
+
+    ------------------------------------------------------------------
+    -- ⑥-3 pairPending 죽은 참조 방지: 짝이 스폰되기 전에 먼저 스폰된 쪽이 이미
+    --    제거(사망/도달)됐다면, 나중에 스폰되는 쪽은 죽은 참조와 연결되지 않고
+    --    쌍 없이(경감 없이) 스폰돼야 한다.
+    ------------------------------------------------------------------
+    local bpg = Battle(d, 1, {})
+    bpg:start()
+    bpg.timeline = { { at = 0, spawn = "deadlock", count = 1, interval = 0, col = 4 } }
+    bpg.spawned = {}
+    bpg.clock = 0
+    bpg:spawnFromTimeline()
+    t.eq(#bpg.enemies, 1, "pairPending 가드 게이트: 첫 번째 개체만 스폰(짝 대기 중)")
+    local first = bpg.enemies[1]
+    t.eq(bpg.pairPending[1], first, "pairPending 가드 게이트: 짝을 기다리는 중(pairPending에 등록됨)")
+
+    -- 짝이 스폰되기 전에 first가 도달로 제거된다(사망도 동일 경로).
+    first.reached = true
+    bpg:update(1 / 60)
+    t.ok(first.counted, "pairPending 가드: first가 짝 스폰 전 실제로 도달 제거됨")
+    t.eq(#bpg.enemies, 0, "pairPending 가드 게이트: first는 정리 루프에서 실제로 제거됨")
+
+    -- 두 번째 개체를 같은 이벤트(i=1)로 스폰한다 — pairPending[1]은 여전히 죽은 first를
+    -- 참조하고 있었지만, 가드가 이를 걸러 second는 쌍 없이 스폰돼야 한다.
+    bpg.timeline[1].count = 2
+    bpg:spawnFromTimeline()
+    t.eq(#bpg.enemies, 1, "pairPending 가드: second가 실제로 스폰됨(먼저 스폰된 first는 이미 제거됨)")
+    local second = bpg.enemies[1]
+    t.eq(second.pairId, nil, "pairPending 가드: 죽은 first와 연결되지 않음(pairId nil)")
+    t.eq(second.pairAlive, nil, "pairPending 가드: 경감 없이 스폰(pairAlive nil)")
+    t.eq(bpg.pairPending[1], nil, "pairPending 가드: 대기 슬롯이 정리됨(죽은 참조가 남지 않음)")
+
+    ------------------------------------------------------------------
     -- ⑦ phase: 스폰 기준 0~3s 가시 / 3~5s 은신(재출현 5s, 순수 산술·상태 저장 없음),
     --    은신 중 world.enemies()/nearest()/oldest() 제외 + 투사체 명중 무효,
     --    서버라인 도달 판정은 은신과 무관
@@ -481,6 +550,104 @@ end
     t.eq(far.hp, 100, "splash: 61px 밖은 데미지 0(반경 제외)")
     t.eq(hiddenV.hp, 100, "splash: 은신 중인 피해자는 면제(0)")
     t.eq(decoy.hp, 100, "splash: printer 대조군 명중과 무관 — decoy는 gc 폭발 범위 밖(별개 타워)")
+
+    ------------------------------------------------------------------
+    -- ⑩-2 splash 피해자별 경감(최종 리뷰 반영): 광역 피해도 피해자 기준으로 resist·pair를
+    --    직격과 동일 순서(resist→pair, 각각 floor·min1)로 적용한다 — 우회를 허용하면
+    --    GC 수집기+컴파일러(230)가 스테이지14 예산(250) 안에 들어와 "표적 분산" 학습
+    --    포인트가 무력화된다. 두 케이스 모두 전제 조건(게이트)이 실제로 참인지부터 값으로
+    --    확인한다(이 웨이브에서 헛단언이 3회 적발된 전례가 있어 값 추적이 필수).
+    ------------------------------------------------------------------
+    local bfin = Battle(d, 6, {})
+    bfin:start()
+    t.ok(bfin:buildTower("compiler", 2, 2, "c2"), "splash 경감: 컴파일러 건설")
+    t.ok(bfin:buildTower("gc-collector", 4, 2, "gc2"), "splash 경감: GC 수집기 건설")
+    local twGC2 = bfin.towersByName["gc2"]
+
+    -- (a) pair: 스플래시 피해자가 pair 생존 쌍이면 낙폭에도 ×0.4가 적용돼야 한다. 직격
+    --     대상은 pair와 무관한 bug로 두어 splash 경로만 순수하게 관측한다.
+    local pairMain = Enemy(d.enemies["bug"], twGC2.r, twGC2.c)
+    pairMain.id, pairMain.hp, pairMain.spawnedAt = 8101, 100, bfin.clock
+    pairMain.x, pairMain.y = twGC2.x, twGC2.y
+
+    local deadlockDef = d.enemies["deadlock"]  -- abilities="pair"
+    local pairV1 = Enemy(deadlockDef, twGC2.r, twGC2.c)
+    pairV1.id, pairV1.hp, pairV1.spawnedAt = 8102, 100, bfin.clock
+    pairV1.x, pairV1.y = twGC2.x + 30, twGC2.y     -- 명중점에서 30px(splash 반경 안)
+    local pairV2 = Enemy(deadlockDef, twGC2.r, twGC2.c)
+    pairV2.id, pairV2.hp, pairV2.spawnedAt = 8103, 100, bfin.clock
+    pairV2.x, pairV2.y = twGC2.x + 5000, twGC2.y   -- 반경 훨씬 밖(짝만 생존, 직접 피격 안 함)
+    pairV1.pairId, pairV1.pairAlive = pairV2.id, true
+    pairV2.pairId, pairV2.pairAlive = pairV1.id, true
+    t.ok(pairV1.abilities.pair, "splash pair 경감 게이트: pairV1은 실제 pair 능력 보유")
+    t.eq(pairV1.pairAlive, true, "splash pair 경감 게이트: pairV1의 짝(pairV2)이 실제로 생존 중")
+
+    bfin.enemies = { pairMain, pairV1, pairV2 }
+    twGC2.pendingTarget = pairMain.id
+    bfin:resolveAttack(twGC2)
+    local projPair = bfin.projectiles[#bfin.projectiles]
+    projPair:update(1000, bfin.clock, bfin.enemies)
+
+    local rawFalloff = projPair.damage * (1 - 0.5 * 30 / 60)          -- 6×0.75=4.5(주 타겟 damage 기준)
+    local unmitigated = math.max(1, math.floor(rawFalloff))          -- floor(4.5)=4
+    local expectedPairDmg = math.max(1, math.floor(rawFalloff * 0.4))  -- floor(4.5×0.4)=floor(1.8)=1
+    t.ok(expectedPairDmg < unmitigated,
+        "splash pair 경감 게이트: 미적용 값과 실제 달라야 진짜 게이트(헛단언 방지)")
+    t.eq(pairV1.hp, 100 - expectedPairDmg,
+        "splash: 피해자가 pair 생존 쌍이면 낙폭에도 ×0.4(floor·min1) 적용")
+
+    -- (b) resist: 이 splash를 쏜 타워가 gc-collector이므로 legacy(resist:printer)의 저항은
+    --     매치하지 않아야 한다(게이트 불일치 — printer가 아닌 타워의 splash는 저항 무의미).
+    twGC2.cd, twGC2.charge = 0, 0
+    local resistMain = Enemy(d.enemies["bug"], twGC2.r, twGC2.c)
+    resistMain.id, resistMain.hp, resistMain.spawnedAt = 8111, 100, bfin.clock
+    resistMain.x, resistMain.y = twGC2.x, twGC2.y
+    local legacyV = Enemy(d.enemies["legacy"], twGC2.r, twGC2.c)  -- abilities="resist:printer"
+    legacyV.id, legacyV.hp, legacyV.spawnedAt = 8112, 300, bfin.clock
+    legacyV.x, legacyV.y = twGC2.x + 30, twGC2.y
+    t.eq(legacyV.abilities.resist, "printer",
+        "splash resist 게이트: legacy의 resist 대상은 printer(gc-collector와 실제로 불일치)")
+
+    bfin.enemies = { resistMain, legacyV }
+    twGC2.pendingTarget = resistMain.id
+    bfin:resolveAttack(twGC2)
+    local projResist = bfin.projectiles[#bfin.projectiles]
+    projResist:update(1000, bfin.clock, bfin.enemies)
+    t.eq(legacyV.hp, 300 - unmitigated,
+        "splash: resist 대상이 printer가 아닌 gc-collector면 저항 미적용(낙폭 그대로)")
+
+    ------------------------------------------------------------------
+    -- ⑩-3 splash 60px 경계: falloff = 1 - 0.5×(60/60) = 0.5. ed<=60이 포함 판정이므로
+    --    정확히 60px 지점도 낙폭 피해를 받는다(charge로 주 타겟 데미지를 비정수로 만들어
+    --    floor가 실제로 개입했는지 구별한다).
+    ------------------------------------------------------------------
+    local bbound = Battle(d, 6, {})
+    bbound:start()
+    t.ok(bbound:buildTower("compiler", 2, 2, "cb"), "splash 경계: 컴파일러 건설")
+    t.ok(bbound:buildTower("gc-collector", 4, 2, "gcb"), "splash 경계: GC 수집기 건설")
+    local twGCb = bbound.towersByName["gcb"]
+    twGCb.charge = 0.1   -- mult = 1 + 0.1×0.5 = 1.05 → 주 타겟 데미지가 비정수가 된다
+
+    local boundMain = Enemy(d.enemies["bug"], twGCb.r, twGCb.c)
+    boundMain.id, boundMain.hp, boundMain.spawnedAt = 8121, 100, bbound.clock
+    boundMain.x, boundMain.y = twGCb.x, twGCb.y
+    local boundEdge = Enemy(d.enemies["bug"], twGCb.r, twGCb.c)
+    boundEdge.id, boundEdge.hp, boundEdge.spawnedAt = 8122, 100, bbound.clock
+    boundEdge.x, boundEdge.y = twGCb.x + 60, twGCb.y   -- 명중점에서 정확히 60px(경계, 포함)
+
+    bbound.enemies = { boundMain, boundEdge }
+    twGCb.pendingTarget = boundMain.id
+    bbound:resolveAttack(twGCb)
+    local projBound = bbound.projectiles[#bbound.projectiles]
+    local mainDmg = projBound.damage
+    t.ok(mainDmg ~= math.floor(mainDmg),
+        "splash 경계 게이트: 주 타겟 데미지가 비정수(charge 배율 반영, 6×1.05=6.3)")
+    projBound:update(1000, bbound.clock, bbound.enemies)
+
+    local expectedEdge = math.max(1, math.floor(mainDmg * 0.5))
+    t.eq(expectedEdge, 3, "splash 경계 산술 자가검증: floor(6.3×0.5)=floor(3.15)=3(비정수 결과로 floor 구별)")
+    t.eq(boundEdge.hp, 100 - expectedEdge,
+        "splash: 정확히 60px 경계도 포함(ed<=60)되어 낙폭 피해 적용")
 
     ------------------------------------------------------------------
     -- ⑪ slowfield(디버거): 사거리 내 실효 speed ×0.6, 2기 겹쳐도 ×0.6 한 번만,
