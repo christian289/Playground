@@ -33,6 +33,7 @@ function Battle:new(d, stageId, opts)
     self.tickAcc = 0
     self.serverHP = 10
     self.money = self.stage.budget
+    self.kills = 0             -- 처치 수 누적(Wave D Task 2, 셸 top 명령용 — 도달/생존과 별개)
     self.items = opts.items or {}
     self.autoAttack = opts.autoAttack == true  -- true면 스크립트 없이 tw.strategy대로 자동 공격
     self.status = "prep"       -- start() 전 상태 (테스트 호환)
@@ -381,6 +382,7 @@ function Battle:update(dt)
         local e = self.enemies[i]
         if e.hp <= 0 and not e.dead then
             e.dead = true
+            self.kills = self.kills + 1
             self.money = self.money + (e.def.reward or 0)
             -- pair 능력: 짝이 죽으면 남은 쪽의 pairAlive를 즉시 false로 내려 데미지 경감을 해제한다.
             if e.abilities.pair and e.pairId then
