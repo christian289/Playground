@@ -14,7 +14,8 @@
 - **결정론**: 모든 주기 행동은 스폰 시각 기준. 상수(코어에 정의): `GROW_EVERY=1.0`s·`GROW_AMOUNT=2`·상한 기본 maxHP×5 / `PHASE_VISIBLE=3.0`s·`PHASE_HIDDEN=2.0`s / `DASH_PERIOD=1.5`s·`DASH_LEN=0.3`s·`DASH_MULT=3` / pair 경감 시 데미지 ×`0.4` / resist:printer 데미지 ×`0.5` / splash 반경 `60`px·가장자리 감쇠 `50%` 선형 / slowfield 이동 ×`0.6`·중첩 불가.
 - **신규 능력 경로(resist·splash)의** 데미지 계산 결과는 `math.max(1, math.floor(x))` (0데미지 금지). 기존 데미지 파이프라인(charge 배율)은 비정수 그대로 두며 전역 floor 금지 — "기존 스테이지 시뮬 결과 불변"이 우선한다(Task 2 리뷰 판정).
 - abilities CSV 표기: `grow`, `pair`, `phase`, `split2`, `dash`, `resist:printer` (`;` 조합, 콜론=대상 지정). 미지의 키워드는 조용히 무시 — **알려진 예외**: 기존 `battle.lua`의 `(abilities):find("split")` 부분 문자열 검사가 `split2`를 오탐한다(Task 1 검증에서 발견). Task 2가 `;` 분리 **토큰 완전 일치** 파서로 교체해 해소하며, 그 전까지 fork-bomb/kernel-panic은 어느 스테이지 타임라인에도 없어 시뮬 영향 0.
-- 신규 스테이지 규칙(기존 CLAUDE.md 그대로): 12×16 미로·건설칸 ≥6, `solution_file` 필수(회귀가 클리어 증명), naive_file은 반드시 패배, 마지막 스폰 종료 ≥240s·이벤트 공백 ≤40s, `countdown` 15~30, `theme`/`problem`/`lore_file` 채움.
+- 신규 스테이지 규칙(기존 CLAUDE.md 그대로): 12×16 미로·건설칸 ≥6, `solution_file` 필수(회귀가 클리어 증명), naive_file은 반드시 패배, 마지막 스폰 종료 ≥240s·이벤트 공백 ≤40s(경계값 금지 — 여유 ≥1s), `countdown` 15~30, `theme`/`problem`/`lore_file` 채움.
+- **미로 설계 규칙(Task 5 리뷰 반영)**: 모든 건설칸(B)은 스폰이 실제 지나는 경로를 사거리로 교전할 수 있어야 한다 — 영구 무기능 장식 슬롯 금지(world.oldest()가 사거리 무시 전역 판정이므로 유휴 레인은 배치 함정이 된다). 같은 테마 3장은 서로 다른 미로여야 한다(기존 관례). 다분기 형태(평행 차선·허브-스포크)는 스폰 경로가 실제로 지나는 가지에만 건설칸을 둔다.
 - 스탯 수치는 전부 CSV로(코어 하드코딩 금지). 절대값은 기존 bug/concat-nil 행을 기준으로 한 상대 규칙(각 태스크에 명시)으로 정하고, 회귀 통과를 완료 조건으로 조정 가능(조정 시 보고서에 기록).
 - 기존 테스트 316개 전체 통과 유지. 커밋마다 스위트 실행.
 - 폰트 글리프 주의(NanumGothic): 새 특수문자는 렌더 확인. 스크린샷은 captureScreenshot(callback)+io로 스크래치패드 절대경로 저장 후 Read 판독.
@@ -138,7 +139,7 @@
 ### Task 7: 통합 검증 + 문서
 
 **Files:**
-- Modify: `love2d-codedefense/README.md`, `love2d-codedefense/CLAUDE.md`
+- Modify: `love2d-codedefense/README.md`, `love2d-codedefense/CLAUDE.md`, `love2d-codedefense/states/play.lua` (문제 카드 라벨)
 - Test: 전체 스위트 + 오토플레이 스크린샷
 
 **Interfaces:**
@@ -147,6 +148,7 @@
 
 - [ ] **Step 1: 통합 스크린샷 검증** — 스테이지 13(oldest 사격)·16(스플래시 링+분열)·17(감속 점)·19(30기 러시 진행 바 눈금)·20(커널 패닉) 오토플레이 각 1장 + 도감 프로필 탭(20스테이지 목록 스크롤) 1장, Read 판독.
 - [ ] **Step 2: CLAUDE.md 갱신** — 능력 키워드 표(grow/pair/phase/split2/dash/resist:·splash/slowfield, 상수 포함), 신규 타워 2종·limit, 스테이지 13~20 테마·퍼즐, world.oldest/age/speed API, 테스트 수 갱신. README 갱신 — 신규 적·타워 소개(스포일러 규칙 준수: 커널 패닉 상세는 간략히), 새 API 한 줄.
+- [ ] **Step 2.5: 문제 카드 라벨 정정(Task 5 리뷰 반영)** — states/play.lua 2곳(~673행, ~862행)의 하드코딩 라벨 `"메모리 영역: "`을 `"영역: "`으로 — 스테이지 13~20의 테마(스레드/프로세스/네트워크)는 메모리 영역이 아니므로 범주 오류 해소. 기존 1~12(코드/데이터/스택/힙)도 "영역:"으로 자연스럽게 읽힘.
 - [ ] **Step 3: 전체 스위트 + 부팅 스모크 후 커밋** — `codedefense: Wave B 문서 갱신`
 
 ### 마무리
