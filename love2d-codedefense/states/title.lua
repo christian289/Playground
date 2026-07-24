@@ -24,7 +24,7 @@ end
 -- cursor(선택된 메뉴 인덱스)에 해당하는 동작을 실행한다(Enter/좌클릭 공용).
 function title:choose()
     if self.cursor == 1 then
-        Gamestate.switch(require("states.stageselect"), self.d, self.p)
+        Gamestate.switch(require("states.faction"), self.d, self.p)
     elseif self.cursor == 2 then
         Gamestate.switch(require("states.intro"), self.d, self.p, "title")
     elseif self.cursor == 3 then

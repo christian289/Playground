@@ -2,6 +2,7 @@ local Gamestate = require("lib.hump.gamestate")
 local fonts = require("src.fonts")
 local art = require("src.art")
 local stars = require("src.stars")
+local factions = require("src.factions")
 
 local sel = {}
 
@@ -9,23 +10,20 @@ local sel = {}
 -- (픽셀 검증 포함, .superpowers/sdd/wa-task-2-report.md 참고) — "*"/"-" 대체 불필요.
 local STAR_FULL, STAR_EMPTY = "★", "☆"
 
-function sel:enter(_, d, p)
+local FACTION_LABEL = { lua = "Lua 진영", shell = "Shell 진영" }
+
+-- faction(진영 선택 상태가 넘긴 "lua"|"shell", 없으면 "lua" 기본) 기준으로 목록을 구성한다.
+-- 언락 판정은 src/factions.lua로 위임(진영 내 목록 이전 항목 클리어 기준 — 전역 id-1 참조 아님).
+function sel:enter(_, d, p, faction)
     self.d, self.p = d, p
-    self.ids = {}
-    for id, s in pairs(d.stages) do
-        if s.mode == "normal" then self.ids[#self.ids + 1] = id end
-    end
-    table.sort(self.ids)
+    self.faction = faction or "lua"
+    self.ids = factions.idsFor(d.stages, self.faction)
     self.cursor = 1
     self.scroll = 0 -- 목록 스크롤 오프셋(0-indexed, 화면 첫 줄에 보이는 항목 = ids[scroll+1])
 end
 
 function sel:unlocked(id)
-    if id == self.ids[1] then return true end
-    for i, sid in ipairs(self.ids) do
-        if sid == id then return self.p.cleared[self.ids[i - 1]] end
-    end
-    return false
+    return factions.unlocked(self.ids, self.p.cleared, id)
 end
 
 function sel:draw()
@@ -57,7 +55,7 @@ function sel:draw()
 
     love.graphics.setFont(fonts.big)
     love.graphics.setColor(P.cyan[1], P.cyan[2], P.cyan[3])
-    love.graphics.printf("스테이지 선택", 0, 40, W, "center")
+    love.graphics.printf(("스테이지 선택 — %s"):format(FACTION_LABEL[self.faction] or self.faction), 0, 40, W, "center")
     love.graphics.setFont(fonts.ui)
     for j = 1, visibleRows do
         local i = self.scroll + j
@@ -112,7 +110,7 @@ function sel:draw()
 
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.6, 0.65, 0.7)
-    love.graphics.printf("↑↓ 이동 · Enter 선택 · ESC 타이틀", 0, 600, W, "center")
+    love.graphics.printf("↑↓ 이동 · Enter 선택 · ESC 진영 선택", 0, 600, W, "center")
     love.graphics.setColor(1, 1, 1)
 end
 
@@ -125,7 +123,7 @@ function sel:keypressed(key)
             Gamestate.switch(require("states.play"), self.d, id, self.p)
         end
     elseif key == "escape" then
-        Gamestate.switch(require("states.title"), self.d, self.p)
+        Gamestate.switch(require("states.faction"), self.d, self.p)
     end
 end
 

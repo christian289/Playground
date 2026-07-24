@@ -3,8 +3,17 @@ local fonts = require("src.fonts")
 local progress = require("src.progress")
 local art = require("src.art")
 local stars = require("src.stars")
+local factions = require("src.factions")
 
 local result = {}
+
+-- 스테이지 선택으로 돌아갈 때 이번에 플레이한 스테이지의 진영을 그대로 넘긴다 — faction을 별도
+-- 파라미터로 이어붙이지 않고 ctx(stageId+d)에서 그때그때 파생하므로 play.lua/Battle 시그니처는
+-- 손대지 않는다(진영 정보가 stages.csv의 languages 칼럼에 이미 있으므로 파생 가능).
+local function backToStageSelect(ctx)
+    local stage = ctx.d.stages[ctx.stageId]
+    Gamestate.switch(require("states.stageselect"), ctx.d, ctx.p, factions.languageOf(stage))
+end
 
 local STAR_FULL, STAR_EMPTY = "★", "☆" -- stageselect.lua와 동일 글리프 — 스크린샷 확인 결과 정상 렌더
 
@@ -225,7 +234,7 @@ function result:keypressed(key)
             self.pmCard = false
             return
         end
-        Gamestate.switch(require("states.stageselect"), self.ctx.d, self.ctx.p)
+        backToStageSelect(self.ctx)
     end
 end
 
@@ -236,7 +245,7 @@ function result:mousepressed(_, _, button)
         self.pmCard = false
         return
     end
-    Gamestate.switch(require("states.stageselect"), self.ctx.d, self.ctx.p)
+    backToStageSelect(self.ctx)
 end
 
 return result

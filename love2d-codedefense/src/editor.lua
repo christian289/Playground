@@ -146,6 +146,13 @@ function Editor.tokenAt(lineText, charIdx)
     return nil
 end
 
+-- 현재 줄에서 커서 이전 텍스트(UTF-8 안전)를 반환한다 — 뷰가 커서의 픽셀 x 위치를 폭 측정으로
+-- 계산할 때 재사용한다(예: states/play.lua의 셸 터미널 입력 줄 커서 렌더).
+function Editor:textBeforeCursor()
+    local cs = chars(self.lines[self.cr])
+    return joinRange(cs, 1, self.cc - 1)
+end
+
 function Editor:setQuickbar(slots) self.quickbar = slots end
 
 function Editor:quickbarPressed(key)

@@ -7,6 +7,8 @@ local progress = require("src.progress")
 local art = require("src.art")
 local particles = require("src.particles")
 local stageinfo = require("src.stageinfo")
+local Shell = require("src.shell")
+local factions = require("src.factions")
 
 local GRID_X, GRID_Y = 8, 48
 local FIELD_W = grid.COLS * grid.CELL -- 384
@@ -60,6 +62,68 @@ local BUILTIN_DOCS = {
             "메모리 릭처럼 시간이 지날수록 강해지는 적은 오래된 것부터 끊어야 싸다.",
         },
         example = "local e = world.oldest()",
+    },
+    -- 셸 진영 명령 카드(Wave D Task 3) — man <명령>이 이 카드를 연다(open 신호 → dictOpen 토글).
+    rm = {
+        sig = 'rm <이름>',
+        lines = {
+            "이름으로 타워를 철거하고 비용의 50%를 환불한다",
+            "demolish와 동일한 철거 로직(셸 표기)",
+        },
+        example = "rm a",
+    },
+    ls = {
+        sig = "ls [enemies]",
+        lines = {
+            "무인자: 내 타워 목록(이름·타워·좌표·전략)",
+            "ls enemies: 필드의 살아있는 적 목록(스폰 순, 은신 제외)",
+        },
+        example = "ls enemies",
+    },
+    top = {
+        sig = "top",
+        lines = {
+            "서버 HP · 잔액 · 처치 수를 한 줄로 요약한다",
+        },
+        example = "top",
+    },
+    target = {
+        sig = "target <이름> <전략>",
+        lines = {
+            "타워의 표적 전략을 바꾼다(nearest/oldest/strongest/first)",
+            "수치 직접 조작은 불가 — 전략 이름만 선택할 수 있다",
+        },
+        example = "target a oldest",
+    },
+    cron = {
+        sig = 'cron <초> "<명령>"',
+        lines = {
+            "지정한 초 간격으로 명령을 자동 반복 예약한다(-l 목록, -r 삭제)",
+            "battle 시계 기준 결정론 — 등록 시각 + 간격 누적",
+        },
+        example = 'cron 5 "top"',
+    },
+    man = {
+        sig = "man <명령>",
+        lines = {
+            "이 함수 사전에서 해당 명령 카드를 연다",
+            "같은 카드를 다시 실행하면 접힌다",
+        },
+        example = "man build",
+    },
+    history = {
+        sig = "history",
+        lines = {
+            "지금까지 실행한 명령을 번호와 함께 나열한다",
+        },
+        example = "history",
+    },
+    clear = {
+        sig = "clear",
+        lines = {
+            "터미널 출력 버퍼를 전부 비운다",
+        },
+        example = "clear",
     },
 }
 
@@ -161,8 +225,25 @@ local function drawDictCard(self, x, y, w, name)
     end
 end
 
--- 함수 사전 ③: 접힘 목록(> build + 유저 함수들, 클릭 판정용 self.dictRows 갱신) + 클릭된
--- 항목의 펼침 카드(목록의 해당 줄 바로 아래에 삽입돼 다음 섹션을 밀어낸다).
+-- 함수 사전 행 렌더 + 클릭 판정 등록(self.dictRows) + 펼침 카드 삽입 — Lua 진영의 함수 목록과
+-- 셸 진영의 명령 목록이 공유하는 헬퍼(둘 다 이름→BUILTIN_DOCS 또는 소스 발췌 카드를 연다).
+local function dictRow(self, x, w, cy, name, label)
+    local open = self.dictOpen == name
+    if open then love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
+    else love.graphics.setColor(0.85, 0.88, 0.92) end
+    love.graphics.print(label, x, cy)
+    self.dictRows[#self.dictRows + 1] = { name = name, x0 = x, x1 = x + w, y0 = cy, y1 = cy + DICT_ROW_H }
+    cy = cy + DICT_ROW_H
+    if open then
+        cy = cy + 3
+        cy = drawDictCard(self, x, cy, w, name)
+        cy = cy + 6
+    end
+    return cy
+end
+
+-- 함수 사전 ③(Lua 진영): 접힘 목록(> build + 유저 함수들, 클릭 판정용 self.dictRows 갱신) +
+-- 클릭된 항목의 펼침 카드(목록의 해당 줄 바로 아래에 삽입돼 다음 섹션을 밀어낸다).
 local function drawFuncDict(self, x, y, w)
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
@@ -170,30 +251,16 @@ local function drawFuncDict(self, x, y, w)
     local cy = y + 18
 
     self.dictRows = {}
-    local function addRow(name, label)
-        local open = self.dictOpen == name
-        if open then love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
-        else love.graphics.setColor(0.85, 0.88, 0.92) end
-        love.graphics.print(label, x, cy)
-        self.dictRows[#self.dictRows + 1] = { name = name, x0 = x, x1 = x + w, y0 = cy, y1 = cy + DICT_ROW_H }
-        cy = cy + DICT_ROW_H
-        if open then
-            cy = cy + 3
-            cy = drawDictCard(self, x, cy, w, name)
-            cy = cy + 6
-        end
-    end
-
-    addRow("build", "> build")
-    addRow("demolish", "> demolish")
-    addRow("world.oldest", "> world.oldest")
+    cy = dictRow(self, x, w, cy, "build", "> build")
+    cy = dictRow(self, x, w, cy, "demolish", "> demolish")
+    cy = dictRow(self, x, w, cy, "world.oldest", "> world.oldest")
     local funcs = self.battle.userFuncs
     if #funcs == 0 then
         love.graphics.setColor(0.7, 0.75, 0.8)
         love.graphics.print("F5로 저장하면 함수가 등록됩니다", x, cy)
         cy = cy + DICT_ROW_H
     else
-        for _, name in ipairs(funcs) do addRow(name, "  " .. name) end
+        for _, name in ipairs(funcs) do cy = dictRow(self, x, w, cy, name, "  " .. name) end
     end
 
     cy = cy + 2
@@ -204,10 +271,168 @@ local function drawFuncDict(self, x, y, w)
     return cy
 end
 
+-- 명령 사전 ③(셸 진영): 스크립트가 없으므로 유저 함수 대신 셸 명령 9종을 클릭 가능한 목록으로
+-- 보여준다(같은 dictRow/drawDictCard 메커니즘 재사용). man <명령>도 같은 dictOpen을 토글한다.
+local SHELL_COMMANDS = {
+    { name = "build", label = "> build" },
+    { name = "rm", label = "> rm" },
+    { name = "ls", label = "> ls" },
+    { name = "top", label = "> top" },
+    { name = "target", label = "> target" },
+    { name = "cron", label = "> cron" },
+    { name = "man", label = "> man" },
+    { name = "history", label = "> history" },
+    { name = "clear", label = "> clear" },
+}
+
+local function drawShellCommandList(self, x, y, w)
+    love.graphics.setFont(fonts.small)
+    love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+    love.graphics.print("명령 사전", x, y)
+    local cy = y + 18
+
+    self.dictRows = {}
+    for _, cmd in ipairs(SHELL_COMMANDS) do
+        cy = dictRow(self, x, w, cy, cmd.name, cmd.label)
+    end
+
+    cy = cy + 2
+    love.graphics.setColor(0.5, 0.55, 0.6)
+    love.graphics.print("(man <명령>으로도 열립니다)", x, cy)
+    cy = cy + DICT_ROW_H
+    love.graphics.setColor(1, 1, 1)
+    return cy
+end
+
+local TERM_INPUT_H = 24 -- 패널 하단에 고정된 `$ ` 프롬프트 입력 줄의 높이
+
+-- 터미널 패널(ui=="shell"): 에디터 자리를 대체한다. 출력 버퍼(상한 200줄, self.termBuffer)를
+-- 스크롤 가능한 위쪽 영역에 최근 줄이 하단에 오도록 그리고, 아래에 `$ ` 프롬프트 + 입력 줄을
+-- 고정 렌더한다. 입력 줄의 텍스트/커서는 self.editor(기존 에디터 UTF-8 입력 프리미티브를 그대로
+-- 재사용 — 한 줄만 쓰고 Enter는 줄바꿈이 아니라 실행으로 가로챈다)를 그대로 읽는다.
+local function drawTerminal(self)
+    local ex, ey, ew, eh = self.editor.x, self.editor.y, self.editor.w, self.editor.h
+    love.graphics.setColor(0.08, 0.09, 0.12)
+    love.graphics.rectangle("fill", ex, ey, ew, eh)
+    love.graphics.setFont(fonts.mono)
+    local lh = fonts.mono:getHeight() + 4
+    local bufH = eh - TERM_INPUT_H - 4
+    local visibleRows = math.max(1, math.floor(bufH / lh))
+    local buf = self.termBuffer
+    local maxScroll = math.max(0, #buf - visibleRows)
+    self.termScroll = math.max(0, math.min(self.termScroll or 0, maxScroll))
+    local endIdx = #buf - self.termScroll
+    local startIdx = math.max(1, endIdx - visibleRows + 1)
+
+    love.graphics.setScissor(ex, ey, ew, bufH)
+    local row = 0
+    for i = startIdx, endIdx do
+        local line = buf[i]
+        if line then
+            love.graphics.setColor(0.82, 0.86, 0.9)
+            love.graphics.print(line, ex + 6, ey + row * lh + 3)
+        end
+        row = row + 1
+    end
+    love.graphics.setScissor()
+
+    if self.termScroll > 0 then
+        love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3], 0.85)
+        love.graphics.setFont(fonts.small)
+        love.graphics.print("↑ 스크롤 중 · 마우스 휠로 이동", ex + 6, ey + 2)
+        love.graphics.setFont(fonts.mono)
+    end
+
+    -- 입력 줄 (하단 고정)
+    local iy = ey + eh - TERM_INPUT_H
+    love.graphics.setColor(0.13, 0.15, 0.2)
+    love.graphics.rectangle("fill", ex, iy, ew, TERM_INPUT_H)
+    local prompt = "$ "
+    love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+    love.graphics.print(prompt, ex + 6, iy + 4)
+    local promptW = fonts.mono:getWidth(prompt)
+    local inputText = self.editor.lines[1] or ""
+    love.graphics.setColor(0.92, 0.94, 0.97)
+    love.graphics.print(inputText, ex + 6 + promptW, iy + 4)
+    -- 커서(깜빡임) — 기존 에디터 커서 표기(0.5초 주기 점멸)와 동일한 리듬
+    if (love.timer.getTime() * 2) % 2 < 1 then
+        local before = self.editor:textBeforeCursor()
+        local cx = ex + 6 + promptW + fonts.mono:getWidth(before)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.rectangle("fill", cx, iy + 2, 2, TERM_INPUT_H - 6)
+    end
+    love.graphics.setColor(1, 1, 1)
+end
+
+function play:isShellStage() return self.stage.ui == "shell" end
+
+-- 터미널 출력 버퍼에 한 줄 추가(상한 200줄 — 초과 시 가장 오래된 줄부터 제거).
+function play:termAppend(line)
+    local buf = self.termBuffer
+    buf[#buf + 1] = line
+    if #buf > 200 then table.remove(buf, 1) end
+end
+
+-- Enter: 입력 줄을 shell:exec에 그대로 넘기고 결과를 버퍼에 반영한다. clear 신호는 버퍼를
+-- 비우고(그 자신의 에코도 남기지 않는다), open 신호(man)는 dictOpen을 토글한다. 배속 표기는
+-- top 명령이 opts.speed로 받아 쓴다(play의 self.speed를 그대로 전달).
+function play:termExec()
+    local line = self.editor:getText()
+    self.editor:setText("")
+    self.termHistoryIdx = nil
+    self.termSavedInput = nil
+    local result = self.shell:exec(line, { speed = self.speed })
+    if result.clear then
+        self.termBuffer = {}
+    else
+        self:termAppend("$ " .. line)
+        for _, l in ipairs(result.output or {}) do self:termAppend(l) end
+    end
+    if result.open then
+        self.dictOpen = (self.dictOpen == result.open) and nil or result.open
+    end
+    self.termScroll = 0 -- 새 출력은 항상 최신 줄이 보이도록 하단으로 복귀
+end
+
+-- ↑: 이력을 최신→과거 순으로 훑는다. 이력 탐색을 시작하는 순간 그때까지 입력 중이던 줄을
+-- termSavedInput에 잠시 보관해 뒀다가 ↓로 이력 끝까지 내려가면 그대로 복원한다.
+function play:termHistoryUp()
+    local hist = self.shell.history
+    if #hist == 0 then return end
+    if self.termHistoryIdx == nil then
+        self.termSavedInput = self.editor:getText()
+        self.termHistoryIdx = #hist + 1
+    end
+    self.termHistoryIdx = math.max(1, self.termHistoryIdx - 1)
+    self.editor:setText(hist[self.termHistoryIdx])
+    self.editor:keypressed("end")
+end
+
+function play:termHistoryDown()
+    if self.termHistoryIdx == nil then return end
+    self.termHistoryIdx = self.termHistoryIdx + 1
+    if self.termHistoryIdx > #self.shell.history then
+        self.termHistoryIdx = nil
+        self.editor:setText(self.termSavedInput or "")
+    else
+        self.editor:setText(self.shell.history[self.termHistoryIdx])
+    end
+    self.editor:keypressed("end")
+end
+
 function play:enter(_, d, stageId, p)
     self.d, self.stageId, self.p = d, stageId, p
     self.stage = d.stages[stageId]
-    self.battle = Battle(d, stageId, { items = p.items })
+    -- 셸 진영(ui=="shell")은 스크립트 없이 opts.autoAttack으로 전략 자동 공격(Task 1)만 쓴다.
+    -- Lua 진영(그 외 ui)은 기존과 완전히 동일한 옵션 — autoAttack 필드 자체가 안 붙는다.
+    local battleOpts = { items = p.items }
+    if self.stage.ui == "shell" then battleOpts.autoAttack = true end
+    self.battle = Battle(d, stageId, battleOpts)
+    self.shell = self:isShellStage() and Shell.new(self.battle) or nil
+    self.termBuffer = self:isShellStage() and { "Code Defense 터미널 — 명령을 모르면 man <명령>" } or {}
+    self.termScroll = 0        -- 버퍼 스크롤(0=최신 줄이 보이는 하단 고정)
+    self.termHistoryIdx = nil  -- ↑↓ 이력 탐색 중 shell.history 인덱스(nil=탐색 중 아님)
+    self.termSavedInput = nil  -- 이력 탐색 시작 시점에 입력 중이던 줄(↓로 끝까지 내려가면 복원)
     self.speed = 1
     self.mx, self.my = -100, -100 -- 마우스 이동 전 호버 오탐 방지
     self.escArmed = 0
@@ -346,6 +571,13 @@ function play:update(dt)
     end
 
     self.battle:update(dt * self.speed)
+    if self.shell then
+        -- 매 프레임(작은 dt 전제) battle clock으로 cron 예약을 확인한다 — 셸은 자체 시계를
+        -- 두지 않고(결정론), due한 명령의 실행 결과를 그대로 터미널 버퍼에 이어붙인다.
+        for _, line in ipairs(self.shell:tick(self.battle.clock)) do
+            self:termAppend(line)
+        end
+    end
     if self.tut and self.tut:done() and not self.tutSaved then
         self.tutSaved = true
         self.p.tutorial_done[self.stageId] = true
@@ -708,8 +940,9 @@ function play:draw()
         end
         cy = cy + 6
 
-        -- ③ 함수 사전 자리 (Task 3이 본 구현)
-        cy = drawFuncDict(self, cx, cy, cw)
+        -- ③ 함수 사전(Lua 진영) / 명령 사전(셸 진영) — 스크립트가 없는 셸 진영은 유저 함수
+        -- 대신 셸 명령 9종을 같은 클릭식 목록으로 보여준다.
+        cy = self:isShellStage() and drawShellCommandList(self, cx, cy, cw) or drawFuncDict(self, cx, cy, cw)
         cy = cy + 8
 
         -- ④ 전투 로그 (최근 최대 8줄, 오래된 줄일수록 옅어지는 페이드 유지) — 위 섹션들이
@@ -746,13 +979,13 @@ function play:draw()
         love.graphics.rectangle("fill", px, py, pw, 22)
         love.graphics.setFont(fonts.small)
         love.graphics.setColor(art.pal.white[1], art.pal.white[2], art.pal.white[3])
-        love.graphics.print("script.lua", px + 8, py + 4)
+        love.graphics.print(self:isShellStage() and "terminal" or "script.lua", px + 8, py + 4)
         -- 개발자 미니 아바타 (우측): 저장 시 typing, 크래시 전이 시 alarm, 그 외 idle
         art.drawDev(fx.devAnim.pose, px + pw - 22, py + 3, 1, t)
         love.graphics.setColor(1, 1, 1)
     end
 
-    -- 에디터 또는 버튼 패널
+    -- 에디터 또는 버튼 패널 또는 터미널(셸 진영)
     if self:isButtonStage() then
         -- 버튼 스테이지에서는 퀵바 단축키가 애초에 눌리지 않으므로(keypressed 상단에서 분기)
         -- 편집기 자체 퀵바 줄을 그리지 않는다 — 버튼 목록/튜토리얼 말풍선과의 시각적 겹침을 줄인다.
@@ -768,11 +1001,13 @@ function play:draw()
             love.graphics.setColor(0.85, 0.88, 0.92)
             love.graphics.print(("[%d] %s"):format(i, btn.label), self.editor.x, 534 + (i - 1) * 13)
         end
+    elseif self:isShellStage() then
+        drawTerminal(self)
     else
         self.editor:draw(fonts, true)
     end
 
-    -- 저장 오류
+    -- 저장 오류(셸 진영은 setScript를 호출하지 않으므로 b.scriptError가 항상 nil — 자연히 생략됨)
     if b.scriptError then
         love.graphics.setColor(1, 0.45, 0.4)
         love.graphics.printf("저장 실패 — " .. b.scriptError, self.editor.x, 545, self.editor.w, "left")
@@ -789,9 +1024,14 @@ function play:draw()
     -- 힌트바 (튜토리얼 말풍선이 대신 안내하는 동안은 겹치지 않도록 숨긴다)
     if not (self.tut and not self.tut:done()) then
         love.graphics.setColor(0.6, 0.65, 0.7)
-        local hint = self:isButtonStage()
-            and "숫자키 버튼 실행 · Ctrl+5/1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
-            or "F5 저장·반영 · F1~F4 스니펫 · Ctrl+L 비우기 · Ctrl+5/1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
+        local hint
+        if self:isButtonStage() then
+            hint = "숫자키 버튼 실행 · Ctrl+5/1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
+        elseif self:isShellStage() then
+            hint = "Enter 실행 · ↑↓ 이력 · man <명령> 도움말 · Ctrl+5/1/2/4 배속 · ESC 포기"
+        else
+            hint = "F5 저장·반영 · F1~F4 스니펫 · Ctrl+L 비우기 · Ctrl+5/1/2/4 배속 · Ctrl+I 문제 · Ctrl+R 재시작 · ESC 포기"
+        end
         love.graphics.printf(hint, 0, 620, 1280, "center")
     end
 
@@ -939,7 +1179,9 @@ function play:keypressed(key)
     if key == "escape" then
         -- 5분짜리 판이 오타 한 번에 날아가지 않도록 2단 확인: 3초 안에 한 번 더 누르면 포기.
         if (self.escArmed or 0) > 0 then
-            Gamestate.switch(require("states.stageselect"), self.d, self.p)
+            -- 진영은 이 스테이지 자체(languages 칼럼)에서 파생한다 — 별도 상태 없이도 항상
+            -- 정확한 진영의 stageselect로 돌아간다(진영 선택을 다시 거치지 않아도 됨).
+            Gamestate.switch(require("states.stageselect"), self.d, self.p, factions.languageOf(self.stage))
         else
             self.escArmed = 3
         end
@@ -959,6 +1201,17 @@ function play:keypressed(key)
         if i and self.buttons[i] and not self.autotype then self:pressButton(i) end
         return
     end
+    if self:isShellStage() then
+        -- F5/퀵바(F1~F4)/Ctrl+L은 셸 진영에서 비활성 — Enter/↑/↓만 가로채고, 그 외 편집 키
+        -- (좌우/Home/End/Backspace/Delete)는 기존 에디터 프리미티브로 그대로 넘긴다.
+        if key == "return" then self:termExec() return end
+        if key == "up" then self:termHistoryUp() return end
+        if key == "down" then self:termHistoryDown() return end
+        if ctrl and key == "l" then return end -- Ctrl+L 비활성(입력줄을 비우지 않는다)
+        if key == "f5" then return end          -- F5 비활성(저장 개념이 없다)
+        self.editor:keypressed(key)
+        return
+    end
     if ctrl and key == "l" then
         -- 힌트 템플릿을 버리고 처음부터 짤 때 지우기 수단이 Backspace 연타뿐이었다.
         self.editor:setText("")
@@ -975,6 +1228,13 @@ function play:textinput(ch)
     self.editor:textinput(ch)
 end
 
+-- 마우스 휠: 셸 진영 터미널 출력 버퍼 스크롤(위로 굴리면 과거 줄, 아래로 굴리면 최신 쪽).
+-- 실제 클램프(스크롤 가능 범위)는 buf 길이·가시 줄 수 기준으로 drawTerminal이 매 프레임 재확정한다.
+function play:wheelmoved(_, y)
+    if not self:isShellStage() then return end
+    self.termScroll = math.max(0, (self.termScroll or 0) + y)
+end
+
 -- 함수 사전 클릭 연동: 에디터에서 build/유저 함수 식별자를 클릭하거나, 정보 칼럼의
 -- 사전 목록 항목을 직접 클릭하면 dictOpen을 토글(같은 항목 재클릭 시 닫힘)/교체한다.
 -- 그 외 클릭(빈 곳, 다른 식별자, 우클릭 등)은 무시한다.
@@ -987,8 +1247,12 @@ function play:mousepressed(x, y, button)
     -- 문제 카드가 열려 있으면 좌클릭은 카드 닫기로만 소비한다(Enter 닫기와 대칭) — 그렇지
     -- 않으면 카드 뒤에 가려진 사전 목록이 오작동으로 클릭될 수 있다.
     if self.showBrief then self.showBrief = false; return end
+    -- 셸 진영은 그 영역에 다중행 코드 에디터가 아니라 터미널이 그려지므로(입력 줄 좌표 계산이
+    -- 다름 — `$ ` 프롬프트 폭 vs 에디터의 40px 줄번호 거터), 코드 식별자 클릭 판정 자체를
+    -- 건너뛴다. 명령 사전 목록 클릭(아래 dictRows 루프)은 셸 진영에서도 그대로 동작한다.
     local editor = self.editor
-    if x >= editor.x and x < editor.x + editor.w and y >= editor.y and y < editor.y + editor.h then
+    if not self:isShellStage() and
+        x >= editor.x and x < editor.x + editor.w and y >= editor.y and y < editor.y + editor.h then
         local lineH = fonts.mono:getHeight() + 4
         local measure = function(s) return fonts.mono:getWidth(s) end
         local li, ci = editor:charAt(x - editor.x, y - editor.y, lineH, measure)
