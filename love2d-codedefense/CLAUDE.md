@@ -10,7 +10,9 @@ Lua 코드(`on_tick(self, world)`, `build(type, r, c, name)`)를 작성해 타�
 바·문제 브리핑·메모리 테마 미로·히든 타워·도감·퍼즐·배포 로그), 비주얼·세계관 설계서:
 `docs/superpowers/specs/2026-07-22-codedefense-visual-lore-design.md`, 플레이어빌리티 보강
 설계서(Wave A): `docs/superpowers/specs/2026-07-23-codedefense-playability-design.md`(슬로우
-모드·`demolish`·별점·위기 경고·도감 프로필 탭·패배 코칭·스테이지 네러티브).
+모드·`demolish`·별점·위기 경고·도감 프로필 탭·패배 코칭·스테이지 네러티브), 신규 적·타워
+설계서(Wave B): `docs/superpowers/specs/2026-07-23-codedefense-new-enemies-design.md`(IT
+업계 유명 문제를 밈으로 삼은 신규 적 7종+보스·신규 타워 2종·스테이지 13~20·world API 확장).
 
 ## 실행 방법
 
@@ -73,17 +75,18 @@ love2d-codedefense/
 ├─ data/
 │  ├─ towers.csv, enemies.csv(origin 칼럼 포함), items.csv, stages.csv(lore_file 칼럼 포함),
 │  │  timelines.csv
-│  ├─ mazes/                ← 스테이지별 미로 텍스트(#=벽, .=통로, B=건설칸), 12개(001~012),
-│  │                            12×16 규격, 테마별 형태(§ "메모리 테마 미로" 참고)
+│  ├─ mazes/                ← 스테이지별 미로 텍스트(#=벽, .=통로, B=건설칸), 20개(001~020),
+│  │                            12×16 규격, 테마별 형태(§ "메모리 테마 미로"·"스테이지 13~20"
+│  │                            참고 — 13~20은 메모리 영역이 아니라 스레드/프로세스/네트워크)
 │  ├─ curriculum/            ← 스테이지별 solution(정답)·hints(따라치기/빈칸)·tutorial(가이드)·
 │  │                            buttons(생성기)·naive(퍼즐 스테이지 순진 배치, 반드시 패배해야 함) Lua 파일
-│  └─ lore/                  ← 스테이지별 서사 데이터 `<n>.lua`(001~012), `return { briefing =
+│  └─ lore/                  ← 스테이지별 서사 데이터 `<n>.lua`(001~020), `return { briefing =
 │                               "...", postmortem = "..." }` 스키마. `stages.csv`의 `lore_file`이
 │                               가리키며, 비어 있으면 해당 스테이지는 브리핑/포스트모템 표시를
 │                               조용히 생략한다(§ "스테이지 네러티브" 참고)
-├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (316개, 13개 스위트:
+├─ tests/                  ← lovec tests로 실행하는 자체 테스트 러너 (495개, 14개 스위트:
 │                               csv/grid/sandbox/battle/data/editor/progress/tutorial/particles/
-│                               cutscene/stageinfo/demolish/stars)
+│                               cutscene/stageinfo/demolish/stars/abilities)
 ├─ lib/                    ← 외부 라이브러리 (직접 수정 금지)
 │  ├─ classic.lua           ← rxi/classic: 경량 OOP
 │  └─ hump/                  ← vrld/hump: gamestate, timer, vector, signal, camera
@@ -116,11 +119,22 @@ love2d-codedefense/
   지정해야 한다. `solution_file`은 필수 — 회귀 테스트(`tests/test_battle.lua`)가 각 스테이지의
   정답 코드로 실제 클리어가 되는지 자동 검증하므로, 정답 없이 스테이지를 추가하면 테스트가
   실패한다.
-  - **문제 브리핑 열**: `theme`(메모리 영역명 — "코드 영역"/"데이터 영역"/"스택"/"힙" 등, 문제
-    카드에 "메모리 영역: X"로 표기)과 `problem`(한 줄 문제 서술, 코딩테스트 문제지 톤)도 모든
-    스테이지에 채운다. 미로 형태는 테마와 어울리게 짓는다 — 코드 영역=정연한 가로 행 /
-    데이터 영역=블록 격자 / 스택=위에서 쌓이는 지그재그 / 힙=단편화 조각(12×16 규격, 건설칸
-    ≥6). 같은 테마의 3개 스테이지는 같은 문법 개념의 난이도 변주로 설계한다.
+  - **문제 브리핑 열**: `theme`(스테이지 1~12는 메모리 영역명 "코드 영역"/"데이터 영역"/
+    "스택"/"힙", 13~20은 실행 테마 "스레드"/"프로세스"/"네트워크" — 문제 카드에 "영역: X"로
+    표기. 과거엔 "메모리 영역: X"로 고정 표기했으나 13~20이 메모리 영역이 아니어서 범주
+    오류였다 — Wave B에서 "영역: X"로 정정, `states/play.lua` 2곳)과 `problem`(한 줄 문제
+    서술, 코딩테스트 문제지 톤)도 모든 스테이지에 채운다. 미로 형태는 테마와 어울리게 짓는다
+    — 코드 영역=정연한 가로 행 / 데이터 영역=블록 격자 / 스택=위에서 쌓이는 지그재그 / 힙=
+    단편화 조각 / 스레드=평행 차선(가로 2~3레인) / 프로세스=격리 구획(방+좁은 문) / 네트워크
+    =허브-스포크(중앙 광장+방사 통로)(12×16 규격, 건설칸 ≥6). 같은 테마의 3개 스테이지는
+    같은 문법 개념의 난이도 변주로 설계하며, 미로 자체도 서로 달라야 한다(테마 형태를
+    공유하되 통로/건설칸 배치는 3장 모두 다르게).
+  - **미로 설계 규칙(Wave B에서 확립, 13~20 적용)**: 모든 건설칸(`B`)은 스폰이 실제로
+    지나가는 경로를 사거리로 교전할 수 있어야 한다 — 영구히 아무 적도 닿지 않는 장식용
+    죽은 슬롯을 두지 않는다(`world.oldest()` 등 `world.*` API는 사거리와 무관하게 필드 전체를
+    보는 전역 판정이라, 유휴 레인에 지은 타워는 "쏠 수 있다고 착각하게 만드는" 배치 함정이
+    되기 쉽다). 다분기 형태(평행 차선·허브-스포크처럼 갈래가 있는 미로)는 스폰 경로가 실제로
+    지나는 가지에만 건설칸을 둔다 — 스폰과 무관한 죽은 가지에 건설칸을 두지 않는다.
   - **lore 열(선택)**: `lore_file`에 `data/lore/<n>.lua`(스키마 `return { briefing = "...",
     postmortem = "..." }`)를 연결하면 브리핑 문단·포스트모템 카드가 자동으로 뜬다(§ "구현된
     규칙"의 "스테이지 네러티브" 참고). 비워 두면 두 표시 모두 조용히 생략되므로 필수는 아니다
@@ -135,9 +149,19 @@ love2d-codedefense/
   - **타임라인 규칙(`d.validate()`가 기계 검증)**: `mode=normal`인 스테이지는 (1) 마지막 스폰
     이벤트 종료 시각(`at + (count-1)*interval`)이 240초 이상이어야 하고, (2) 인접한 두 스폰
     이벤트 사이의 공백이 40초를 넘으면 안 된다. 300초 전투 시간을 스폰으로 고르게 채우기
-    위한 규칙이며, 위반하면 부팅 시 `main.lua`가 즉시 에러로 중단한다.
+    위한 규칙이며, 위반하면 부팅 시 `main.lua`가 즉시 에러로 중단한다. **설계 시 경계값은
+    피한다**(Wave B에서 확립) — 검증식이 "40초 초과 금지"라 정확히 40초는 통과하지만, 신규
+    스테이지 13~20의 공백은 여유를 두어 39초 이하로 설계했다(예: 스테이지 19는 공백
+    30~35초). 정확히 경계에 걸치는 값은 반올림·부동소수 오차에 취약해 피하는 편이 안전하다.
 - **결정론 원칙**: 게임 로직에 랜덤을 쓰지 않는다. 같은 배치·같은 코드는 항상 같은 결과가
   나와야 회귀 테스트와 하드코어 스피드런 기록이 의미를 가진다.
+- **데미지 반올림 원칙(Wave B에서 확립)**: **신규 능력 경로(`resist:<타워id>`·`pair`·
+  `splash`)의 데미지 계산 결과에만** `math.max(1, math.floor(x))`(내림 + 0데미지 금지)를
+  적용한다(`src/battle.lua`의 `resolveAttack`, `src/projectile.lua`). **기존 데미지
+  파이프라인(차지샷 배율 `1 + charge*0.5` 등)은 비정수 그대로 두며, 여기에 전역 floor를
+  추가하지 않는다** — 기존 스테이지의 시뮬레이션 결과(클리어/패배 판정, 회귀 테스트 기준값)
+  가 달라지지 않는 것이 우선이다. 앞으로 새 능력을 추가할 때도 이 경계를 따른다: 그 능력이
+  실제로 만들어내는 새 계산 경로에만 floor·min1을 적용하고, 기존 경로에는 손대지 않는다.
 - 스폰 열은 미로 1행의 통로(`.`)와 일치해야 한다 — `src/db.lua`의 `d.validate()`가 이를
   기계 검증하며, `main.lua`가 부팅 시 항상 이 검증을 돌려 오류가 있으면 즉시 에러로 중단시킨다.
 - CSV 빈 셀 처리에 주의: 숫자 필드(`cost`, `hp`, `budget`, `countdown`, `puzzle`, `limit`,
@@ -221,14 +245,14 @@ love2d-codedefense/
   우상단 오버레이(적 구성 패널·전투 로그)는 모두 정보 칼럼으로 흡수되었다 — 전장에는 더 이상
   텍스트 오버레이가 없다. 셰이크는 전장에만 적용되고 정보 칼럼·에디터·HUD는 고정이다.
 - **정보 칼럼** (x=400, y=48, w=240, h=512 — 전장과 바닥이 나란함): 위에서부터 순서대로
-  ① **문제 요약**(`[문제 N] concept` / `메모리 영역: theme` / `Ctrl+I 상세` 안내),
+  ① **문제 요약**(`[문제 N] concept` / `영역: theme` / `Ctrl+I 상세` 안내),
   ② **적 구성**(구 전장 우상단 오버레이 — 스테이지 등장 적 종류별 미니 스프라이트 +
   "처리 n / 전체 N", 모든 스폰이 끝나면 "잔여 소탕 · 생존!" 한 줄 추가),
   ③ **함수 사전**(아래 별도 절 참고),
   ④ **전투 로그**(구 전장 오버레이 — 최근 8줄, 오래된 줄일수록 옅어지는 페이드)가 이어진다.
   상단 HUD 바로 아래에는(전장 폭 기준) 300초 대비 현재 진행률과 스폰 이벤트 시점 눈금을 그리는
   얇은(4px) 진행 바가 별도로 있다. 스테이지 진입(카운트다운 중)에는 전장+정보 칼럼을 아우르는
-  중앙에 문제 카드가 자동으로 뜬다 — `[문제 N] concept`, `메모리 영역: theme`, (lore가 있으면)
+  중앙에 문제 카드가 자동으로 뜬다 — `[문제 N] concept`, `영역: theme`, (lore가 있으면)
   회색 톤 브리핑 문단, `problem` 한 줄 서술, `예산 X · 유입 예정 N기`, 제출/채점 안내를
   보여주며 Enter로 닫고 전투 중 언제든 Ctrl+I로 다시 연다. 튜토리얼 말풍선이 활성 상태면 문제
   카드보다 z순서상 위에 그려져 튜토리얼이 우선한다.
@@ -309,21 +333,72 @@ love2d-codedefense/
 - **크래시/워치독**: 런타임 오류가 나면 타워가 3초(`WATCHDOG`) 동안 "크래시" 상태로 비활성화된
   뒤 자동 재시작한다. 재시작 직후 곧바로 다시 크래시하면(`recovering` 플래그) 영구 비활성화되어
   더 이상 재시작을 시도하지 않는다.
-- **몬스터 능력**: `crash_tower`(널 포인터 — 서버 도달 시 최근접 타워 강제 크래시),
-  `split`(concat-nil — 사망 시 체력 절반씩 둘로 분열). CSV의 `abilities` 필드로 조합 가능.
+- **몬스터·타워 능력 키워드** (CSV의 `abilities`/`ability` 필드, `;`로 조합·`Enemy.parseAbilities`가
+  토큰 완전 일치로 파싱 — 부분 문자열 검사가 아니므로 `split2`가 `split` 판정에 오탐되지
+  않는다): 상수는 전부 `src/enemy.lua`(적)·`src/projectile.lua`(splash)에 로컬로 정의된
+  코어 상수이며 CSV에 노출되지 않는다.
+
+  | 키워드 | 대상(예) | 동작 | 상수 |
+  |---|---|---|---|
+  | `crash_tower` | 널 포인터 | 서버 도달 시 최근접 타워 강제 크래시 | – |
+  | `split` | concat-nil | 사망 시 체력 절반씩 둘로 분열(깊이 1, 자식은 더 분열하지 않음) | – |
+  | `grow` | 메모리 릭 | 스폰 후 `GROW_EVERY`마다 maxHP/HP가 `GROW_AMOUNT`씩 증가, 상한은 기본(CSV) hp×`GROW_CAP_MULT` | `GROW_EVERY=1.0`s·`GROW_AMOUNT=2`·`GROW_CAP_MULT=5` |
+  | `pair` | 데드락 | 같은 스폰 이벤트 안에서 홀짝으로 짝지어짐, 짝이 살아 있는 동안 받는 데미지 ×배율(내림·최소1). 홀수 스폰의 마지막 1기는 짝 없음(경감 없음) | 배율 `0.4` |
+  | `phase` | 하이젠버그 | 스폰 시각 기준 가시/은신을 교대 반복. 은신 중엔 `world.*` 스냅샷·투사체 명중·타워 자동 타겟에서 전부 제외(서버라인 도달 판정은 은신과 무관) | `PHASE_VISIBLE=3.0`s(가시)·`PHASE_HIDDEN=2.0`s(은신) |
+  | `split2` | 포크 밤, 커널 패닉 | 사망 시 체력 절반씩 둘로 분열하며, 그 자식도 한 번 더 분열 가능(깊이 상한 2 — `split`의 상위 호환) | 깊이 상한 `2` |
+  | `dash` | 레이스 컨디션 | 스폰 시각 기준 주기마다 짧은 창 동안 이동 속도 배율 | `DASH_PERIOD=1.5`s(주기)·`DASH_LEN=0.3`s(창)·`DASH_MULT=3`(배율) |
+  | `resist:<타워id>` | 레거시 코드(`resist:printer`) | 지정한 타워 종류의 데미지만 배율 감쇄(내림·최소1), 다른 타워 종류의 데미지는 그대로(반올림 없음) | 배율 `0.5` |
+  | `splash`(타워 `ability`) | GC 수집기 | 명중점 기준 반경 안 "다른" 적에게 중심 100%→가장자리 50% 선형 낙폭 피해(내림·최소1), 은신 중인 피해자는 면제 | 반경 `SPLASH_RADIUS=60`px |
+  | `slowfield`(타워 `ability`) | 디버거 | 사거리 안 적의 실효 이동 속도에 배율(여러 대가 겹쳐도 OR 판정이라 한 번만 적용, `dash`와는 곱연산으로 복합) | 배율 `SLOW_MULT=0.6` |
+
+  `grow`/`dash`/`phase`의 실효 속도·성장은 전부 `age`(스폰 후 경과초, battle clock 기준)의
+  순수 함수로 재계산되며 별도 상태를 저장하지 않으므로(단, `grow`는 이미 적용된 증분만
+  누적) 매 호출 결정론이 보장된다.
 - **타워 종류**: `printer`(기본 발사기, cost 100), `compiler`(공격하지 않는 테크 타워, cost 50,
   고급 타워 건설을 해금), `sniper`(장거리 저격, cost 150, `requires=compiler` — 필드에 컴파일러가
-  있어야 건설 가능), `gugu-class`(히든 — 아래 별도 절 참고)(`data/towers.csv`). `towers.csv`에는
-  `limit`(스테이지당 최대 설치 수, 빈 값=무제한), `hidden`(1=도감에서 발견 전 "???"로 표시),
-  `ability`(엔진이 인식하는 특수 능력 키워드 — 현재 `gugu` 하나뿐, `battle.lua`가 이 키워드로
-  분기)의 3개 열이 추가돼 있다.
+  있어야 건설 가능), `gugu-class`(히든 — 아래 별도 절 참고), `gc-collector`·`debugger`(Wave B
+  신규 — 아래 "신규 타워" 절 참고)(`data/towers.csv`). `towers.csv`에는 `limit`(스테이지당 최대
+  설치 수, 빈 값=무제한), `hidden`(1=도감에서 발견 전 "???"로 표시), `ability`(엔진이 인식하는
+  특수 능력 키워드 — `gugu`/`splash`/`slowfield`, `battle.lua`가 이 키워드로 분기)의 3개 열이
+  추가돼 있다.
+- **신규 타워(Wave B)**:
+  - **GC 수집기(`gc-collector`)**: cost 180, damage 6, range 108, cooldown 1.2,
+    `requires=compiler`(컴파일러 필요), limit 없음, `ability=splash`. 명중 시 위 표의 `splash`
+    낙폭 피해로 명중점 주변 적까지 함께 처리한다 — 포크 밤(`split2`)·DDoS 봇 같은 물량형 적
+    대응이 존재 이유다.
+  - **디버거(`debugger`)**: cost 80, damage 0(공격하지 않는 순수 필드 타워), range 132,
+    `requires` 없음, **limit 2**(스테이지당 최대 2기 — 감속 도배로 실시간 압박이 사라지는
+    것을 막는 의도적 상한), `ability=slowfield`. `runTick`이 `tw.def.ability == "slowfield"`인
+    타워는 타겟팅·`on_tick` 호출·명령 예산 소비 자체를 건너뛰므로(우연히 damage 0이라 무해한
+    게 아니라 의도적으로 발사 루프에서 제외) 스크립트에서 `self:attack(...)`을 걸어도 아무
+    일도 일어나지 않는다 — 사거리 안에 있기만 하면 자동으로 감속 효과를 낸다.
+- **world API 확장(Wave B)**: 타워 스크립트에 노출되는 적 스냅샷(`api.lua`의 `snapshot`)에
+  `age`(스폰 후 경과초)·`speed`(현재 실효 이동 속도 px/s — `dash`/`slowfield` 배율이 반영된
+  값)가 추가됐고, `world.oldest()`(`age`가 가장 큰, 즉 가장 먼저 스폰된 적의 스냅샷을 반환 —
+  동률이면 더 먼저 스폰된, 즉 낮은 `id` 쪽. 적이 없으면 `nil`)가 `world.nearest()`/
+  `weakest()`/`fastest()`와 같은 반열에 추가됐다(`BUILTIN_DOCS`에도 카드 등록, "함수 사전"에서
+  클릭해 볼 수 있다). **은신(phase) 적은 `world.oldest()`를 포함해 `world.*` 전부에서
+  똑같이 제외된다** — `api.refresh`가 스냅샷 목록(`snaps`)을 만들 때 `e:isPhased(clock)`로
+  한 번만 걸러내고 그 목록을 모든 `world.*` 함수가 공유하므로, 새 `world.*` 함수를 추가해도
+  은신 제외 규칙을 따로 구현할 필요가 없다(단일 필터 지점).
 - **퍼즐 스테이지 (6·9·12)**: `stages.csv`의 `puzzle=1`인 스테이지는 미로·예산·적 구성이 특정
   배치를 사실상 강제하도록 설계됐다 — 6(건설칸이 전부 프린터 사거리 밖 가장자리라 컴파일러+
   스나이퍼 조합 필수), 9(사거리가 닿는 건설칸이 극소수), 12(독립된 3차선이라 분할 지점마다
   타워가 필요). 판정 철학은 그대로다(§0 무변경, 코드 형태가 아니라 결과만 봄) — 좁아지는 것은
   전술 해공간이지 정답 코드 강제가 아니다. `naive_file`(예: `curriculum/006_naive.lua`)에 "사거리
   등을 고려 안 하고 단순하게 지으면" 나오는 스크립트를 등록해 두면, 회귀 테스트가 그 배치는
-  반드시 defeat임을(= "브루트포스는 시간초과") 결정론으로 증명한다.
+  반드시 defeat임을(= "브루트포스는 시간초과") 결정론으로 증명한다. Wave B의 퍼즐 스테이지는
+  16(단일 표적 화력으로 포크 밤의 분열 물량을 못 이김 — GC 수집기의 광역 필수)과 20(광역
+  없이 단일 차선만 방어하면 반드시 패배 — 종합 방어선 필수)이다.
+- **스테이지 13~20 (Wave B, 테마: 스레드/프로세스/네트워크)**: 기존 1~12(코드 영역/데이터
+  영역/스택/힙 × 3, 메모리 영역 테마)는 그대로 두고, 신규 8스테이지를 스레드(13~15)·
+  프로세스(16~18)·네트워크(19~20) 테마로 이어 붙였다 — 13 정렬 기준(메모리 릭/`world.oldest()`
+  타겟팅), 14 표적 분산(데드락/타워 2기 협동), 15 안전 검사(하이젠버그/nil 체크 사격), 16
+  광역 방어(포크 밤/GC 수집기, 퍼즐), 17 브레이크포인트(레이스 컨디션/디버거+예측 사격), 18
+  정밀 타격(레거시 코드/스나이퍼 테크 체인), 19 물량 방어(DDoS 봇/연사+광역, 한 이벤트에
+  30기 러시), 20 복합 방어(전 종 혼합+커널 패닉 보스, 퍼즐). 정확한 수치(HP·보상·예산 등)는
+  `data/enemies.csv`/`data/towers.csv`/`data/stages.csv`가 원본이므로 여기서 되풀이하지
+  않는다 — 회귀 테스트(solution 클리어·naive 패배)를 통과하도록 구현 중 조정된 값들이다.
 - **히든 타워 "구구 클래스"** (한국 코딩 밈 오마주 — **스포일러이므로 이 항목은 CLAUDE.md에만
   전체 기록하고 README.md에는 절대 옮기지 않는다**):
   - 소환: 코드에서 `build("gugu-class", r, c, name)` 또는 한글 별칭 `build("구구클래스", r, c, name)`
@@ -437,7 +512,10 @@ v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스
 3개)·적 구성 패널·진행 바·문제 브리핑·히든 타워·도감·배포 로그까지의 범위다. 이후 플레이어빌리티
 보강 웨이브(Wave A, `docs/superpowers/specs/2026-07-23-codedefense-playability-design.md`)에서
 `demolish` API·슬로우 모드(x0.5)·별점·위기 경고·진행 바 눈금 색·패배 코칭·도감 프로필 탭·
-스테이지 네러티브(브리핑/포스트모템)+도감 origin이 추가되어 위 "구현된 규칙"에 반영돼 있다.
+스테이지 네러티브(브리핑/포스트모템)+도감 origin이 추가되었고, 이어진 신규 적·타워 웨이브
+(Wave B, `docs/superpowers/specs/2026-07-23-codedefense-new-enemies-design.md`)에서 신규 적
+7종+보스(커널 패닉)·신규 타워 2종(GC 수집기/디버거)·신규 스테이지 13~20(스레드/프로세스/
+네트워크)·world API 확장(`age`/`speed`/`oldest`)이 추가되어 위 "구현된 규칙"에 반영돼 있다.
 설계서(`docs/superpowers/specs/2026-07-21-love2d-codedefense-design.md` 9장,
 `docs/superpowers/specs/2026-07-22-codedefense-stage-experience-design.md`) 기준으로 다음이
 남아 있다.
@@ -460,25 +538,29 @@ v0.1은 코어 루프(카운트다운→실시간→300초 생존)·샌드박스
 ```
 
 `tests/main.lua`가 `tests/test_*.lua` 스위트를 전부 실행하고 `RESULT pass=N fail=N`을 출력한다
-(현재 316개, 전부 PASS — 13개 스위트: `test_csv`·`test_grid`·`test_sandbox`·`test_battle`·
+(현재 495개, 전부 PASS — 14개 스위트: `test_csv`·`test_grid`·`test_sandbox`·`test_battle`·
 `test_data`·`test_editor`·`test_progress`·`test_tutorial`·`test_particles`·`test_cutscene`·
-`test_stageinfo`·`test_demolish`·`test_stars`. `test_particles.lua`·`test_cutscene.lua`가 뷰
-전용 이펙트/컷신 로직을, `test_stageinfo.lua`가 적 구성 패널 집계 유틸을, `test_demolish.lua`가
-`Battle:demolishTower`(환불·재사용·틱 중 철거 스킵 방지)를, `test_stars.lua`가 `stars.of`의
-HP→별점 경계값을 다룬다. `test_data.lua`는 `d.validate()`가 보지 못하는 lore 파일 "내용"
-회귀도 잡는다 — `lore_file`이 있는 모든 스테이지를 `io.open`+`loadstring`으로 직접 로드·실행해
-`briefing`/`postmortem`이 비어있지 않은 문자열을 반환하는지 확인한다(구문 오류나 스키마 누락은
-파일 존재 검사만으로는 잡히지 않기 때문). 브리핑/포스트모템 카드·도감 origin의 실제 렌더링처럼
+`test_stageinfo`·`test_demolish`·`test_stars`·`test_abilities`. `test_particles.lua`·
+`test_cutscene.lua`가 뷰 전용 이펙트/컷신 로직을, `test_stageinfo.lua`가 적 구성 패널 집계
+유틸을, `test_demolish.lua`가 `Battle:demolishTower`(환불·재사용·틱 중 철거 스킵 방지)를,
+`test_stars.lua`가 `stars.of`의 HP→별점 경계값을 다룬다. `test_abilities.lua`(Wave B 신규)가
+`grow`/`pair`/`phase`/`split2`/`dash`/`resist`의 능력 6종(상한·경감 해제·주기·깊이 제한 등)과
+`splash`/`slowfield` 타워 능력, `world.oldest()`·스냅샷 `age`/`speed`, 그리고 같은 스크립트를
+2회 실행했을 때 `status`/`serverHP`가 완전히 일치하는 결정론 재현까지 헤드리스로 검증한다.
+`test_data.lua`는 `d.validate()`가 보지 못하는 lore 파일 "내용" 회귀도 잡는다 — `lore_file`이
+있는 모든 스테이지를 `io.open`+`loadstring`으로 직접 로드·실행해 `briefing`/`postmortem`이
+비어있지 않은 문자열을 반환하는지 확인한다(구문 오류나 스키마 누락은 파일 존재 검사만으로는
+잡히지 않기 때문). 브리핑/포스트모템 카드·도감 origin·스플래시 링·감속 점 같은
 `states/*.lua`에만 있는 순수 뷰 표시는 헤드리스 스위트로 검증되지 않으므로, 오토플레이
 하네스로 스크린샷을 찍어 육안 확인한다(§ "구현된 규칙"의 관련 항목 참고). 실패가 있으면 콘솔
 종료 코드도 0이 아니게 된다.
 
 스테이지를 추가할 때는 `data/curriculum/<n>_solution.lua`를 **반드시** 함께 추가해야 한다 —
-`tests/test_battle.lua`가 CSV에 등록된 모든 스테이지를 순회하며 `solution_file`의 코드로 실제
-전투를 실행해 클리어(300초 서버 생존)까지 확인하는 회귀 테스트이므로, 정답 코드가 없거나
-틀리면 테스트가 실패해 스테이지 추가가 자동으로 검증된다. 회귀 테스트는 `Battle:setScript`로
-정답 스크립트를 주입하는 방식이며, 스크립트 안의 `build()` 좌표는 반드시 스테이지 예산
-(`budget`) 안에서 지을 수 있는 조합이어야 한다. 스테이지에 `naive_file`이 등록돼 있으면
-(퍼즐 스테이지 6·9·12) 같은 회귀 루프가 그 스크립트로도 전투를 돌려 **반드시 defeat**임을
-함께 증명한다 — 순진 배치가 실제로 클리어해 버리면 테스트가 실패해 퍼즐 설계가 깨졌음을
-알려준다.
+`tests/test_battle.lua`가 CSV에 등록된 모든 스테이지(현재 1~20)를 순회하며 `solution_file`의
+코드로 실제 전투를 실행해 클리어(300초 서버 생존)까지 확인하는 회귀 테스트이므로, 정답 코드가
+없거나 틀리면 테스트가 실패해 스테이지 추가가 자동으로 검증된다. 회귀 테스트는
+`Battle:setScript`로 정답 스크립트를 주입하는 방식이며, 스크립트 안의 `build()` 좌표는 반드시
+스테이지 예산(`budget`) 안에서 지을 수 있는 조합이어야 한다. 스테이지에 `naive_file`이 등록돼
+있으면(퍼즐 스테이지 6·9·12·16·20) 같은 회귀 루프가 그 스크립트로도 전투를 돌려 **반드시
+defeat**임을 함께 증명한다 — 순진 배치가 실제로 클리어해 버리면 테스트가 실패해 퍼즐 설계가
+깨졌음을 알려준다.

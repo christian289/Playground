@@ -670,7 +670,7 @@ function play:draw()
         love.graphics.print(("[문제 %d] %s"):format(self.stageId, self.stage.concept), cx, cy)
         cy = cy + 16
         love.graphics.setColor(0.7, 0.75, 0.8)
-        love.graphics.print("메모리 영역: " .. self.stage.theme, cx, cy)
+        love.graphics.print("영역: " .. self.stage.theme, cx, cy)
         cy = cy + 16
         love.graphics.setColor(0.55, 0.6, 0.65)
         love.graphics.print("Ctrl+I 상세", cx, cy)
@@ -859,7 +859,7 @@ function play:draw()
         love.graphics.printf(("[문제 %d] %s"):format(self.stageId, stage.concept), cardX + pad, cardY + pad, cardW - pad * 2, "left")
         love.graphics.setFont(fonts.small)
         love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
-        love.graphics.printf("메모리 영역: " .. stage.theme, cardX + pad, cardY + pad + 24, cardW - pad * 2, "left")
+        love.graphics.printf("영역: " .. stage.theme, cardX + pad, cardY + pad + 24, cardW - pad * 2, "left")
         local textY = cardY + pad + 46
         if briefLines > 0 then
             love.graphics.setColor(0.6, 0.63, 0.68) -- 회색 서사체 — 문제 서술(흰색)과 톤 구분
