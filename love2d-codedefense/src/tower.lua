@@ -17,6 +17,7 @@ function Tower:new(def, r, c, items)
     self.env = nil         -- battle이 샌드박스 env 부여
     self.pendingTarget = nil
     self.lastError = nil
+    self.strategy = "nearest"  -- 표적 전략(autoAttack용, Wave D Task 1). 기본값 nearest.
 end
 
 function Tower:effectiveCooldown()

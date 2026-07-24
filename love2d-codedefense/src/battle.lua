@@ -14,6 +14,10 @@ local CHARGE_MAX = 3
 local RESIST_MULT = 0.5     -- resist:<타워id> 감쇄 배율(직격·splash 피해자 공통)
 local PAIR_MULT = 0.4       -- pair 동반 경감 배율(직격·splash 피해자 공통)
 
+-- 표적 전략(Wave D Task 1, autoAttack용): nearest=거리 최소·oldest=age 최대·
+-- strongest=현재 hp 최대·first=서버라인 잔여 거리 최소(grid.dist). 기본값은 "nearest".
+local STRATEGIES = { nearest = true, oldest = true, strongest = true, first = true }
+
 local Battle = Object:extend()
 Battle.TOTAL = TOTAL
 
@@ -30,6 +34,7 @@ function Battle:new(d, stageId, opts)
     self.serverHP = 10
     self.money = self.stage.budget
     self.items = opts.items or {}
+    self.autoAttack = opts.autoAttack == true  -- true면 스크립트 없이 tw.strategy대로 자동 공격
     self.status = "prep"       -- start() 전 상태 (테스트 호환)
     self.enemies, self.towers, self.projectiles, self.log = {}, {}, {}, {}
     self.towersByName = {}
@@ -118,6 +123,59 @@ function Battle:demolishTower(name)
     return true
 end
 
+-- 이름으로 타워의 표적 전략을 바꾼다(nearest/oldest/strongest/first). autoAttack 모드에서
+-- runTick이 매 틱 이 전략으로 selectTarget을 호출한다. 실패해도 tw.strategy는 그대로 둔다.
+function Battle:setTargetStrategy(name, strat)
+    local tw = self.towersByName[name]
+    if not tw then
+        self:say(("[오류] 타워가 없습니다 — \"%s\""):format(tostring(name)))
+        return false
+    end
+    if not STRATEGIES[strat] then
+        self:say(("[오류] 알 수 없는 전략 — \"%s\" (nearest/oldest/strongest/first)"):format(tostring(strat)))
+        return false
+    end
+    tw.strategy = strat
+    return true
+end
+
+-- autoAttack용 표적 선택: tw.strategy(기본 nearest)에 따라 이 타워 사거리 안 + 은신 제외
+-- 후보 중 하나를 고른다. 동률은 항상 먼저 스폰된(낮은 id) 적. self.enemies를 직접 순회하며
+-- (api.refresh의 world.* 스냅샷과 달리) 스크립트 env 없이도 동작해야 하므로 별도 구현이다.
+-- "bigger key wins" 한 형태로 통일해 네 전략의 비교·동률 로직을 하나의 분기로 다룬다:
+--   nearest  → key = -dist2(거리 최소 = key 최대)
+--   oldest   → key =  age (age 최대)
+--   strongest→ key =  hp  (hp 최대)
+--   first    → key = -잔여거리(grid.dist, 서버라인 잔여 거리 최소 = key 최대)
+function Battle:selectTarget(tw)
+    local strategy = tw.strategy or "nearest"
+    local range2 = tw.def.range * tw.def.range
+    local best, bestKey
+    for _, e in ipairs(self.enemies) do
+        if not e.dead and not e.reached and not e:isPhased(self.clock) then
+            local dx, dy = e.x - tw.x, e.y - tw.y
+            local dist2 = dx * dx + dy * dy
+            if dist2 <= range2 then
+                local key
+                if strategy == "oldest" then
+                    key = e.age
+                elseif strategy == "strongest" then
+                    key = e.hp
+                elseif strategy == "first" then
+                    local d = self.grid.dist[e.r] and self.grid.dist[e.r][e.c]
+                    if d then key = -d end
+                else -- "nearest"(기본값 및 미지정 포함)
+                    key = -dist2
+                end
+                if key ~= nil and (not best or key > bestKey or (key == bestKey and e.id < best.id)) then
+                    best, bestKey = e, key
+                end
+            end
+        end
+    end
+    return best
+end
+
 -- 실시간 스크립트 저장: 새 env를 컴파일해서 성공 시에만 교체(build 재실행 포함).
 -- 실패 시 기존 env/script는 그대로 유지된다.
 function Battle:setScript(code)
@@ -192,8 +250,10 @@ function Battle:runTick()
         -- slowfield(디버거)는 공격하지 않는 순수 필드 타워다. damage가 0이라 결과적으로
         -- 피해가 안 나가는 것과는 무관하게, ability로 직접 분기해 타겟팅·on_tick 호출·명령
         -- 예산 소비 자체를 건너뛴다(우연히 0 데미지라서가 아니라 의도적으로 발사 루프 제외).
-        if not tw.demolished and self.env and self.env.on_tick and tw.crashed <= 0 and not tw.disabled
-            and tw.def.ability ~= "slowfield" then
+        -- 이 조건(eligible)은 스크립트 경로·autoAttack 경로 둘 다에 공통으로 적용된다.
+        local eligible = not tw.demolished and tw.crashed <= 0 and not tw.disabled
+            and tw.def.ability ~= "slowfield"
+        if eligible and self.env and self.env.on_tick then
             self.setTower(tw)
             local selfApi, world = api.refresh(self.env, tw, self.enemies, self.clock)
             tw.pendingTarget = nil
@@ -215,6 +275,15 @@ function Battle:runTick()
                 tw.overclock = math.max(0, 1 - (used / (BUDGET / 2)))
                 self:resolveAttack(tw)
             end
+        elseif eligible and self.autoAttack then
+            -- autoAttack(스크립트 없는 셸 진영 등, Wave D Task 1): 스크립트 경로와 배타적이다
+            -- (self.env.on_tick이 있으면 항상 스크립트 경로가 우선한다 — 위 elseif). tw.strategy로
+            -- 표적을 고른 뒤 쿨다운·오버클럭·투사체 생성은 기존 resolveAttack을 그대로 재사용해
+            -- 스크립트 공격과 동일한 판정을 받는다. on_tick 호출이 없으므로 오버클럭은 갱신하지
+            -- 않는다(예산을 쓰지 않았으니 자연스러운 결과 — 기존 tw.overclock 값 그대로 유지).
+            local target = self:selectTarget(tw)
+            tw.pendingTarget = target and target.id or nil
+            self:resolveAttack(tw)
         end
     end
 end
