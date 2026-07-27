@@ -9,7 +9,8 @@
 ## 0. 먼저 확인할 것 (5분)
 
 1. `git log --oneline -30` — 마지막 커밋 확인. 브랜치는 **`feature/hotfix`**
-   (구 `feature/codedefense-tutorial`의 후속 — 개명 시점에 분기, 이전 브랜치는 기록용 동결).
+   (구 `feature/codedefense-tutorial`의 후속 — 개명 시점에 분기. 구 브랜치는 hotfix에 완전히
+   포함됨을 확인하고 2026-07-27 삭제했으며, 커밋 이력은 전부 hotfix에 남아 있다).
 2. `git status` — 이전 세션이 세션 한도로 중단되며 커밋 전 부분 작업을 남겼을 수 있다
    (실제로 2회 발생). 부분 작업이 있으면 버리지 말고 파일을 읽어 이어붙일 것.
 3. `.superpowers/sdd/progress.md` — 태스크별 진행 원장(있다면). **git 무시 대상이라 새 클론에는
