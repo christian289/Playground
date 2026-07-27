@@ -15,6 +15,11 @@ function love.load()
     local root = love.filesystem.getSource()
     if love.filesystem.isFused() then
         root = love.filesystem.getSourceBaseDirectory()
+    elseif root:match("%.love$") then
+        -- 비융합 .love 단독 실행: 게임 데이터(data/)는 exe 옆 폴더로 배포되므로 성립하지 않는 실행 방식
+        error("이 .love 파일은 단독 실행용이 아닙니다.\n" ..
+            "배포 폴더(ThisFar)의 ThisFar.exe를 실행해 주세요.\n" ..
+            "(개발 실행은 소스 폴더에서: lovec .)")
     end
     local d = db.load(root)
     local errs = d.validate()

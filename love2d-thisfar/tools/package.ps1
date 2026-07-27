@@ -112,6 +112,10 @@ Get-ChildItem $loveDir -Filter "*.dll" | Copy-Item -Destination $distDir
 $license = Join-Path $loveDir "license.txt"
 if (Test-Path $license) { Copy-Item $license (Join-Path $distDir "LOVE-license.txt") }
 
+# 5) 중간 산물 .love 제거 — dist에 남겨두면 실행 파일로 오인해 더블클릭하는 함정이 된다
+#    (.love 단독 실행은 data/가 exe 옆에 있는 이 배포 구조에서 성립하지 않음 — main.lua도 안내 오류를 냄)
+Remove-Item $loveFile -Force -ErrorAction SilentlyContinue
+
 $size = [math]::Round((Get-ChildItem $distDir -Recurse | Measure-Object Length -Sum).Sum / 1MB, 1)
 Write-Host "완료: $distDir (총 ${size}MB)"
 Write-Host "실행: $exePath"
