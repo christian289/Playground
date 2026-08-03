@@ -211,6 +211,9 @@ end
 function sel:wheelmoved(_, y)
     local maxScroll = math.max(0, #self.ids - VISIBLE_ROWS)
     self.scroll = math.max(0, math.min(self.scroll - y, maxScroll))
+    -- 같은 프레임에 배칭된 클릭이 스크롤 이전 좌표(직전 draw의 rect)로 다른 스테이지에
+    -- 진입하는 것을 방지 — rect를 비우면 그 클릭은 무해하게 무시되고 다음 draw가 재구성한다.
+    self.rows = {}
 end
 
 return sel
