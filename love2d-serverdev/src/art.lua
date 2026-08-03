@@ -725,10 +725,12 @@ function art.rookIconData()
 end
 
 --------------------------------------------------------------------------------
--- 타이틀 게임명 — 폰트 렌더 기반(문장형 제목이라 5x7 도트 픽셀 레터링 대신 큰 폰트 2줄로 배치).
--- 룩 심볼과 마찬가지로 love.timer를 직접 부르지 않고 t를 인자로 받아 미세한 발광 펄스만 준다.
+-- 타이틀 메인 게임명("서버실"/"개발자") — 폰트 렌더 기반(문장형 제목이라 5x7 도트 픽셀
+-- 레터링 대신 큰 폰트 2줄로 배치). 룩 심볼과 마찬가지로 love.timer를 직접 부르지 않고 t를
+-- 인자로 받아 미세한 발광 펄스만 준다. 모토(부제)·기존 설명 태그라인은 이 블록 아래
+-- (states/title.lua)에서 별도로 그린다 — 이 모듈은 메인 타이틀 2줄(그린→시안 네온)만 담당한다.
 --------------------------------------------------------------------------------
-local TITLE_LINE1, TITLE_LINE2 = "정말 이렇게까지", "게임을 해야할까?"
+local TITLE_LINE1, TITLE_LINE2 = "서버실", "개발자"
 
 -- 2줄 제목 블록의 총 높이(그리지 않고 계산만) — 호출부(title.lua)가 draw 전에 레이아웃을
 -- 잡을 때 drawTitleText와 동일한 lh 공식을 쓰도록 단일 지점으로 뽑아 둔다(드리프트 방지).
@@ -736,7 +738,8 @@ local function titleLineH(font) return font:getHeight() + 4 end
 function art.titleTextHeight(font) return titleLineH(font) * 2 end
 
 -- (cx, y) 상단 중앙 기준으로 title 폰트 2줄을 그린다. 그린→시안 그라데이션 + 옅은 자홍 글로우
--- 레이어를 살짝 오프셋해 겹쳐 네온 발광 느낌을 낸다(픽셀 시절 CODE=green/DEFENSE=cyan 배색 계승).
+-- 레이어를 살짝 오프셋해 겹쳐 네온 발광 느낌을 낸다(픽셀 시절 CODE=green/DEFENSE=cyan 배색을
+-- 이어받아 2026-07-27 재개명 후에도 "서버실"=green/"개발자"=cyan으로 유지).
 function art.drawTitleText(cx, y, font, t)
     local P = art.pal
     local W = love.graphics.getWidth()

@@ -1,4 +1,4 @@
--- src/shell.lua — ThisFar(《정말 이렇게까지 게임을 해야할까?》) 셸 진영 파서(순수 Lua, love API/love.timer 금지).
+-- src/shell.lua — ServerDev(《서버실 개발자:우리는 음지에서 일하고 고액연봉을 지향한다.》) 셸 진영 파서(순수 Lua, love API/love.timer 금지).
 -- "문자열 in → 문자열 out" 게이트웨이: Shell.new(battle) → shell:exec(line, opts)
 -- → { ok, output, [open], [clear] }. shell:tick(clock)이 cron 예약 명령을 실행한다.
 -- 이후 회차(외부 제어 어댑터)가 이 계약을 그대로 재사용할 예정이므로, 여기서 view(states/*)를

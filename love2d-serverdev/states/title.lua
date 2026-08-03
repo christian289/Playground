@@ -7,14 +7,20 @@ local title = {}
 local ITEMS = { "게임 시작", "세계관", "도감", "종료" }
 local MENU_STEP = 48 -- 메뉴 항목 y 간격(각 항목이 이 간격만큼의 y 밴드를 차지)
 
+-- 모토(부제) — 메인 타이틀 "서버실"/"개발자" 아래, 유명 표어의 개발자 유머 패러디.
+-- 기존 설명 태그라인은 그 아래 소형으로 그대로 유지한다.
+local MOTTO = "우리는 음지에서 일하고 고액연봉을 지향한다."
+local TAGLINE = "코드로 타워를 조종해 서버를 지켜라"
+
 -- 레이아웃 상수 — 모듈 로드 시 1회만 계산(main.lua가 fonts.load()를 먼저 실행하므로 이 시점엔
--- fonts.title/ui 지표가 이미 확정돼 있다). draw()와 itemAt() 양쪽이 같은 값을 참조해야
+-- fonts.title/subtitle/ui 지표가 이미 확정돼 있다). draw()와 itemAt() 양쪽이 같은 값을 참조해야
 -- 마우스 히트 판정이 실제 그려지는 메뉴 위치와 어긋나지 않는다.
 local ROOK_SCALE = 3.4
 local ROOK_Y = 8
 local TITLE_Y = ROOK_Y + 16 * ROOK_SCALE + 6
-local SUBTITLE_Y = TITLE_Y + art.titleTextHeight(fonts.title) + 10
-local MENU_Y0 = SUBTITLE_Y + fonts.ui:getHeight() + 26
+local MOTTO_Y = TITLE_Y + art.titleTextHeight(fonts.title) + 8
+local TAGLINE_Y = MOTTO_Y + fonts.subtitle:getHeight() + 6
+local MENU_Y0 = TAGLINE_Y + fonts.ui:getHeight() + 20
 
 function title:enter(_, d, p)
     self.d, self.p = d, p
@@ -107,12 +113,18 @@ function title:draw()
     -- 살짝 축소)
     art.drawRook(W / 2 - 8 * ROOK_SCALE, ROOK_Y, ROOK_SCALE, t)
 
-    -- 게임명(문장형 제목, 폰트 렌더 2줄) — 룩 심볼 바로 아래
+    -- 메인 타이틀("서버실"/"개발자", 폰트 렌더 2줄, green→cyan 네온) — 룩 심볼 바로 아래
     art.drawTitleText(W / 2, TITLE_Y, fonts.title, t)
 
+    -- 모토(부제) — 메인 타이틀 아래, 중간 크기
+    love.graphics.setFont(fonts.subtitle)
+    love.graphics.setColor(art.pal.white[1], art.pal.white[2], art.pal.white[3])
+    love.graphics.printf(MOTTO, 0, MOTTO_Y, W, "center")
+
+    -- 기존 설명 태그라인 — 모토 아래, 소형
     love.graphics.setFont(fonts.ui)
     love.graphics.setColor(0.7, 0.75, 0.82)
-    love.graphics.printf("코드로 타워를 조종해 서버를 지켜라", 0, SUBTITLE_Y, W, "center")
+    love.graphics.printf(TAGLINE, 0, TAGLINE_Y, W, "center")
 
     -- 메뉴
     love.graphics.setFont(fonts.big)

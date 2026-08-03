@@ -1,13 +1,13 @@
-# ThisFar(《정말 이렇게까지 게임을 해야할까?》) 배포 패키징 (LÖVE 표준 fuse 방식)
+# ServerDev(《서버실 개발자:우리는 음지에서 일하고 고액연봉을 지향한다.》) 배포 패키징 (LÖVE 표준 fuse 방식)
 # 사용법: 프로젝트 루트에서  powershell -ExecutionPolicy Bypass -File tools\package.ps1
-# 출력:  dist\ThisFar\  — 폴더째 복사하면 LÖVE 미설치 PC에서도 실행 가능
+# 출력:  dist\ServerDev\  — 폴더째 복사하면 LÖVE 미설치 PC에서도 실행 가능
 
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $loveDir = "C:\Program Files\LOVE"
-$distDir = Join-Path $projectRoot "dist\ThisFar"
-$loveFile = Join-Path $projectRoot "dist\ThisFar.love"
+$distDir = Join-Path $projectRoot "dist\ServerDev"
+$loveFile = Join-Path $projectRoot "dist\ServerDev.love"
 
 if (-not (Test-Path (Join-Path $loveDir "love.exe"))) {
     throw "LÖVE 설치를 찾을 수 없습니다: $loveDir (winget install love)"
@@ -91,11 +91,11 @@ try {
     Write-Warning "아이콘 주입 건너뜀(기본 LÖVE 아이콘 사용): $_"
 }
 
-# 2) love.exe와 결합(fuse) → ThisFar.exe
+# 2) love.exe와 결합(fuse) → ServerDev.exe
 #    주의: dist 폴더를 통째로 지우고 재생성하면 Windows의 지연 삭제(delete-pending) 때문에
 #    직후 복사가 조용히 실패할 수 있다 — 폴더는 유지하고 파일 단위로 제자리 갱신한다.
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
-$exePath = Join-Path $distDir "ThisFar.exe"
+$exePath = Join-Path $distDir "ServerDev.exe"
 if (Test-Path $exePath) { Remove-Item $exePath -Force }
 cmd /c copy /b "`"$fuseBase`"+`"$loveFile`"" "`"$exePath`"" | Out-Null
 if (-not (Test-Path $exePath)) { throw "fuse 실패: $exePath" }

@@ -1,7 +1,9 @@
-# love2d-thisfar
+# love2d-serverdev
 
-LÖVE (Love2D) 11.5 기반 코딩 교육용 타워디펜스 《정말 이렇게까지 게임을 해야할까?》(구 Code
-Defense — 2026-07-24 개명, 사유는 저장소 루트 커밋 로그 참고). 플레이어가 게임 내 에디터에서
+LÖVE (Love2D) 11.5 기반 코딩 교육용 타워디펜스 《서버실 개발자:우리는 음지에서 일하고
+고액연봉을 지향한다.》(구 Code Defense → 《정말 이렇게까지 게임을 해야할까?》(ThisFar,
+2026-07-24 개명) → 현재(2026-07-27 재개명) — 사유는 저장소 루트 커밋 로그 및 HANDOFF.md §1
+참고). 플레이어가 게임 내 에디터에서
 Lua 코드(`on_tick(self, world)`, `build(type, r, c, name)`)를 작성해 타워를 조종하고, 위에서
 내려오는 밈 몬스터(버그/널 포인터/concat-nil)를 막습니다. 설계서:
 `docs/superpowers/specs/2026-07-21-love2d-codedefense-design.md` (레포 루트 기준, 4.1/5.1절이
@@ -30,7 +32,7 @@ Lua 코드(`on_tick(self, world)`, `build(type, r, c, name)`)를 작성해 타�
 ## 구조
 
 ```
-love2d-thisfar/
+love2d-serverdev/
 ├─ main.lua              ← 엔트리 포인트: 폰트·아트 로드 → db.load → 데이터 무결성 검증 →
 │                            intro_seen 여부로 intro 또는 title 상태로 진입
 ├─ conf.lua               ← 창 크기(1280x640, play만 3칼럼 재배치·나머지 화면은 960 기준 레이아웃을
@@ -65,7 +67,8 @@ love2d-thisfar/
 ├─ states/                ← hump Gamestate 화면들 (뷰 전담, 로직은 src/battle.lua·src/tutorial.lua에 위임)
 │  ├─ intro.lua             ← 인트로 컷신 4장면 (첫 실행 1회 자동 재생, 타이틀 "세계관" 메뉴로 재생)
 │  ├─ title.lua             ← 타이틀 메뉴 4항목(게임 시작/세계관/도감/종료), 룩(Rook) 심볼 +
-│  │                            폰트 렌더 문장형 게임명 2줄, ↑↓+Enter 및 마우스(호버 이동·
+│  │                            폰트 렌더 메인 타이틀 2줄("서버실"/"개발자") + 모토(부제) +
+│  │                            기존 설명 태그라인, ↑↓+Enter 및 마우스(호버 이동·
 │  │                            좌클릭 선택) 겸용
 │  ├─ faction.lua           ← 진영 선택 화면(Wave D, 신규) — 타이틀 "게임 시작" 다음. Lua/Shell
 │  │                            2항목, 셸 스테이지가 0개면 "(준비 중)"으로 진입 차단
@@ -329,15 +332,20 @@ love2d-thisfar/
   4장면 컷신을 보여준다 — 지상의 화려한 서비스 → 새벽 서버실의 개발자 → 버그로 인한 장애 발생 →
   코드로 맞서는 결의. 장면마다 `src/art.lua`의 코드 생성 일러스트와 `src/cutscene.lua`의 초당
   30자 타이프라이터 텍스트가 함께 나온다. 타이틀 화면은 네온 서버실 배경에 책상 앞 개발자
-  뒷모습, 룩(Rook, 체스 성탑) 심볼, 그리고 그 아래 문장형 게임명 2줄을 그린다 —
-  `art.drawRook(x, y, scale, t)`가 16×16 도트(총안 3개+몸통+받침, green 몸체·cyan 하이라이트)를
-  직접 그리고, `art.rookIconData()`가 같은 도트를 32×32 `ImageData`로 만들어 `main.lua`가 부팅 시
-  `love.window.setIcon`으로 창/작업표시줄 아이콘을 설정한다. 게임명은 (구 버전의 5×7 도트
-  픽셀 레터링 "CODE DEFENSE" 대신) `art.drawTitleText(cx, y, font, t)`가 `fonts.title`(40px
-  나눔고딕)로 "정말 이렇게까지"/"게임을 해야할까?" 2줄을 그린다 — 문장형 제목이라 픽셀 폰트로는
-  감당이 안 돼 Wave 개명 때 폰트 렌더 기반으로 바꿨다(green→cyan 그라데이션 + 자홍 글로우 레이어로
-  네온 톤 유지). `states/title.lua`는 `art.titleTextHeight(font)`로 실제 렌더 높이를 미리 계산해
-  룩 심볼·부제·메뉴 y좌표를 그 높이에 맞춰 배치한다(폰트 교체 시에도 레이아웃이 안 깨지도록).
+  뒷모습, 룩(Rook, 체스 성탑) 심볼, 그리고 그 아래 메인 타이틀·모토·태그라인 3단 텍스트를
+  그린다 — `art.drawRook(x, y, scale, t)`가 16×16 도트(총안 3개+몸통+받침, green 몸체·cyan
+  하이라이트)를 직접 그리고, `art.rookIconData()`가 같은 도트를 32×32 `ImageData`로 만들어
+  `main.lua`가 부팅 시 `love.window.setIcon`으로 창/작업표시줄 아이콘을 설정한다. 메인
+  타이틀은 (구 버전의 5×7 도트 픽셀 레터링 "CODE DEFENSE" 대신) `art.drawTitleText(cx, y, font, t)`가
+  `fonts.title`(40px 나눔고딕)로 "서버실"(green)/"개발자"(cyan) 2줄을 그린다 — 문장형 제목이라
+  픽셀 폰트로는 감당이 안 돼 Wave 개명 때 폰트 렌더 기반으로 바꿨고(green→cyan 그라데이션 +
+  자홍 글로우 레이어로 네온 톤 유지), 2026-07-27 재개명(ThisFar→ServerDev)에도 이 렌더 메커니즘은
+  그대로 두고 텍스트 내용만 바꿨다. 그 아래 `states/title.lua`가 모토(부제) "우리는 음지에서
+  일하고 고액연봉을 지향한다."(`fonts.subtitle`, 메인과 태그라인 사이 중간 크기, 흰색)와 기존
+  설명 태그라인 "코드로 타워를 조종해 서버를 지켜라"(`fonts.ui`, 소형)를 차례로 그린다.
+  `states/title.lua`는 `art.titleTextHeight(font)`로 메인 타이틀의 실제 렌더 높이를 미리 계산해
+  룩 심볼·모토·태그라인·메뉴 y좌표를 그 높이에 맞춰 순서대로 배치한다(폰트 교체 시에도 레이아웃이
+  안 깨지도록).
   intro/title/stageselect/result/codex는 `love.graphics.getWidth()` 기반
   중앙 정렬로 1280 폭 창에 대응한다(intro의 960×420 일러스트는 재작업 없이 `translate`로 중앙에
   감쌈). 전투 화면(`states/play.lua`)에는 코드 생성 픽셀아트 몬스터/타워,
