@@ -14,7 +14,14 @@ local GRID_X, GRID_Y = 8, 48
 local FIELD_W = grid.COLS * grid.CELL -- 384
 local FIELD_H = grid.ROWS * grid.CELL -- 512
 local INFO_X, INFO_W = 400, 240 -- 정보 칼럼(전장과 에디터 사이)
+local COMBINED_W = (INFO_X + INFO_W) - GRID_X -- 전장+정보 칼럼 기준 폭 — 문제 카드·튜토리얼 중앙 카드가 공유
 local play = {}
+
+-- 클릭 좌표(x,y)가 rect({x0,y0,x1,y1})안인지 검사(rect가 nil이면 항상 false) — 튜토리얼 버튼
+-- rect·함수 사전 카드 rect 등 여러 클릭 판정이 공유하는 헬퍼.
+local function hitRect(x, y, r)
+    return r ~= nil and x >= r.x0 and x < r.x1 and y >= r.y0 and y < r.y1
+end
 
 -- enemies.csv의 color 필드("r;g;b" 문자열, 0~1 실수)를 {r,g,b}로 파싱. 형식이 어긋나면 흰색.
 local function parseColor(s)
@@ -206,6 +213,7 @@ local function drawDictCard(self, x, y, w, name)
         love.graphics.setColor(0.6, 0.9, 0.7)
         love.graphics.print(doc.example, x + pad, cy)
         love.graphics.setColor(1, 1, 1)
+        self.dictCardRect = { x0 = x, y0 = y, x1 = x + w, y1 = y + h }
         return y + h
     else
         local src, startLine, truncated = extractFuncSource(self.editor.lines, name)
@@ -216,6 +224,7 @@ local function drawDictCard(self, x, y, w, name)
             love.graphics.setColor(0.7, 0.75, 0.8)
             love.graphics.print("소스를 찾을 수 없습니다", x + pad, y + pad)
             love.graphics.setColor(1, 1, 1)
+            self.dictCardRect = { x0 = x, y0 = y, x1 = x + w, y1 = y + h }
             return y + h
         end
         local n = 1 + #src + (truncated and 1 or 0)
@@ -236,6 +245,7 @@ local function drawDictCard(self, x, y, w, name)
             love.graphics.print("…", x + pad, cy)
         end
         love.graphics.setColor(1, 1, 1)
+        self.dictCardRect = { x0 = x, y0 = y, x1 = x + w, y1 = y + h }
         return y + h
     end
 end
@@ -266,6 +276,7 @@ local function drawFuncDict(self, x, y, w)
     local cy = y + 18
 
     self.dictRows = {}
+    self.dictCardRect = nil -- 이번 프레임에 카드가 열리면 drawDictCard가 다시 채운다
     cy = dictRow(self, x, w, cy, "build", "> build")
     cy = dictRow(self, x, w, cy, "demolish", "> demolish")
     cy = dictRow(self, x, w, cy, "world.oldest", "> world.oldest")
@@ -307,6 +318,7 @@ local function drawShellCommandList(self, x, y, w)
     local cy = y + 18
 
     self.dictRows = {}
+    self.dictCardRect = nil -- 이번 프레임에 카드가 열리면 drawDictCard가 다시 채운다
     for _, cmd in ipairs(SHELL_COMMANDS) do
         cy = dictRow(self, x, w, cy, cmd.name, cmd.label)
     end
@@ -459,9 +471,15 @@ function play:enter(_, d, stageId, p)
     self.mx, self.my = -100, -100 -- 마우스 이동 전 호버 오탐 방지
     self.escArmed = 0
     self.tut = nil
+    if self.stage.tutorial_file ~= "" and not p.tutorial_done[stageId] then
+        self.tut = require("src.tutorial").load(d.root .. "/data/" .. self.stage.tutorial_file)
+    end
     self.tutSaved = false
+    self.tutShake = 0       -- 튜토리얼이 키/텍스트 입력을 막았을 때 0.3초 흔들림(뷰 전용, 원시 dt)
     self.dictOpen = nil     -- 함수 사전 펼침 상태: nil | "build" | 함수명
+    self.dictCardRect = nil -- 펼쳐진 사전 카드의 화면 rect({x0,y0,x1,y1}) — 카드 본문 클릭 접기용
     self.dictRows = {}      -- 정보 칼럼 사전 목록 클릭 판정({name,x0,x1,y0,y1})
+    self.runBtnRect = nil   -- [▶ 실행] 버튼 화면 rect(셸 진영이면 nil 유지) — draw가 매 프레임 갱신
     self.funcCounted = {}   -- 판당 funcbook 카운트 1회 가드(이름별)
     self.autotype = nil                 -- {target=문자열, pos=글자수, timer}
     self.buttons = {}
@@ -507,7 +525,10 @@ function play:enter(_, d, stageId, p)
             end
         end
     end
-    self.showBrief = true               -- 문제 카드: 카운트다운 중 자동 표시, Ctrl+I로 재열람
+    -- 문제 카드: 튜토리얼이 활성인 스테이지는 자동 표시를 억제한다(Enter 의미 충돌 방지 —
+    -- 카드 닫기 vs 말풍선 진행 — 및 이중 모달 혼란 제거). 튜토리얼이 없거나 이미 완료된
+    -- 재방문은 기존대로 자동 표시. Ctrl+I 수동 토글은 이 값과 무관하게 그대로 동작한다.
+    self.showBrief = not self.tut       -- 카운트다운 중 자동 표시, Ctrl+I로 재열람
 
     particles.clear()
     self.fx = {
@@ -518,10 +539,6 @@ function play:enter(_, d, stageId, p)
         crisisTimer = 0,                 -- 위기 경고 비네트 사인 펄스용 누적 타이머 — 원시 dt(배속 무관)
         prevPhased = {},                 -- 하이젠버그 은신→재출현 전환 감지(프레임-diff)용
     }
-
-    if self.stage.tutorial_file ~= "" and not p.tutorial_done[stageId] then
-        self.tut = require("src.tutorial").load(d.root .. "/data/" .. self.stage.tutorial_file)
-    end
 end
 
 function play:isButtonStage() return self.stage.ui == "button" end
@@ -740,6 +757,8 @@ function play:update(dt)
     if (self.escArmed or 0) > 0 then self.escArmed = self.escArmed - dt end
     -- 저장 실패 테두리 플래시 감쇠 (원시 dt)
     if (fx.saveErrFlash or 0) > 0 then fx.saveErrFlash = fx.saveErrFlash - dt end
+    -- 튜토리얼 잠금 피드백(흔들림) 감쇠 (원시 dt — 배속 무관하게 0.3초 유지)
+    if (self.tutShake or 0) > 0 then self.tutShake = math.max(0, self.tutShake - dt) end
     -- 위기 경고 비네트 사인 펄스 누적 (원시 dt — 배속 무관하게 항상 흘러 위기 진입 시 끊김 없이 이어짐)
     fx.crisisTimer = fx.crisisTimer + dt
     particles.update(dt)
@@ -1029,6 +1048,45 @@ function play:draw()
         self.editor:draw(fonts, true)
     end
 
+    -- [▶ 실행] 버튼: F5와 완전히 같은 경로(play:save)를 클릭으로도 쓸 수 있게 한다. 힌트바
+    -- 안내만으로는 실행 수단이 안 보인다는 보고 대응. 에디터가 보이는 스테이지(hint/free/button)
+    -- 전부에 표시하고, 저장 개념이 없는 셸 진영(터미널)에서는 숨긴다. 퀵바(x=656~1024 부근) 및
+    -- 버튼 목록 텍스트(editor.x 기준 좌측)와 겹치지 않도록 에디터 우하단 바깥 여백에 둔다.
+    self.runBtnRect = nil
+    if not self:isShellStage() then
+        local bw, bh = 96, 28
+        local bx = self.editor.x + self.editor.w - bw
+        local by = self.editor.y + self.editor.h + 4
+        self.runBtnRect = { x0 = bx, y0 = by, x1 = bx + bw, y1 = by + bh }
+        local hover = hitRect(self.mx or -1, self.my or -1, self.runBtnRect)
+        love.graphics.setColor(hover and 0.22 or 0.16, hover and 0.5 or 0.4, hover and 0.4 or 0.3, 0.95)
+        love.graphics.rectangle("fill", bx, by, bw, bh, 4)
+        love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+        love.graphics.setLineWidth(hover and 2 or 1)
+        love.graphics.rectangle("line", bx, by, bw, bh, 4)
+        love.graphics.setLineWidth(1)
+        love.graphics.setFont(fonts.ui)
+        if hover then love.graphics.setColor(1, 1, 1)
+        else love.graphics.setColor(0.85, 0.95, 0.88) end
+        love.graphics.printf("▶ 실행", bx, by + 5, bw, "center")
+        love.graphics.setColor(1, 1, 1)
+        if hover then
+            local tip = "F5 — 저장·반영"
+            love.graphics.setFont(fonts.small)
+            local tw = fonts.small:getWidth(tip) + 16
+            local th = 22
+            local tx = math.min(bx, love.graphics.getWidth() - tw - 4)
+            local ty = by - th - 4
+            love.graphics.setColor(0.05, 0.07, 0.12, 0.93)
+            love.graphics.rectangle("fill", tx, ty, tw, th, 4, 4)
+            love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3], 0.4)
+            love.graphics.rectangle("line", tx, ty, tw, th, 4, 4)
+            love.graphics.setColor(0.85, 0.88, 0.92)
+            love.graphics.print(tip, tx + 8, ty + 4)
+            love.graphics.setColor(1, 1, 1)
+        end
+    end
+
     -- 저장 오류(셸 진영은 setScript를 호출하지 않으므로 b.scriptError가 항상 nil — 자연히 생략됨)
     if b.scriptError then
         love.graphics.setColor(1, 0.45, 0.4)
@@ -1097,7 +1155,7 @@ function play:draw()
     if self.showBrief then
         local stage = self.stage
         local cardW = 360
-        local combinedW = (INFO_X + INFO_W) - GRID_X -- 전장+정보 칼럼 기준 중앙(x≈320)
+        local combinedW = COMBINED_W -- 전장+정보 칼럼 기준 중앙(x≈320) — 튜토리얼 중앙 카드와 폭 공유
         local cardX = GRID_X + (combinedW - cardW) / 2
         local pad = 14
         -- 브리핑 문단(Task 5, §8): 문제 서술(problem) 위에 서사체 도입부를 얹는다.
@@ -1177,7 +1235,7 @@ function play:draw()
         love.graphics.setColor(1, 1, 1)
     end
 
-    if self.tut then self.tut:draw(fonts, GRID_X, GRID_Y) end
+    if self.tut then self.tut:draw(fonts, GRID_X, GRID_Y, COMBINED_W, self.tutShake or 0) end
 end
 
 function play:keypressed(key)
@@ -1185,7 +1243,12 @@ function play:keypressed(key)
     -- Task 5 훅: 튜토리얼이 활성 상태면 허용된 키만 통과시킨다. 튜토리얼이 키를 소비했으면
     -- (Ctrl+X 스킵, Enter 진행, 스텝 지정 키 진행) 여기서 멈춰 에디터로 새어나가지 않게 한다.
     if self.tut and not self.tut:done() then
-        if not self.tut:allows(key, ctrl) then return end
+        if not self.tut:allows(key, ctrl) then
+            -- UX 개편: 잠긴 키를 눌러도 반응이 전혀 없어 보이던 문제 — 말풍선/카드를 0.3초
+            -- 흔들어 "지금은 이 키가 안 먹는다"는 피드백을 준다(로직은 변경 없음, 뷰 타이머만).
+            self.tutShake = 0.3
+            return
+        end
         if self.tut:keypressed(key, ctrl) then return end
     end
     -- 문제 카드: Ctrl+I로 언제든 토글(버튼/에디터 입력과 무충돌), Enter는 카드가 열려
@@ -1245,7 +1308,10 @@ end
 
 function play:textinput(ch)
     -- Task 5 훅: 튜토리얼이 텍스트 입력을 막는 구간에서는 무시한다.
-    if self.tut and not self.tut:done() and not self.tut:allowsText() then return end
+    if self.tut and not self.tut:done() and not self.tut:allowsText() then
+        self.tutShake = 0.3 -- keypressed의 잠금 피드백과 동일한 흔들림(로직은 변경 없음)
+        return
+    end
     if self:isButtonStage() or self.autotype then return end
     self.editor:textinput(ch)
 end
@@ -1266,9 +1332,26 @@ end
 
 function play:mousepressed(x, y, button)
     if button ~= 1 then return end
+    -- 튜토리얼 중앙 카드의 버튼형 라벨([Enter ▶ 다음]/[Ctrl+X 건너뛰기])은 화면에서 가장 위에
+    -- 그려지므로(§ Tutorial:draw) 클릭 판정도 최우선이다 — 키보드와 동일 처리(Tutorial:keypressed
+    -- 직접 호출)로 로직을 우회하지 않는다.
+    if self.tut and not self.tut:done() then
+        if hitRect(x, y, self.tut.enterRect) then self.tut:keypressed("return", false) return end
+        if hitRect(x, y, self.tut.skipRect) then self.tut:keypressed("x", true) return end
+    end
     -- 문제 카드가 열려 있으면 좌클릭은 카드 닫기로만 소비한다(Enter 닫기와 대칭) — 그렇지
     -- 않으면 카드 뒤에 가려진 사전 목록이 오작동으로 클릭될 수 있다.
     if self.showBrief then self.showBrief = false; return end
+    -- [▶ 실행] 버튼: F5와 완전히 같은 경로 — 튜토리얼 잠금 스텝에서는 키보드 F5와 동일하게
+    -- tut:allows("f5")를 통과해야만 동작한다(우회 금지). 막혔으면 키 차단과 같은 흔들림 피드백.
+    if hitRect(x, y, self.runBtnRect) then
+        if self.tut and not self.tut:done() and not self.tut:allows("f5", false) then
+            self.tutShake = 0.3
+        else
+            self:save()
+        end
+        return
+    end
     -- 셸 진영은 그 영역에 다중행 코드 에디터가 아니라 터미널이 그려지므로(입력 줄 좌표 계산이
     -- 다름 — `$ ` 프롬프트 폭 vs 에디터의 40px 줄번호 거터), 코드 식별자 클릭 판정 자체를
     -- 건너뛴다. 명령 사전 목록 클릭(아래 dictRows 루프)은 셸 진영에서도 그대로 동작한다.
@@ -1296,6 +1379,13 @@ function play:mousepressed(x, y, button)
             self.dictOpen = (self.dictOpen == row.name) and nil or row.name
             return
         end
+    end
+
+    -- 펼쳐진 사전 카드의 본문을 클릭하면 접는다 — 기존에는 행/토큰 재클릭 토글만 있고
+    -- 카드 본문 클릭은 무시돼(=반응 없음) 사용자가 접으려 해도 안 접히는 문제가 있었다.
+    if self.dictOpen and hitRect(x, y, self.dictCardRect) then
+        self.dictOpen = nil
+        return
     end
 end
 
