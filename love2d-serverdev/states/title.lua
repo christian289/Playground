@@ -15,6 +15,7 @@ local TAGLINE = "코드로 타워를 조종해 서버를 지켜라"
 -- 레이아웃 상수 — 모듈 로드 시 1회만 계산(main.lua가 fonts.load()를 먼저 실행하므로 이 시점엔
 -- fonts.title/subtitle/ui 지표가 이미 확정돼 있다). draw()와 itemAt() 양쪽이 같은 값을 참조해야
 -- 마우스 히트 판정이 실제 그려지는 메뉴 위치와 어긋나지 않는다.
+local FLOOR = 452 -- 배경 바닥 시작 y (drawBackground의 벽/바닥 경계 — 힌트 줄 배치도 이 값 기준)
 local ROOK_SCALE = 3.4
 local ROOK_Y = 8
 local TITLE_Y = ROOK_Y + 16 * ROOK_SCALE + 6
@@ -53,7 +54,6 @@ end
 local function drawBackground(t)
     local P = art.pal
     local W = love.graphics.getWidth()
-    local FLOOR = 452
     love.graphics.setColor(P.bg[1], P.bg[2], P.bg[3])
     love.graphics.rectangle("fill", 0, 0, W, 640)
     -- 상단 어두운 비네트(로고/메뉴 영역 톤)
@@ -142,7 +142,9 @@ function title:draw()
 
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.55, 0.6, 0.66)
-    love.graphics.printf("↑↓/마우스 이동 · Enter/클릭 선택", 0, MENU_Y0 + #ITEMS * MENU_STEP + 8, W, "center")
+    -- 제목 3단(메인+모토+태그라인)으로 메뉴가 내려와 기존 위치(메뉴 아래)는 서버랙 밴드(FLOOR-66..FLOOR)와
+    -- 겹친다 — 랙 아래 빈 바닥 띠(FLOOR..데스크 발광 486)로 내려 가독성을 확보한다.
+    love.graphics.printf("↑↓/마우스 이동 · Enter/클릭 선택", 0, FLOOR + 12, W, "center")
     love.graphics.setColor(1, 1, 1)
 end
 
