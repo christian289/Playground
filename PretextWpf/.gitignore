@@ -1,0 +1,7 @@
+.upstream/
+.vs/
+artifacts/
+TestResults/
+**/bin/
+**/obj/
+BenchmarkDotNet.Artifacts/
