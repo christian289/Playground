@@ -6,8 +6,8 @@
 | ARCH-002 | Error | `CoreAssembly_ReferencesOnlyFrameworkAndWpfAssemblies_Expected` | 핵심 DLL third-party 참조 금지 | Passing |
 | AN-001 | Error | `TextStyle_InvalidValues_Throws` | 공개 style 입력 검증 | Passing |
 | AN-002 | Error | `PrepareOptions_InvalidValues_Throws` | 공개 option 입력 검증 | Passing |
-| AN-003 | Happy | `Analyze_MixedUnicode_MapsUtf16AndGraphemes` | UTF-16/grapheme 불변식 | Planned |
-| AN-004 | Boundary | `Segment_UnicodeScripts_UsesExpectedBreaks` | STA/CJK/Thai/Lao/Khmer/Myanmar 줄 경계 | Planned |
+| AN-003 | Happy | `Analyze_MixedUnicode_MapsUtf16AndGraphemes` | UTF-16/grapheme 불변식 | Passing |
+| AN-004 | Boundary | `Segment_UnicodeScripts_UsesExpectedBreaks` | STA/CJK/Thai/Lao/Khmer/Myanmar 줄 경계 | Passing |
 | BIDI-001 | Happy | `ComputeSegmentLevels_MixedHebrewLatin_ExpectedLevels` | 혼합 bidi level | Planned |
 | BIDI-002 | Boundary | `ComputeSegmentLevels_BracketsAndEmoji_ExpectedLevels` | bracket/astral 처리 | Planned |
 | BIDI-003 | Error | `ComputeSegmentLevels_InvalidOffsets_Throws` | bidi 입력 범위 검증 | Planned |
