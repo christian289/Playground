@@ -7,7 +7,7 @@ local title = {}
 local ITEMS = { "게임 시작", "세계관", "도감", "종료" }
 local MENU_STEP = 48 -- 메뉴 항목 y 간격(각 항목이 이 간격만큼의 y 밴드를 차지)
 
--- 모토(부제) — 메인 타이틀 "서버실"/"개발자" 아래, 유명 표어의 개발자 유머 패러디.
+-- 모토(부제) — 메인 타이틀 "서버실 개발자" 아래, 유명 표어의 개발자 유머 패러디.
 -- 기존 설명 태그라인은 그 아래 소형으로 그대로 유지한다.
 local MOTTO = "우리는 음지에서 일하고 고액연봉을 지향한다."
 local TAGLINE = "코드로 타워를 조종해 서버를 지켜라"
@@ -109,11 +109,10 @@ function title:draw()
     local W = love.graphics.getWidth()
     drawBackground(t)
 
-    -- 룩 심볼 (게임명 위 — 문장형 제목 2줄이 들어갈 자리를 확보하기 위해 픽셀 로고 시절보다
-    -- 살짝 축소)
+    -- 룩 심볼 (게임명 위 — 큰 제목과 모토의 여백을 확보하기 위해 픽셀 로고 시절보다 살짝 축소)
     art.drawRook(W / 2 - 8 * ROOK_SCALE, ROOK_Y, ROOK_SCALE, t)
 
-    -- 메인 타이틀("서버실"/"개발자", 폰트 렌더 2줄, green→cyan 네온) — 룩 심볼 바로 아래
+    -- 메인 타이틀("서버실 개발자", 폰트 렌더 한 줄, green 네온) — 룩 심볼 바로 아래
     art.drawTitleText(W / 2, TITLE_Y, fonts.title, t)
 
     -- 모토(부제) — 메인 타이틀 아래, 중간 크기
