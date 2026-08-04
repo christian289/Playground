@@ -47,7 +47,7 @@
           "sourceRepository": "https://github.com/chenglou/pretext",
           "sourcePath": "src/line-break.ts",
           "sourceSha256": "61cbc9f649dbe8a632749d86001d365c1cf7c0486a01d26596aa5babfa324cb6",
-          "destinationPath": "src/Pretext.Wpf/Internal/Analysis/SegmentBreakInfo.cs",
+          "destinationPath": "src/Pretext.Wpf/Internal/Analysis/SegmentBreakKind.cs",
           "copyMode": "adapted"
         },
         {
@@ -329,6 +329,70 @@
           "sourceSha256": "9bf0e34aca41bfc33406fe605cf21f42d2b8d89aef0a20d079ff85b892425163",
           "destinationPath": "src/Pretext.Wpf.Demo/Controls/DynamicLayoutSurface.cs",
           "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/line-break.ts",
+          "destinationPath": "src/Pretext.Wpf/Internal/Layout/LineWalker.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/layout.ts",
+          "destinationPath": "src/Pretext.Wpf/Public/PreparedText.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/measurement.ts",
+          "destinationPath": "src/Pretext.Wpf/Internal/Layout/LayoutProfile.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/measurement.ts",
+          "destinationPath": "src/Pretext.Wpf/Internal/Measurement/ISegmentMeasurer.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/rich-inline.ts",
+          "destinationPath": "src/Pretext.Wpf/Public/PreparedRichInline.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/layout.test.ts",
+          "destinationPath": "tests/Pretext.Wpf.Tests/Parity/CanvasParityMeasurer.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/layout.test.ts",
+          "destinationPath": "tools/parity/fake-canvas.ts",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/test-data.ts",
+          "destinationPath": "tools/parity/generate.ts",
+          "copyMode": "adapted"
+        }
+      ],
+      "generatedArtifacts": [
+        {
+          "generator": "tools/parity/generate.ts",
+          "sourcePaths": [
+            "src/test-data.ts",
+            "src/layout.ts",
+            "src/rich-inline.ts"
+          ],
+          "outputs": [
+            "tests/Pretext.Wpf.Tests/TestData/upstream-parity-corpus.json",
+            "tests/Pretext.Wpf.Tests/TestData/upstream-rich-corpus.json",
+            "tests/Pretext.Wpf.Tests/TestData/native-word-dictionary.json"
+          ],
+          "note": "Captured output of the upstream engine under its own deterministic fake canvas; native-word-dictionary.json holds ICU word boundaries used only where WPF is unavailable."
         }
       ]
     },
