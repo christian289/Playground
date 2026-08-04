@@ -60,6 +60,19 @@ internal static class UnicodeClassifier
         (0x1F000, 0x1FAFF),
     };
 
+    private static readonly (int Start, int End)[] NumericAffixRanges =
+    {
+        (0x0024, 0x0025), (0x002B, 0x002B), (0x005C, 0x005C), (0x00A2, 0x00A5),
+        (0x00B0, 0x00B1), (0x058F, 0x058F), (0x0609, 0x060B), (0x066A, 0x066A),
+        (0x07FE, 0x07FF), (0x09F2, 0x09F3), (0x09F9, 0x09FB), (0x0AF1, 0x0AF1),
+        (0x0BF9, 0x0BF9), (0x0D79, 0x0D79), (0x0E3F, 0x0E3F), (0x17DB, 0x17DB),
+        (0x2030, 0x2037), (0x2057, 0x2057), (0x20A0, 0x20CF), (0x2103, 0x2103),
+        (0x2109, 0x2109), (0x2116, 0x2116), (0x2212, 0x2213), (0xA838, 0xA838),
+        (0xFDFC, 0xFDFC), (0xFE69, 0xFE6A), (0xFF04, 0xFF05), (0xFFE0, 0xFFE1),
+        (0xFFE5, 0xFFE6), (0x11FDD, 0x11FE0), (0x1E2FF, 0x1E2FF),
+        (0x1ECAC, 0x1ECAC), (0x1ECB0, 0x1ECB0),
+    };
+
     internal static bool IsCjk(Rune rune) => IsInRanges(rune.Value, CjkRanges);
 
     internal static bool IsHangul(Rune rune) => IsInRanges(rune.Value, HangulRanges);
@@ -112,6 +125,24 @@ internal static class UnicodeClassifier
     }
 
     internal static bool IsEmojiCandidate(Rune rune) => IsInRanges(rune.Value, EmojiRanges);
+
+    /// <summary>
+    /// Characters prohibited from starting a line in CJK text (kinsoku shori);
+    /// they attach to the preceding unit. Mirrors upstream <c>kinsokuStart</c>.
+    /// </summary>
+    internal static bool IsKinsokuStart(Rune rune) => rune.Value is
+        0xFF0C or 0xFF0E or 0xFF01 or 0xFF1A or 0xFF1B or 0xFF1F or
+        0x3001 or 0x3002 or 0x30FB or 0xFF09 or 0x3015 or 0x3009 or
+        0x300B or 0x300D or 0x300F or 0x3011 or 0x3017 or 0x3019 or
+        0x301B or 0x30FC or 0x3005 or 0x303B or 0x309D or 0x309E or
+        0x30FD or 0x30FE;
+
+    /// <summary>
+    /// Currency/percent-style affixes that bind to an adjacent numeric run instead
+    /// of forming their own break opportunity (UAX #14 PR/PO classes).
+    /// Mirrors upstream <c>lineBreakNumericAffixRanges</c>.
+    /// </summary>
+    internal static bool IsLineBreakNumericAffix(Rune rune) => IsInRanges(rune.Value, NumericAffixRanges);
 
     internal static bool IsNativeWordBreakScript(UnicodeScript script) =>
         script is UnicodeScript.Thai or UnicodeScript.Lao or UnicodeScript.Khmer or UnicodeScript.Myanmar;
