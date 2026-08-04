@@ -8,9 +8,9 @@
 | AN-002 | Error | `PrepareOptions_InvalidValues_Throws` | 공개 option 입력 검증 | Passing |
 | AN-003 | Happy | `Analyze_MixedUnicode_MapsUtf16AndGraphemes` | UTF-16/grapheme 불변식 | Passing |
 | AN-004 | Boundary | `Segment_UnicodeScripts_UsesExpectedBreaks` | STA/CJK/Thai/Lao/Khmer/Myanmar 줄 경계 | Passing |
-| BIDI-001 | Happy | `ComputeSegmentLevels_MixedHebrewLatin_ExpectedLevels` | 혼합 bidi level | Planned |
-| BIDI-002 | Boundary | `ComputeSegmentLevels_BracketsAndEmoji_ExpectedLevels` | bracket/astral 처리 | Planned |
-| BIDI-003 | Error | `ComputeSegmentLevels_InvalidOffsets_Throws` | bidi 입력 범위 검증 | Planned |
+| BIDI-001 | Happy | `ComputeSegmentLevels_MixedHebrewLatin_ExpectedLevels` | 혼합 bidi level | Passing |
+| BIDI-002 | Boundary | `ComputeSegmentLevels_BracketsAndEmoji_ExpectedLevels` | bracket/astral 처리 | Passing |
+| BIDI-003 | Error | `ComputeSegmentLevels_InvalidOffsets_Throws` | bidi 입력 범위 검증 | Passing |
 | MEAS-001 | Happy | `Measure_SegmentsOnSta_ReturnsFiniteAdvances` | WPF shaping 측정 | Planned |
 | MEAS-002 | Boundary | `Measure_StyledBoundaries_PreservesWidths` | style boundary 측정 | Planned |
 | MEAS-003 | Happy | `Measure_RepeatedRequest_UsesCache` | 측정 cache 재사용 | Planned |
