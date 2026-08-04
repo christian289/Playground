@@ -4,8 +4,8 @@
 |---|---|---|---|---|
 | ARCH-001 | Error | `IsAllowed_FrameworkAndWpfAssemblies_ExpectedPolicy` | 핵심 DLL 허용 assembly allowlist | Passing |
 | ARCH-002 | Error | `CoreAssembly_ReferencesOnlyFrameworkAndWpfAssemblies_Expected` | 핵심 DLL third-party 참조 금지 | Passing |
-| AN-001 | Error | `TextStyle_InvalidValues_Throws` | 공개 style 입력 검증 | Planned |
-| AN-002 | Error | `PrepareOptions_InvalidValues_Throws` | 공개 option 입력 검증 | Planned |
+| AN-001 | Error | `TextStyle_InvalidValues_Throws` | 공개 style 입력 검증 | Passing |
+| AN-002 | Error | `PrepareOptions_InvalidValues_Throws` | 공개 option 입력 검증 | Passing |
 | AN-003 | Happy | `Analyze_MixedUnicode_MapsUtf16AndGraphemes` | UTF-16/grapheme 불변식 | Planned |
 | AN-004 | Boundary | `Segment_UnicodeScripts_UsesExpectedBreaks` | STA/CJK/Thai/Lao/Khmer/Myanmar 줄 경계 | Planned |
 | BIDI-001 | Happy | `ComputeSegmentLevels_MixedHebrewLatin_ExpectedLevels` | 혼합 bidi level | Planned |
@@ -20,7 +20,7 @@
 | LAY-003 | Boundary | `LayoutNextLineRange_Cursor_ContinuesStreaming` | streaming cursor | Planned |
 | LAY-004 | Error | `Layout_InvalidArguments_Throws` | layout guard matrix | Planned |
 | LAY-005 | Happy | `Layout_WarmedPreparedText_AllocatesZeroBytes` | hot-path 0 B/op | Planned |
-| RICH-001 | Error | `RichInline_InvalidArguments_Throws` | rich API guard matrix | Planned |
+| RICH-001 | Error | `RichInline_InvalidArguments_Throws` | rich API guard matrix | Passing |
 | RICH-002 | Happy | `RichInline_StyledItems_MaterializesOwnedFragments` | fragment ownership/spacing | Planned |
 | RICH-003 | Boundary | `RichInline_ChipsAndBidi_PreservesAtomicRanges` | chip/bidi/letter spacing | Planned |
 | RICH-004 | Happy | `RichInline_WarmedPrepared_AllocatesZeroBytes` | rich hot-path 0 B/op | Planned |
