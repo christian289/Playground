@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Pretext.Wpf</RootNamespace>
+    <AssemblyName>Pretext.Wpf</AssemblyName>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <Target Name="RejectExternalCoreReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="'@(PackageReference)' != ''"
+           Text="Pretext.Wpf must not contain PackageReference items." />
+    <Error Condition="'@(ProjectReference)' != ''"
+           Text="Pretext.Wpf must not contain ProjectReference items." />
+  </Target>
+</Project>

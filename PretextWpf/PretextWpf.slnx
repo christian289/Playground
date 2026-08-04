@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Pretext.Wpf/Pretext.Wpf.csproj" />
+    <Project Path="src/Pretext.Wpf.Demo/Pretext.Wpf.Demo.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Pretext.Wpf.Tests/Pretext.Wpf.Tests.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Pretext.Wpf.Benchmarks/Pretext.Wpf.Benchmarks.csproj" />
+  </Folder>
+</Solution>
