@@ -1,0 +1,168 @@
+{
+  "measurer": "Line-behavior expectations (the 'layout' field) assume the same fake measurer as TextLayoutEngineTests.FakeMeasurer: 10.0 width per grapheme, 5.0 for a single space, 0.0 for U+200B (zero-width space).",
+  "cases": [
+    {
+      "id": "whitespace-only-input-stays-empty",
+      "text": "  \t\n  ",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": { "normalized": "", "segments": [] },
+      "upstream": "prepare invariants > whitespace-only input stays empty"
+    },
+    {
+      "id": "collapses-ordinary-whitespace-runs-and-trims-edges",
+      "text": "  Hello\t \n  World  ",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": {
+        "normalized": "Hello World",
+        "segments": ["Hello", " ", "World"],
+        "kinds": ["Text", "Space", "Text"]
+      },
+      "upstream": "prepare invariants > collapses ordinary whitespace runs and trims the edges"
+    },
+    {
+      "id": "pre-wrap-keeps-hard-breaks-as-explicit-segments",
+      "text": "Hello\nWorld",
+      "options": { "whiteSpace": "PreWrap", "wordBreak": "Normal" },
+      "expect": {
+        "segments": ["Hello", "\n", "World"],
+        "kinds": ["Text", "HardBreak", "Text"]
+      },
+      "upstream": "prepare invariants > pre-wrap mode keeps hard breaks as explicit segments"
+    },
+    {
+      "id": "pre-wrap-normalizes-crlf-into-a-single-hard-break",
+      "text": "Hello\r\nWorld",
+      "options": { "whiteSpace": "PreWrap", "wordBreak": "Normal" },
+      "expect": {
+        "normalized": "Hello\nWorld",
+        "segments": ["Hello", "\n", "World"],
+        "kinds": ["Text", "HardBreak", "Text"]
+      },
+      "upstream": "prepare invariants > pre-wrap mode normalizes CRLF into a single hard break"
+    },
+    {
+      "id": "pre-wrap-keeps-tabs-as-explicit-segments",
+      "text": "Hello\tWorld",
+      "options": { "whiteSpace": "PreWrap", "wordBreak": "Normal" },
+      "expect": {
+        "segments": ["Hello", "\t", "World"],
+        "kinds": ["Text", "Tab", "Text"]
+      },
+      "upstream": "prepare invariants > pre-wrap mode keeps tabs as explicit segments"
+    },
+    {
+      "id": "keeps-standalone-non-breaking-space-as-visible-glue-content",
+      "text": "\u00A0",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": {
+        "normalized": "\u00A0",
+        "segments": ["\u00A0"],
+        "kinds": ["Glue"],
+        "layout": { "maxWidth": 200, "lineHeight": 19, "lineCount": 1 }
+      },
+      "upstream": "prepare invariants > keeps standalone non-breaking spaces as visible glue content"
+    },
+    {
+      "id": "treats-zero-width-spaces-as-explicit-break-opportunities",
+      "text": "alpha\u200Bbeta",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": {
+        "segments": ["alpha", "\u200B", "beta"],
+        "kinds": ["Text", "ZeroWidthBreak", "Text"],
+        "layout": { "maxWidth": 50.1, "lineHeight": 10, "lineCount": 2 }
+      },
+      "upstream": "prepare invariants > treats zero-width spaces as explicit break opportunities"
+    },
+    {
+      "id": "treats-soft-hyphens-as-discretionary-break-points",
+      "text": "trans\u00ADatlantic",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": {
+        "segments": ["trans", "\u00AD", "atlantic"],
+        "kinds": ["Text", "SoftHyphen", "Text"]
+      },
+      "upstream": "prepare invariants > treats soft hyphens as discretionary break points"
+    },
+    {
+      "id": "keeps-closing-punctuation-attached-to-the-preceding-word",
+      "text": "hello.",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": { "segments": ["hello."] },
+      "upstream": "prepare invariants > keeps closing punctuation attached to the preceding word"
+    },
+    {
+      "id": "keeps-opening-quotes-attached-to-the-following-word",
+      "text": "\u201CWhenever",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": { "segments": ["\u201CWhenever"] },
+      "upstream": "prepare invariants > keeps opening quotes attached to the following word"
+    },
+    {
+      "id": "does-not-attach-opening-punctuation-to-following-whitespace",
+      "text": "\u201C hello",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": { "segments": ["\u201C", " ", "hello"] },
+      "upstream": "prepare invariants > does not attach opening punctuation to following whitespace"
+    },
+    {
+      "id": "applies-cjk-punctuation-attachment-rules",
+      "text": "\u4E2D\u6587\uFF0C\u6D4B\u8BD5\u3002",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": { "segments": ["\u4E2D", "\u6587\uFF0C", "\u6D4B", "\u8BD5\u3002"] },
+      "upstream": "prepare invariants > applies CJK and Hangul punctuation attachment rules (comma case)"
+    },
+    {
+      "id": "applies-hangul-punctuation-attachment-rules",
+      "text": "\uD14C\uC2A4\uD2B8\uC785\uB2C8\uB2E4.",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": { "segments": ["\uD14C", "\uC2A4", "\uD2B8", "\uC785", "\uB2C8", "\uB2E4."] },
+      "upstream": "prepare invariants > applies CJK and Hangul punctuation attachment rules (Hangul case)"
+    },
+    {
+      "id": "keeps-numeric-prefix-attached-dollar",
+      "text": "$500",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": { "segments": ["$500"] },
+      "upstream": "prepare invariants > keeps numeric prefix and postfix line-break classes attached ($500)"
+    },
+    {
+      "id": "keeps-numeric-prefix-attached-plus",
+      "text": "+500",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": { "segments": ["+500"] },
+      "upstream": "prepare invariants > keeps numeric prefix and postfix line-break classes attached (+500)"
+    },
+    {
+      "id": "keeps-url-like-run-together-as-one-segment",
+      "text": "see https://example.com/reports/q3?lang=ar&mode=full now",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": {
+        "segments": ["see", " ", "https://example.com/reports/q3?lang=ar&mode=full", " ", "now"]
+      },
+      "upstream": "prepare invariants > keeps URL-like runs together as one breakable segment (adapted: our MergeUrlAndSymbolRuns keeps the whole run as a single unbreakable segment instead of upstream's two-piece split)"
+    },
+    {
+      "id": "keeps-hashtag-and-mention-symbol-chains-together",
+      "text": "#hashtag mention@domain",
+      "options": { "whiteSpace": "Normal", "wordBreak": "Normal" },
+      "expect": {
+        "segments": ["#hashtag", " ", "mention@domain"]
+      },
+      "upstream": "prepare invariants > keeps no-space word-internal symbol chains together as one breakable segment (# and @ cases)"
+    },
+    {
+      "id": "keep-all-does-not-split-hangul-run",
+      "text": "\uD55C\uAD6D\uC5B4\uD14C\uC2A4\uD2B8",
+      "options": { "whiteSpace": "Normal", "wordBreak": "KeepAll" },
+      "expect": { "segments": ["\uD55C\uAD6D\uC5B4\uD14C\uC2A4\uD2B8"] },
+      "upstream": "prepare invariants > keep-all keeps CJK-containing no-space runs cohesive with punctuation fallback boundaries (Hangul-only run)"
+    },
+    {
+      "id": "keep-all-merges-mixed-latin-cjk-run",
+      "text": "abc\u65E5\u672C\u8A9E",
+      "options": { "whiteSpace": "Normal", "wordBreak": "KeepAll" },
+      "expect": { "segments": ["abc\u65E5\u672C\u8A9E"] },
+      "upstream": "prepare invariants > keep-all keeps CJK-containing no-space runs cohesive with punctuation fallback boundaries (abc\u65E5\u672C\u8A9E case)"
+    }
+  ]
+}

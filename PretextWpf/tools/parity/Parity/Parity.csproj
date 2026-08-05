@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>PretextParityRunner</AssemblyName>
+    <RootNamespace>Pretext.Wpf.Tools.Parity</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- Test-method naming convention differs from library naming. -->
+    <NoWarn>$(NoWarn);CA1707;CA1822</NoWarn>
+    <!-- Deliberately outside the solution: this runner substitutes WPF types. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Suites resolve fixtures next to the executing assembly. -->
+    <Content Include="$(MSBuildThisFileDirectory)../../../tests/Pretext.Wpf.Tests/TestData/**"
+             Link="TestData/%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="xunit.v3.assert" Version="3.2.2" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <CoreDir>$(MSBuildThisFileDirectory)../../../src/Pretext.Wpf/</CoreDir>
+    <TestDir>$(MSBuildThisFileDirectory)../../../tests/Pretext.Wpf.Tests/</TestDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Every platform-independent core source. -->
+    <CoreSource Include="$(CoreDir)**/*.cs" />
+    <CoreSource Remove="$(CoreDir)obj/**/*.cs" />
+    <CoreSource Remove="$(CoreDir)bin/**/*.cs" />
+    <CoreSource Remove="$(CoreDir)Properties/AssemblyInfo.cs" />
+    <!-- Formatter-backed measurement needs the real WPF stack; stubbed in WpfShims.cs. -->
+    <CoreSource Remove="$(CoreDir)Internal/Measurement/WpfTextMeasurer.cs" />
+    <CoreSource Remove="$(CoreDir)Internal/Measurement/TextRunProperties.cs" />
+    <CoreSource Remove="$(CoreDir)Internal/Measurement/PlainTextSource.cs" />
+    <Compile Include="@(CoreSource)" LinkBase="Core" />
+
+    <!-- xunit suites that touch no device-dependent WPF API. -->
+    <Compile Include="$(TestDir)Analysis/TextAnalyzerTests.cs" LinkBase="Suites" />
+    <Compile Include="$(TestDir)Bidi/BidiLevelResolverTests.cs" LinkBase="Suites" />
+    <Compile Include="$(TestDir)Parity/CanvasParityMeasurer.cs" LinkBase="Suites" />
+    <Compile Include="$(TestDir)Parity/UpstreamParityTests.cs" LinkBase="Suites" />
+    <Compile Include="$(TestDir)TestSupport/LayoutCorpusLoader.cs" LinkBase="Suites" />
+    <Compile Include="$(TestDir)Layout/TextLayoutEngineTests.cs" LinkBase="Suites" />
+    <Compile Include="$(TestDir)Layout/UpstreamRegressionTests.cs" LinkBase="Suites" />
+    <Compile Include="$(TestDir)RichInline/RichInlineLayoutEngineTests.cs" LinkBase="Suites" />
+  </ItemGroup>
+</Project>

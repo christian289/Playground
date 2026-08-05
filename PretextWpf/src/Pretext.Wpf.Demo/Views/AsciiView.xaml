@@ -1,0 +1,36 @@
+<UserControl x:Class="Pretext.Wpf.Demo.Views.AsciiView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:playground="clr-namespace:Pretext.Wpf.Demo.Playground">
+    <Grid>
+        <playground:AsciiSurface x:Name="Surface" />
+
+        <!-- #ascii-controls -->
+        <StackPanel HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Margin="16,12,0,0">
+            <ListBox x:Name="SceneTabs"
+                     Style="{StaticResource ChipListBox}"
+                     ItemContainerStyle="{StaticResource SceneChip}"
+                     SelectionChanged="OnSceneSelected" />
+            <TextBlock x:Name="SceneHint"
+                       MaxWidth="350"
+                       Margin="0,8,0,0"
+                       HorizontalAlignment="Left"
+                       FontSize="11"
+                       Foreground="#555555"
+                       LineHeight="16"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- #stats -->
+        <TextBlock x:Name="Stats"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,16,12"
+                   FontFamily="Consolas"
+                   FontSize="10"
+                   Foreground="#444444"
+                   IsHitTestVisible="False" />
+    </Grid>
+</UserControl>
