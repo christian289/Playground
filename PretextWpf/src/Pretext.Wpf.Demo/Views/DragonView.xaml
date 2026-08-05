@@ -1,0 +1,368 @@
+<UserControl x:Class="Pretext.Wpf.Demo.Views.DragonView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:playground="clr-namespace:Pretext.Wpf.Demo.Playground"
+             Focusable="True">
+    <Grid>
+        <playground:DragonSurface x:Name="Surface" />
+
+        <!-- #hint -->
+        <TextBlock x:Name="Hint"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,0,20"
+                   FontSize="12"
+                   Foreground="#33FFFFFF"
+                   IsHitTestVisible="False"
+                   Text="click &amp; hold for fire — drag through text — press P for panel" />
+
+        <!-- #stats -->
+        <TextBlock x:Name="Stats"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,16,12"
+                   FontFamily="Consolas"
+                   FontSize="10"
+                   Foreground="#444444"
+                   IsHitTestVisible="False" />
+
+        <!-- #panel-toggle -->
+        <Button x:Name="PanelToggle"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,12,16,0"
+                Content="⚙"
+                Style="{StaticResource PanelToggleButton}"
+                ToolTip="Settings (P)"
+                Click="OnPanelToggleClick" />
+
+        <!-- #panel -->
+        <Border x:Name="SettingsPanel"
+                Width="300"
+                Margin="0,12,16,16"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Background="{StaticResource Brush.PanelBackground}"
+                BorderBrush="{StaticResource Brush.PanelBorder}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Visibility="Collapsed">
+            <DockPanel>
+                <Border DockPanel.Dock="Top"
+                        Padding="16,16,16,12"
+                        BorderBrush="#222222"
+                        BorderThickness="0,0,0,1">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right"
+                                Content="×"
+                                Style="{StaticResource PanelCloseButton}"
+                                ToolTip="Close"
+                                Click="OnPanelCloseClick" />
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="#CCCCCC"
+                                   Text="Playground Controls" />
+                    </DockPanel>
+                </Border>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <Border Padding="16,12" BorderBrush="#1A1A1A" BorderThickness="0,0,0,1">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="PRESETS" />
+                                <ListBox x:Name="PresetList"
+                                         Style="{StaticResource ChipListBox}"
+                                         ItemContainerStyle="{StaticResource PresetChip}"
+                                         SelectionChanged="OnPresetSelected" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16,12" BorderBrush="#1A1A1A" BorderThickness="0,0,0,1">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="DRAGON" />
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Segments" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="10" Maximum="80"
+                                            SmallChange="1" IsSnapToTickEnabled="True" TickFrequency="1"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding DragonSegments}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding DragonSegments, StringFormat={}{0:0}}" />
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Speed" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="0.02" Maximum="0.4"
+                                            SmallChange="0.01"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding DragonSpeed}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding DragonSpeed, StringFormat={}{0:0.###}}" />
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Size" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="0.3" Maximum="3"
+                                            SmallChange="0.1"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding DragonScale}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding DragonScale, StringFormat={}{0:0.###}}" />
+                                </Grid>
+                                <DockPanel Margin="0,0,0,8">
+                                    <CheckBox DockPanel.Dock="Right"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              IsChecked="{Binding ShowWings}" />
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Wings" />
+                                </DockPanel>
+                                <DockPanel>
+                                    <CheckBox DockPanel.Dock="Right"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              IsChecked="{Binding ShowSpines}" />
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Spines" />
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16,12" BorderBrush="#1A1A1A" BorderThickness="0,0,0,1">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="PHYSICS" />
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Push force" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="1" Maximum="30"
+                                            SmallChange="0.5"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding PushForce}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding PushForce, StringFormat={}{0:0.###}}" />
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Spring" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="0.002" Maximum="0.08"
+                                            SmallChange="0.001"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding SpringStrength}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding SpringStrength, StringFormat={}{0:0.###}}" />
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Damping" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="0.8" Maximum="0.99"
+                                            SmallChange="0.005"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding Damping}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding Damping, StringFormat={}{0:0.###}}" />
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Gravity" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="0" Maximum="3"
+                                            SmallChange="0.1"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding BurnGravity}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding BurnGravity, StringFormat={}{0:0.###}}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16,12" BorderBrush="#1A1A1A" BorderThickness="0,0,0,1">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="FIRE" />
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Blast radius" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="30" Maximum="250"
+                                            SmallChange="5"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding FireRadius}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding FireRadius, StringFormat={}{0:0}}" />
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Blast force" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="5" Maximum="50"
+                                            SmallChange="1"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding FireForce}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding FireForce, StringFormat={}{0:0}}" />
+                                </Grid>
+                                <DockPanel Margin="0,0,0,8">
+                                    <CheckBox DockPanel.Dock="Right"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              IsChecked="{Binding ScreenShake}" />
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Screen shake" />
+                                </DockPanel>
+                                <DockPanel Margin="0,0,0,8">
+                                    <CheckBox DockPanel.Dock="Right"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              IsChecked="{Binding ShowEmbers}" />
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Embers" />
+                                </DockPanel>
+                                <DockPanel>
+                                    <CheckBox DockPanel.Dock="Right"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              IsChecked="{Binding ShowParticles}" />
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Particles" />
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16,12" BorderBrush="#1A1A1A" BorderThickness="0,0,0,1">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="ENEMIES" />
+                                <DockPanel Margin="0,0,0,8">
+                                    <CheckBox DockPanel.Dock="Right"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              IsChecked="{Binding ShowEnemies}" />
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Enabled" />
+                                </DockPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Count" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="1" Maximum="20"
+                                            SmallChange="1" IsSnapToTickEnabled="True" TickFrequency="1"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding EnemyCount}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding EnemyCount, StringFormat={}{0:0}}" />
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Speed" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="0.1" Maximum="2"
+                                            SmallChange="0.1"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding EnemySpeed}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding EnemySpeed, StringFormat={}{0:0.###}}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="16,12">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="ATMOSPHERE" />
+                                <DockPanel Margin="0,0,0,8">
+                                    <CheckBox DockPanel.Dock="Right"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              IsChecked="{Binding ShowRunes}" />
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Runes" />
+                                </DockPanel>
+                                <DockPanel Margin="0,0,0,8">
+                                    <CheckBox DockPanel.Dock="Right"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              IsChecked="{Binding ShowCursor}" />
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Custom cursor" />
+                                </DockPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource ControlLabel}" Text="Text opacity" />
+                                    <Slider Grid.Column="1"
+                                            Margin="8,0"
+                                            Minimum="0" Maximum="1.5"
+                                            SmallChange="0.05"
+                                            Style="{StaticResource PanelSlider}"
+                                            Value="{Binding TextOpacity}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource ControlValue}"
+                                               Text="{Binding TextOpacity, StringFormat={}{0:0.###}}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -82,27 +82,29 @@ LAY-002 (b)의 기대값도 이 차분으로 교정했다. 줄바꿈이 공백�
 `System.Globalization`에는 대응 API가 없다. 엔진 쪽 분할 경로는 fixture에 담긴 ICU 경계로
 어느 OS에서든 검증되지만, formatter 탐침 자체는 Windows에서만 실행된다.
 
-## 데모 앱 (다음 마일스톤)
+## 데모 앱 — Pretext Playground 재현
 
-지금 `Pretext.Wpf.Demo`에는 엔진을 대화형으로 확인하는 창 하나(`MainWindow` +
-`PretextTextSurface`)만 있다. 아래 9종 데모 갤러리와 그 테스트는 아직 없다.
+`Pretext.Wpf.Demo`는 pretext.cool에 배포된 커뮤니티 쇼케이스
+"Pretext Playground"(0xNyk)를 WPF로 재현한 것이다(배포 번들 캡처 기반 —
+`upstream-manifest.json`의 pretext.cool source 참고). 탭 3개:
+
+- **Dragon** — pretext 레이아웃으로 조판된 페이지의 모든 글자가 물리 파티클이 되고,
+  마우스를 따라오는 ASCII 용, 클릭 유지 화염(글자 점화·잔불·화면 흔들림), 적 4종+점수,
+  룬, 원근 텍스트 터널, 커스텀 커서, 프리셋 6종 + 설정 패널(P/Esc) 포함.
+- **ASCII Animations** — Matrix Rain / Text Wave / Text Morph / Particle Text /
+  Typewriter 5개 씬. Typewriter는 매 프레임 `Prepare`+`LayoutWithLines`로 줄바꿈을
+  다시 계산하고 `WalkLineRanges`로 shrinkwrap 폭을 측정한다.
+- **Layout Lab** — 기존 smoke surface(`PretextTextSurface`) 유지.
+
+이전에 계획만 있던 9종 upstream 갤러리(accordion·bubbles·masonry 등, APP-001~017)는
+이 재현으로 대체되어 폐기했다.
 
 | ID | 분류 | 테스트 | 보호 계약 | 상태 |
 |---|---|---|---|---|
-| APP-001 | Error | `DemoExecutionGuard_PhaseFailure_ReportsVisibleError` | 예외 경계와 cleanup | Planned |
-| APP-002 | Error | `ViewModelBoundary_PublicSurface_HasNoWpfTypes` | ViewModel WPF 타입 금지 | Planned |
-| APP-003 | Happy | `TextLineDrawingBuilder_MixedRuns_PreservesVisualOrder` | bidi glyph drawing | Planned |
-| APP-004 | Boundary | `TextSurface_ResizeAndDpi_ReusesPreparedText` | width/DPI cache lifecycle | Planned |
-| APP-005 | Happy | `Accordion_Toggle_ReusesPreparedMeasurements` | accordion cache/animation | Planned |
-| APP-006 | Happy | `Bubbles_WidthChange_SelectsTightLayout` | bubble width 예측 | Planned |
-| APP-007 | Happy | `DynamicLayout_Lifecycle_SubscriptionsAreSymmetric` | render lifecycle | Planned |
-| APP-008 | Happy | `VariableAscii_FrameGeneration_IsDeterministic` | ASCII frame parity | Planned |
-| APP-009 | Boundary | `Editorial_ObstacleRouting_ProducesValidSlots` | obstacle-aware layout | Planned |
-| APP-010 | Boundary | `Justification_Strategies_PreserveContent` | 세 justification 전략 | Planned |
-| APP-011 | Error | `SafeUriLauncher_InvalidScheme_Throws` | HTTP(S) URI allowlist | Planned |
-| APP-012 | Happy | `MarkdownParser_SupportedAst_ProducesDescriptors` | Markdig AST 변환 | Planned |
-| APP-013 | Boundary | `PredictedStack_ViewportChange_RecyclesVisibleRange` | 예측 virtualization | Planned |
-| APP-014 | Happy | `Masonry_Assignments_UseShortestColumn` | deterministic masonry | Planned |
-| APP-015 | Manual | 9개 데모 탐색·상호작용 smoke | WPF-UI 갤러리 E2E | Planned |
-| APP-016 | Manual | 창 resize·DPI·키보드·focus smoke | 접근성/렌더 lifecycle | Planned |
-| APP-017 | Manual | Status recorded result 표시 | 검증 artifact provenance | Planned |
+| APP-001 | Manual | 탭 3종 전환·렌더 smoke (UIA+스크린샷) | 셸/탭/렌더 루프 lifecycle | Passing (manual, Windows) |
+| APP-002 | Manual | Dragon 설정 패널 열기·Chaos 프리셋 적용 smoke | 패널 바인딩/프리셋 | Passing (manual, Windows) |
+| APP-003 | Manual | ASCII 5씬 전환 smoke (씬별 스크린샷) | ascii 씬 동작 | Passing (manual, Windows) |
+| APP-004 | Manual | 창 760×900 resize 시 1열 재레이아웃 smoke | resize→Prepare/Layout 경로 | Passing (manual, Windows) |
+
+화염 분사(클릭 유지)와 P/Esc 키보드 토글은 실제 포인터/키 입력이 필요해 자동 스크린샷
+검증에서 제외했다 — 코드 경로는 업스트림 번들을 그대로 포팅했고, 수동 확인을 권장한다.

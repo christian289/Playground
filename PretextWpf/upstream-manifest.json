@@ -115,223 +115,6 @@
         },
         {
           "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/index.html",
-          "sourceSha256": "21def97ff7fdf5ff6e9a8d52c953830072a0ea71be797b95eb51a2be99856fa3",
-          "destinationPath": "src/Pretext.Wpf.Demo/Infrastructure/DemoRegistry.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/accordion.ts",
-          "sourceSha256": "eeae8f8e8f1ca9a55ab225f1b7ca28095ce31e4f0805a053008edab059a8c239",
-          "destinationPath": "src/Pretext.Wpf.Demo/ViewModels/Demos/AccordionViewModel.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/accordion.html",
-          "sourceSha256": "6f69a3ddd555beb7ed343c74b72d7baea7d32aa8402661c56f98489e27f5c801",
-          "destinationPath": "src/Pretext.Wpf.Demo/Views/Demos/AccordionView.xaml",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/bubbles-shared.ts",
-          "sourceSha256": "d0b531677a88afb4e09ddd1ffc62309224afa28f18f4a1fe10d72d7af7b8027f",
-          "destinationPath": "src/Pretext.Wpf.Demo/ViewModels/Demos/BubblesViewModel.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/bubbles.ts",
-          "sourceSha256": "0c4356419ec78157f759d77e63cc957caff5381717435584d414577d28c0dd32",
-          "destinationPath": "src/Pretext.Wpf.Demo/ViewModels/Demos/BubblesViewModel.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/bubbles.html",
-          "sourceSha256": "a3e040a1826db5354f1beaeb7eea614b27194d79aebc7074ce4803defd4df043",
-          "destinationPath": "src/Pretext.Wpf.Demo/Views/Demos/BubblesView.xaml",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/dynamic-layout.ts",
-          "sourceSha256": "5bbc6c5bb9b4dba94c3998aa8824bb7f9c3feed039ac50efbd86bfdab7e6221d",
-          "destinationPath": "src/Pretext.Wpf.Demo/Controls/DynamicLayoutSurface.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/dynamic-layout-text.ts",
-          "sourceSha256": "03acb43a7e8c3f73313ed46a42e4c91c7e3c0a78574282ffa81990844449b0d4",
-          "destinationPath": "src/Pretext.Wpf.Demo/Assets/Text/dynamic-layout.txt",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/dynamic-layout.html",
-          "sourceSha256": "f80e319b0c48377565c4edbf6057d6551c106d2cf88f5b8442a850a79bab8efb",
-          "destinationPath": "src/Pretext.Wpf.Demo/Views/Demos/DynamicLayoutView.xaml",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/wrap-geometry.ts",
-          "sourceSha256": "bbb1070f7190d3fb3891b77a3425ddcb9d69c92e256eb4fd401105d85e8be06a",
-          "destinationPath": "src/Pretext.Wpf.Demo/Controls/DynamicLayoutSurface.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/variable-typographic-ascii.ts",
-          "sourceSha256": "fc59fe6333d31f5c811504236767e5828ef264bd92347bd33d12532963bd8d95",
-          "destinationPath": "src/Pretext.Wpf.Demo/ViewModels/Demos/VariableAsciiViewModel.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/variable-typographic-ascii.html",
-          "sourceSha256": "5de7719bb5ac994141c3f503b69ef2707ea2137fe482b4c70beb0b45b6891d0d",
-          "destinationPath": "src/Pretext.Wpf.Demo/Views/Demos/VariableAsciiView.xaml",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/editorial-engine.ts",
-          "sourceSha256": "a01f6b8288959b029056cfd1991640eba4970efdd061c366c85a667784b50531",
-          "destinationPath": "src/Pretext.Wpf.Demo/Controls/EditorialSurface.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/editorial-engine.html",
-          "sourceSha256": "0e0560dcf767d882587b1186a68ff6cdcab33c9cf7e5a24250abdbb1e7ad15e2",
-          "destinationPath": "src/Pretext.Wpf.Demo/Views/Demos/EditorialView.xaml",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/justification-comparison.model.ts",
-          "sourceSha256": "5bd97605d4b2f3f5c135443a19b0b1e2f4b40cad725b589d6bec9818bfd8f808",
-          "destinationPath": "src/Pretext.Wpf.Demo/Services/JustificationLayoutService.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/justification-comparison.data.ts",
-          "sourceSha256": "8dc1587c2809d782fcafc66d3872f1b40d0da849d5eb7732852a8980564a070a",
-          "destinationPath": "src/Pretext.Wpf.Demo/ViewModels/Demos/JustificationViewModel.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/justification-comparison.ts",
-          "sourceSha256": "c2863205cb3f7a00967740a0e289bb087732b29d97333bbdfe66d1f244a0127b",
-          "destinationPath": "src/Pretext.Wpf.Demo/ViewModels/Demos/JustificationViewModel.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/justification-comparison.ui.ts",
-          "sourceSha256": "cd9a0ad0d14a5412d6316e09325624ace5a51d53fa66531149bc6cbfe19aafed",
-          "destinationPath": "src/Pretext.Wpf.Demo/Controls/JustificationSurface.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/justification-comparison.html",
-          "sourceSha256": "c30006a13f3e8a4202e4aef8eb0c2738e0943d58126d08bc5fb6bd8c68ab87bd",
-          "destinationPath": "src/Pretext.Wpf.Demo/Views/Demos/JustificationView.xaml",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/rich-note.model.ts",
-          "sourceSha256": "55d5714891b64b5abeddfe1a20515a5797a232c3c294bf63ccacb0e464e54312",
-          "destinationPath": "src/Pretext.Wpf.Demo/Models/RichTextDocument.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/rich-note.ts",
-          "sourceSha256": "6950f0245ea3dbcddfef8ccbde262b748083982e40fae0be2e3d292cf3edfb01",
-          "destinationPath": "src/Pretext.Wpf.Demo/ViewModels/Demos/RichTextViewModel.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/rich-note.html",
-          "sourceSha256": "b40b6abd73712221b18a360f1e2242c4ccc1ff6322f760c518ce1a418e807791",
-          "destinationPath": "src/Pretext.Wpf.Demo/Views/Demos/RichTextView.xaml",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/markdown-chat.model.ts",
-          "sourceSha256": "18a57dc34b7a2e1cf56a475a40807a463321e74330d4832763e057850ad9d439",
-          "destinationPath": "src/Pretext.Wpf.Demo/Services/MarkdownDocumentParser.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/markdown-chat.data.ts",
-          "sourceSha256": "460b213280bc42b538b4814365a158add8cd4973f48635a14154807211950276",
-          "destinationPath": "src/Pretext.Wpf.Demo/Assets/Text/markdown-chat.md",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/markdown-chat.ts",
-          "sourceSha256": "6b1e9d71b899555a69bf6cb415b5dec276398ecb7ad4eac67b73e8fbd01cd388",
-          "destinationPath": "src/Pretext.Wpf.Demo/ViewModels/Demos/MarkdownChatViewModel.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/markdown-chat.html",
-          "sourceSha256": "c8e8d368df698dbe38feb03a868447838974d4675c2b4d9d0411f82c5f86f4eb",
-          "destinationPath": "src/Pretext.Wpf.Demo/Views/Demos/MarkdownChatView.xaml",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/masonry/index.ts",
-          "sourceSha256": "3228dbab855e71c511c59021d73d4341ce3beee7a65997699bdc328ebbce9729",
-          "destinationPath": "src/Pretext.Wpf.Demo/Services/MasonryLayoutService.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/masonry/index.html",
-          "sourceSha256": "2f3b1fd4342c0d535fc95b78b69d9187795315e11fb17c4dbc42569d07a6e7e5",
-          "destinationPath": "src/Pretext.Wpf.Demo/Views/Demos/MasonryView.xaml",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/demos/masonry/shower-thoughts.json",
-          "sourceSha256": "f2b3489b71a15696e00bbe928f93bfe276b8983785ef31ac0038007f0ee69b0d",
-          "destinationPath": "src/Pretext.Wpf.Demo/Assets/Data/shower-thoughts.json",
-          "copyMode": "exact"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/assets/claude-symbol.svg",
-          "sourceSha256": "531706e30bc32255fc1bf2b22611986fedc21342c1c7670c529ddc91460e46b1",
-          "destinationPath": "src/Pretext.Wpf.Demo/Controls/DynamicLayoutSurface.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
-          "sourcePath": "pages/assets/openai-symbol.svg",
-          "sourceSha256": "9bf0e34aca41bfc33406fe605cf21f42d2b8d89aef0a20d079ff85b892425163",
-          "destinationPath": "src/Pretext.Wpf.Demo/Controls/DynamicLayoutSurface.cs",
-          "copyMode": "adapted"
-        },
-        {
-          "sourceRepository": "https://github.com/chenglou/pretext",
           "sourcePath": "src/line-break.ts",
           "destinationPath": "src/Pretext.Wpf/Internal/Layout/LineWalker.cs",
           "copyMode": "adapted"
@@ -393,6 +176,70 @@
             "tests/Pretext.Wpf.Tests/TestData/native-word-dictionary.json"
           ],
           "note": "Captured output of the upstream engine under its own deterministic fake canvas; native-word-dictionary.json holds ICU word boundaries used only where WPF is unavailable."
+        }
+      ]
+    },
+    {
+      "repository": "https://www.pretext.cool/demos/pretext-playground/",
+      "commit": "deployed-vite-bundle-2026-08-05",
+      "capturedUtc": "2026-08-05T05:30:18.544Z",
+      "note": "Community showcase \"Pretext Playground\" by 0xNyk, reproduced as the WPF demo app. The source repository (github.com/0xNyk/pretext-playground) is no longer public, so the deployed Vite bundle was captured and de-minified. layout-B0URrYGj.js is the upstream pretext engine itself and maps to the already-ported Pretext.Wpf library, not to new files.",
+      "copiedFiles": [
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "index.html",
+          "sourceSha256": "2031e05803c405daf066c477945b97a99d69dd04530b850c7ba4c0feb62c2ed7",
+          "destinationPath": "src/Pretext.Wpf.Demo/MainWindow.xaml",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "ascii.html",
+          "sourceSha256": "6a6aefbb402750e3a0e978d55faba15b62a66fba6d7cb471023fda1d043b3c40",
+          "destinationPath": "src/Pretext.Wpf.Demo/Views/AsciiView.xaml",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/shared-aeVaPDaJ.css",
+          "sourceSha256": "1b55675761d2c21462a3b999927ebcfadb59ac2123cf7e206df4c69c43249c62",
+          "destinationPath": "src/Pretext.Wpf.Demo/App.xaml",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/main-CaY02GpH.js",
+          "sourceSha256": "e2fb9ce0811621b95de9590ae01ca355b907106fe1848fd6211caeaa49ef1dd4",
+          "destinationPath": "src/Pretext.Wpf.Demo/Views/DragonView.xaml",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/dragon-JNptzR-R.js",
+          "sourceSha256": "edca0476c207be2951fff15e8b14078b8409f766d138c822dc962aceb76745f4",
+          "destinationPath": "src/Pretext.Wpf.Demo/Playground/DragonSurface.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/dragon-JNptzR-R.js",
+          "sourceSha256": "edca0476c207be2951fff15e8b14078b8409f766d138c822dc962aceb76745f4",
+          "destinationPath": "src/Pretext.Wpf.Demo/Playground/DragonConfig.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/ascii-CGAS80-L.js",
+          "sourceSha256": "fb86a8bf34ad2dbbcca0ac0ebef548ee6ffadd27da3b35e217e8d2e102ea2323",
+          "destinationPath": "src/Pretext.Wpf.Demo/Playground/AsciiSurface.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/ascii-CGAS80-L.js",
+          "sourceSha256": "fb86a8bf34ad2dbbcca0ac0ebef548ee6ffadd27da3b35e217e8d2e102ea2323",
+          "destinationPath": "src/Pretext.Wpf.Demo/Playground/Scenes",
+          "copyMode": "adapted"
         }
       ]
     },

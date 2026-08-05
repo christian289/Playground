@@ -8,8 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Pretext.Wpf\Pretext.Wpf.csproj" />
-    <PackageReference Include="WPF-UI" Version="4.3.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="Markdig" Version="1.3.2" />
   </ItemGroup>
 </Project>
