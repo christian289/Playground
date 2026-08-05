@@ -4,7 +4,7 @@ local art = require("src.art")
 
 local title = {}
 
-local ITEMS = { "게임 시작", "세계관", "도감", "종료" }
+local ITEMS = { "게임 시작", "에디터 워밍업", "세계관", "도감", "종료" }
 local MENU_STEP = 48 -- 메뉴 항목 y 간격(각 항목이 이 간격만큼의 y 밴드를 차지)
 
 -- 모토(부제) — 메인 타이틀 "서버실 개발자" 아래, 유명 표어의 개발자 유머 패러디.
@@ -37,13 +37,19 @@ local function itemAt(y)
     return nil
 end
 
+function title.nextStartState()
+    return "states.faction"
+end
+
 -- cursor(선택된 메뉴 인덱스)에 해당하는 동작을 실행한다(Enter/좌클릭 공용).
 function title:choose()
     if self.cursor == 1 then
-        Gamestate.switch(require("states.faction"), self.d, self.p)
+        Gamestate.switch(require(title.nextStartState(self.p)), self.d, self.p)
     elseif self.cursor == 2 then
-        Gamestate.switch(require("states.intro"), self.d, self.p, "title")
+        Gamestate.switch(require("states.editorpractice"), self.d, self.p)
     elseif self.cursor == 3 then
+        Gamestate.switch(require("states.intro"), self.d, self.p, "title")
+    elseif self.cursor == 4 then
         Gamestate.switch(require("states.codex"), self.d, self.p)
     else
         love.event.quit()

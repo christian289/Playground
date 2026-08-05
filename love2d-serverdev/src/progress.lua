@@ -1,6 +1,10 @@
 local progress = {}
 local FILE = "progress.lua"
 
+local function validSpeed(value)
+    return value == 0.5 or value == 1 or value == 2 or value == 4
+end
+
 local function serialize(v, out)
     local ty = type(v)
     if ty == "number" or ty == "boolean" then out[#out + 1] = tostring(v)
@@ -38,11 +42,14 @@ function progress.load(file)
                 p.tutorial_done = p.tutorial_done or {}
                 p.records = p.records or {}
                 p.funcbook = p.funcbook or {}
+                if p.editor_practice_done == nil then p.editor_practice_done = false end
+                if not validSpeed(p.play_speed) then p.play_speed = 1 end
                 return p
             end
         end
     end
-    return { cleared = {}, items = {}, codes = {}, tutorial_done = {}, records = {}, funcbook = {} }
+    return { cleared = {}, items = {}, codes = {}, tutorial_done = {}, records = {}, funcbook = {},
+        editor_practice_done = false, play_speed = 1 }
 end
 
 return progress

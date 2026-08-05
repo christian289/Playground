@@ -9,6 +9,6 @@ return {
     allow = {}, advance = { on = "enter" } },
   { text = "다 쳤으면 F5로 저장 — 저장하는 순간 전장에 반영돼요!",
     allow = { "textinput", "f5", "f1", "f2", "f3", "f4", "up", "down", "left", "right",
-              "home", "end", "backspace", "delete", "return", "tab" },
+              "home", "end", "backspace", "delete", "return", "tab", "s", "z", "y", "k", "u", "reload_hint" },
     advance = { on = "event", event = "saved" } },
 }

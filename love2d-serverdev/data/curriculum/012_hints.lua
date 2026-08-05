@@ -5,7 +5,7 @@ build("printer", 11, 5, "mid")
 build("printer", 11, 8, "right1")
 build("printer", 13, 8, "right2")
 
-local PRIORITY = { ["null-ptr"] = 3, ["concat-nil"] = 2, ["bug"] = 1 }
+local PRIORITY = ______
 
 local function pick(world)
   local best, bestScore = nil, -1

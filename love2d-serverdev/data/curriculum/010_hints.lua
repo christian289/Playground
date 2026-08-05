@@ -1,16 +1,17 @@
--- 테이블 활용: 테이블에 적 종류별 수를 세어 위협을 판단해 보세요.
--- 널 포인터가 있으면 우선 공격하도록 만들면 좋습니다.
+-- 테이블 활용: 빈칸에 적 종류별 위협도를 담은 테이블을 넣으세요.
+-- 더 긴급한 적 종류에 더 큰 값을 할당해, 점수가 가장 높은 적이 선택되게 하세요.
 build("printer", 5, 3, "a")
 build("printer", 9, 5, "b")
 build("printer", 13, 9, "c")
 
 function on_tick(self, world)
   local count = {}
-  local target = nil
+  local PRIORITY = ______
+  local target, bestScore = nil, -1
   for _, e in ipairs(world.enemies()) do
     count[e.type] = (count[e.type] or 0) + 1
-    if not target or e.dist < target.dist then target = e end
+    local score = (PRIORITY[e.type] or 0) * 1000 - e.dist
+    if score > bestScore then target, bestScore = e, score end
   end
-  -- 여기에 조건을 추가해 널 포인터를 우선해 보세요
   if target then self:attack(target) end
 end

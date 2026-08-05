@@ -10,5 +10,5 @@ function on_tick(self, world)
   for _, e in ipairs(world.enemies()) do
     if e.type == "______" then danger = e end
   end
-  self:attack(danger or world.nearest())
+  self:attack(danger or world.______())
 end

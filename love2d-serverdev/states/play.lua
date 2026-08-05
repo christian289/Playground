@@ -9,6 +9,7 @@ local particles = require("src.particles")
 local stageinfo = require("src.stageinfo")
 local Shell = require("src.shell")
 local factions = require("src.factions")
+local api = require("src.api")
 
 local GRID_X, GRID_Y = 8, 48
 local FIELD_W = grid.COLS * grid.CELL -- 384
@@ -37,40 +38,9 @@ local function loadText(root, rel)
     return s
 end
 
--- 함수 사전 ①: 빌트인 문서 리터럴. build()만 등재(유저 함수는 소스 발췌로 대신한다).
-local BUILTIN_DOCS = {
-    build = {
-        sig = 'build(종류, 행, 열, "이름")',
-        lines = {
-            "타워를 짓는 유일한 수단",
-            "같은 이름 재호출은 무시(멱등)",
-            "예산 차감 · 건설칸(B) 전용",
-            "스나이퍼는 컴파일러 필요",
-            '한글 별칭: build("구구클래스", ...)',
-        },
-        example = 'build("printer", 3, 10, "a")',
-    },
-    demolish = {
-        sig = 'demolish("이름")',
-        lines = {
-            "이름으로 타워를 철거하는 수단",
-            "환불: 철거 시점 비용의 50%(내림)",
-            "없는 이름이면 실패(false) + 오류 로그",
-            "크래시·비활성 타워도 철거 가능",
-            '함정: build("이름")가 스크립트에',
-            "남아 있으면 다음 저장(F5) 때 재건설됨",
-        },
-        example = 'demolish("a")',
-    },
-    ["world.oldest"] = {
-        sig = "world.oldest()",
-        lines = {
-            "필드에서 가장 오래 버틴 적의 스냅샷을 반환한다(없으면 nil).",
-            "메모리 릭처럼 시간이 지날수록 강해지는 적은 오래된 것부터 끊어야 싸다.",
-        },
-        example = "local e = world.oldest()",
-    },
-    -- 셸 진영 명령 카드(Wave D Task 3) — man <명령>이 이 카드를 연다(open 신호 → dictOpen 토글).
+-- Lua API 문서는 src.api.CATALOG가 유일한 원본이다. 셸 명령 문서만 아래에 별도 추가한다.
+local BUILTIN_DOCS = api.docsByName()
+local SHELL_COMMAND_DOCS = {
     rm = {
         sig = 'rm <이름>',
         lines = {
@@ -133,6 +103,7 @@ local BUILTIN_DOCS = {
         example = "clear",
     },
 }
+for name, doc in pairs(SHELL_COMMAND_DOCS) do BUILTIN_DOCS[name] = doc end
 
 -- 셸 진영 전용 문서 오버라이드: `man build`가 열어야 할 카드는 Lua 문법(`build(종류, 행, 열,
 -- "이름")`)이 아니라 셸 문법(`build <타워> <행> <열> <이름>`)이어야 한다 — BUILTIN_DOCS.build는
@@ -178,6 +149,35 @@ local function extractFuncSource(lines, name)
     for i = startIdx, math.min(endIdx, startIdx + 9) do out[#out + 1] = lines[i] end
     return out, startIdx, truncated
 end
+
+local function hasReward(self, rewardId)
+    if not rewardId then return true end
+    for _, item in ipairs(self.battle.items or {}) do
+        if item == rewardId then return true end
+    end
+    return false
+end
+
+local function apiLabel(self, doc)
+    local label = "> " .. doc.name
+    if doc.requires and not hasReward(self, doc.requires) then
+        label = label .. " [잠김: " .. doc.reward .. "]"
+    end
+    return label
+end
+-- 식별자 토큰은 일반 편집 동작을 그대로 두고, 클릭 시에만 바로 앞의 `.`/`:`를 보완해
+-- world.nearest·self:attack·cache.get 같은 사전 항목을 연다.
+local function dictionaryTokenAt(line, charIdx)
+    local token, _, _, byteStart = Editor.tokenAt(line, charIdx)
+    if not token then return nil end
+    if BUILTIN_DOCS[token] then return token end
+    local separator = line:sub(byteStart - 1, byteStart - 1)
+    local prefix = line:sub(1, byteStart - 2):match("([%a_][%w_]*)$")
+    local qualified = prefix and separator ~= "" and prefix .. separator .. token
+    if qualified and BUILTIN_DOCS[qualified] then return qualified end
+    return token
+end
+
 
 -- 사전 카드(펼침 상태) — 빌트인은 문서 리터럴, 유저 함수는 소스 발췌. 다음 y를 반환한다.
 local function drawDictCard(self, x, y, w, name)
@@ -250,8 +250,7 @@ local function drawDictCard(self, x, y, w, name)
     end
 end
 
--- 함수 사전 행 렌더 + 클릭 판정 등록(self.dictRows) + 펼침 카드 삽입 — Lua 진영의 함수 목록과
--- 셸 진영의 명령 목록이 공유하는 헬퍼(둘 다 이름→BUILTIN_DOCS 또는 소스 발췌 카드를 연다).
+-- 함수 사전 행 렌더 + 클릭 판정 등록(self.dictRows) + 펼침 카드 삽입.
 local function dictRow(self, x, w, cy, name, label)
     local open = self.dictOpen == name
     if open then love.graphics.setColor(art.pal.cyan[1], art.pal.cyan[2], art.pal.cyan[3])
@@ -267,26 +266,37 @@ local function dictRow(self, x, w, cy, name, label)
     return cy
 end
 
--- 함수 사전 ③(Lua 진영): 접힘 목록(> build + 유저 함수들, 클릭 판정용 self.dictRows 갱신) +
--- 클릭된 항목의 펼침 카드(목록의 해당 줄 바로 아래에 삽입돼 다음 섹션을 밀어낸다).
+-- 함수 사전 ③(Lua 진영): 내 함수는 API 목록보다 먼저 두어 모든 기본 API를 펼쳐도 계속 클릭할 수 있다.
 local function drawFuncDict(self, x, y, w)
     love.graphics.setFont(fonts.small)
-    love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
-    love.graphics.print("함수 사전", x, y)
-    local cy = y + 18
-
     self.dictRows = {}
     self.dictCardRect = nil -- 이번 프레임에 카드가 열리면 drawDictCard가 다시 채운다
-    cy = dictRow(self, x, w, cy, "build", "> build")
-    cy = dictRow(self, x, w, cy, "demolish", "> demolish")
-    cy = dictRow(self, x, w, cy, "world.oldest", "> world.oldest")
+    local cy = y
     local funcs = self.battle.userFuncs
+
+    love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+    love.graphics.print("내 함수", x, cy)
+    cy = cy + 18
     if #funcs == 0 then
         love.graphics.setColor(0.7, 0.75, 0.8)
         love.graphics.print("F5로 저장하면 함수가 등록됩니다", x, cy)
         cy = cy + DICT_ROW_H
     else
         for _, name in ipairs(funcs) do cy = dictRow(self, x, w, cy, name, "  " .. name) end
+    end
+
+    cy = cy + 6
+    love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+    local toggle = self.dictBuiltinsOpen and "▼ 접기" or "▶ 펼치기"
+    love.graphics.print(("기본 API · 읽기 전용 (%d) %s"):format(#api.CATALOG, toggle), x, cy)
+    self.dictRows[#self.dictRows + 1] = {
+        action = "toggleBuiltins", x0 = x, x1 = x + w, y0 = cy, y1 = cy + DICT_ROW_H,
+    }
+    cy = cy + 18
+    if self.dictBuiltinsOpen then
+        for _, doc in ipairs(api.CATALOG) do
+            cy = dictRow(self, x, w, cy, doc.name, apiLabel(self, doc))
+        end
     end
 
     cy = cy + 2
@@ -467,7 +477,7 @@ function play:enter(_, d, stageId, p)
     self.termScroll = 0        -- 버퍼 스크롤(0=최신 줄이 보이는 하단 고정)
     self.termHistoryIdx = nil  -- ↑↓ 이력 탐색 중 shell.history 인덱스(nil=탐색 중 아님)
     self.termSavedInput = nil  -- 이력 탐색 시작 시점에 입력 중이던 줄(↓로 끝까지 내려가면 복원)
-    self.speed = 1
+    self.speed = p.play_speed or 1
     self.mx, self.my = -100, -100 -- 마우스 이동 전 호버 오탐 방지
     self.escArmed = 0
     self.tut = nil
@@ -476,9 +486,10 @@ function play:enter(_, d, stageId, p)
     end
     self.tutSaved = false
     self.tutShake = 0       -- 튜토리얼이 키/텍스트 입력을 막았을 때 0.3초 흔들림(뷰 전용, 원시 dt)
-    self.dictOpen = nil     -- 함수 사전 펼침 상태: nil | "build" | 함수명
-    self.dictCardRect = nil -- 펼쳐진 사전 카드의 화면 rect({x0,y0,x1,y1}) — 카드 본문 클릭 접기용
-    self.dictRows = {}      -- 정보 칼럼 사전 목록 클릭 판정({name,x0,x1,y0,y1})
+    self.dictOpen = nil         -- 함수 사전 펼침 상태: nil | "build" | 함수명
+    self.dictBuiltinsOpen = false -- 기본 API 17개는 접어 내 함수 카드를 우선 보인다
+    self.dictCardRect = nil     -- 펼쳐진 사전 카드의 화면 rect({x0,y0,x1,y1}) — 카드 본문 클릭 접기용
+    self.dictRows = {}          -- 정보 칼럼 사전 목록 클릭 판정({name,x0,x1,y0,y1})
     self.runBtnRect = nil   -- [▶ 실행] 버튼 화면 rect(셸 진영이면 nil 유지) — draw가 매 프레임 갱신
     self.funcCounted = {}   -- 판당 funcbook 카운트 1회 가드(이름별)
     self.autotype = nil                 -- {target=문자열, pos=글자수, timer}
@@ -539,6 +550,15 @@ function play:enter(_, d, stageId, p)
         crisisTimer = 0,                 -- 위기 경고 비네트 사인 펄스용 누적 타이머 — 원시 dt(배속 무관)
         prevPhased = {},                 -- 하이젠버그 은신→재출현 전환 감지(프레임-diff)용
     }
+end
+
+-- 외부 data/의 기본 힌트를 다시 읽는다. 수정 가능한 모드 자산이므로 저장된 코드보다도
+-- 우선하며, 파일이 없으면 현재 편집 내용은 보존한다.
+function play:reloadHint()
+    if not self.stage.hints_file or self.stage.hints_file == "" then return false end
+    return self.editor:reload(self.stage.hints_file, function(path)
+        return loadText(self.d.root, path)
+    end)
 end
 
 function play:isButtonStage() return self.stage.ui == "button" end
@@ -799,6 +819,10 @@ function play:draw()
     hx = hx + fonts.ui:getWidth(hudHP)
     love.graphics.setColor(0.9, 0.92, 0.95)
     love.graphics.print(hudTail, hx, 6)
+    if b:canFinishEarly() then
+        love.graphics.setColor(art.pal.green[1], art.pal.green[2], art.pal.green[3])
+        love.graphics.printf("모든 웨이브 처리됨 · Ctrl+Enter로 즉시 마감", 640, 6, 620, "right")
+    end
 
     -- 진행 바 (HUD 아래, 300초 대비 현재 시각 + 스폰 이벤트 눈금)
     do
@@ -1046,6 +1070,10 @@ function play:draw()
         drawTerminal(self)
     else
         self.editor:draw(fonts, true)
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(0.62, 0.68, 0.76)
+        love.graphics.printf("Ctrl+S 저장 · Ctrl+Z/Y 되돌리기/다시\nCtrl+Backspace/Delete 단어 · Ctrl+K/U 줄 · Ctrl+Shift+R 힌트", self.editor.x, self.editor.y + self.editor.h + 36, self.editor.w, "left")
+        love.graphics.setColor(1, 1, 1)
     end
 
     -- [▶ 실행] 버튼: F5와 완전히 같은 경로(play:save)를 클릭으로도 쓸 수 있게 한다. 힌트바
@@ -1240,6 +1268,12 @@ end
 
 function play:keypressed(key)
     local ctrl = love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")
+    local shift = love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift")
+    if self.tut and not self.tut:done() and ctrl and shift and key == "r" and
+        self.tut:allows("reload_hint", false) then
+        self:reloadHint()
+        return
+    end
     -- Task 5 훅: 튜토리얼이 활성 상태면 허용된 키만 통과시킨다. 튜토리얼이 키를 소비했으면
     -- (Ctrl+X 스킵, Enter 진행, 스텝 지정 키 진행) 여기서 멈춰 에디터로 새어나가지 않게 한다.
     if self.tut and not self.tut:done() then
@@ -1272,13 +1306,23 @@ function play:keypressed(key)
         end
         return
     end
+    if ctrl and shift and key == "r" then
+        self:reloadHint()
+        return
+    end
     if ctrl and key == "r" then
         Gamestate.switch(require("states.play"), self.d, self.stageId, self.p)
         return
     end
     if ctrl and (key == "1" or key == "2" or key == "4" or key == "5") then
         self.speed = (key == "5") and 0.5 or tonumber(key)
+        self.p.play_speed = self.speed
+        progress.save(self.p)
         if self.tut then self.tut:notify("speed_changed") end
+        return
+    end
+    if ctrl and key == "return" then
+        self.battle:finishEarly()
         return
     end
     if self:isButtonStage() then
@@ -1302,8 +1346,9 @@ function play:keypressed(key)
         self.editor:setText("")
         return
     end
+    if ctrl and key == "s" then self:save() return end
     if key == "f5" then self:save() return end
-    if not self.editor:quickbarPressed(key) then self.editor:keypressed(key) end
+    if not self.editor:quickbarPressed(key) then self.editor:keypressed(key, ctrl) end
 end
 
 function play:textinput(ch)
@@ -1362,7 +1407,12 @@ function play:mousepressed(x, y, button)
         local measure = function(s) return fonts.mono:getWidth(s) end
         local li, ci = editor:charAt(x - editor.x, y - editor.y, lineH, measure)
         if not li then return end
-        local tok = Editor.tokenAt(editor.lines[li], ci)
+        local ctrl = love.keyboard.isDown("lctrl") or love.keyboard.isDown("rctrl")
+        if not ctrl then
+            editor:moveCursorAt(x - editor.x, y - editor.y, lineH, measure)
+            return
+        end
+        local tok = dictionaryTokenAt(editor.lines[li], ci)
         if not tok then return end
         local isDict = BUILTIN_DOCS[tok] ~= nil
         if not isDict then
@@ -1376,7 +1426,12 @@ function play:mousepressed(x, y, button)
 
     for _, row in ipairs(self.dictRows or {}) do
         if x >= row.x0 and x < row.x1 and y >= row.y0 and y < row.y1 then
-            self.dictOpen = (self.dictOpen == row.name) and nil or row.name
+            if row.action == "toggleBuiltins" then
+                self.dictBuiltinsOpen = not self.dictBuiltinsOpen
+                if not self.dictBuiltinsOpen and BUILTIN_DOCS[self.dictOpen] then self.dictOpen = nil end
+            else
+                self.dictOpen = (self.dictOpen == row.name) and nil or row.name
+            end
             return
         end
     end

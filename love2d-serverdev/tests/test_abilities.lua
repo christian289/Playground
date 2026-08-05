@@ -6,6 +6,12 @@ return function(t)
     local api = require("src.api")
     local Projectile = require("src.projectile")
     local d = db.load(PROJECT_ROOT)
+    local function countList(list, iterator)
+        local count = 0
+        for _ in iterator(list) do count = count + 1 end
+        return count
+    end
+
 
     ------------------------------------------------------------------
     -- ① grow: 스폰 후 GROW_EVERY(1.0s)마다 maxHP/HP += GROW_AMOUNT(2), 상한(base×5) 불변
@@ -143,7 +149,7 @@ return function(t)
     setTower2(twP2)
     local _, world2 = api.refresh(env2, twP2, b2.enemies)
     local snaps2 = world2.enemies()
-    t.eq(#snaps2, 1, "스냅샷 1개")
+    t.eq(countList(snaps2, env2.ipairs), 1, "스냅샷 1개")
     t.eq(snaps2[1].age, eSnap.age, "스냅샷 age가 e.age와 일치")
     t.eq(snaps2[1].speed, eSnap.speed, "스냅샷 speed가 e.speed(실효 속도)와 일치")
     t.eq(snaps2[1].speed, dashDef.speed * 3, "스냅샷 speed에 대시 배율 반영")
@@ -339,23 +345,23 @@ return function(t)
 
     bph.clock = 1.0   -- 가시 구간
     local _, worldVis = api.refresh(envPh, twPh, bph.enemies, bph.clock)
-    t.eq(#worldVis.enemies(), 1, "phase: 가시 구간엔 world.enemies()에 포함")
+    t.eq(countList(worldVis.enemies(), envPh.ipairs), 1, "phase: 가시 구간엔 world.enemies()에 포함")
 
     bph.clock = 4.0   -- 은신 구간
     local _, worldHidden = api.refresh(envPh, twPh, bph.enemies, bph.clock)
-    t.eq(#worldHidden.enemies(), 0, "phase: 은신 구간엔 world.enemies()에서 제외")
+    t.eq(countList(worldHidden.enemies(), envPh.ipairs), 0, "phase: 은신 구간엔 world.enemies()에서 제외")
     t.eq(worldHidden.nearest(), nil, "phase: 은신 중 world.nearest() nil")
     t.eq(worldHidden.oldest(), nil, "phase: 은신 중 world.oldest() nil")
 
     bph.clock = 5.0   -- 재출현
     local _, worldBack = api.refresh(envPh, twPh, bph.enemies, bph.clock)
-    t.eq(#worldBack.enemies(), 1, "phase: 재출현(age5.0) 시 다시 world.enemies()에 포함")
+    t.eq(countList(worldBack.enemies(), envPh.ipairs), 1, "phase: 재출현(age5.0) 시 다시 world.enemies()에 포함")
 
     -- 혼합: 은신 중인 쪽이 나이가 더 많아도 oldest 후보에서 제외되고 가시 적이 선택됨
     bph.enemies = { ephA, ephB }
     bph.clock = 4.0
     local _, worldMix = api.refresh(envPh, twPh, bph.enemies, bph.clock)
-    t.eq(#worldMix.enemies(), 1, "phase: 은신 중인 적은 혼합 목록에서도 제외")
+    t.eq(countList(worldMix.enemies(), envPh.ipairs), 1, "phase: 은신 중인 적은 혼합 목록에서도 제외")
     local oldestMix = worldMix.oldest()
     t.eq(oldestMix.id, ephB.id,
         "phase: 은신 중(나이 더 많음)인 적은 oldest 후보에서 제외, 가시 적이 선택됨")

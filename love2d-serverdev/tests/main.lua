@@ -3,8 +3,20 @@ local ROOT = love.filesystem.getSource():gsub("[/\\]tests$", "")
 package.path = ROOT .. "/?.lua;" .. ROOT .. "/?/init.lua;" .. package.path
 _G.PROJECT_ROOT = ROOT   -- 데이터 파일 io 접근용
 
-local suites = { "test_csv", "test_grid", "test_sandbox", "test_battle", "test_data", "test_editor", "test_progress", "test_tutorial", "test_particles", "test_cutscene", "test_stageinfo", "test_demolish", "test_stars", "test_abilities", "test_shell", "test_factions" }
+local suites = { "test_csv", "test_grid", "test_sandbox", "test_api", "test_battle", "test_data", "test_editor", "test_editorpractice", "test_progress", "test_tutorial", "test_particles", "test_cutscene", "test_stageinfo", "test_demolish", "test_stars", "test_abilities", "test_shell", "test_factions" }
+local requestedSuite = os.getenv("LOVE_TEST_SUITE")
 local pass, fail = 0, 0
+
+if requestedSuite then
+    local known = false
+    for _, name in ipairs(suites) do
+        if name == requestedSuite then known = true; break end
+    end
+    if not known then
+        fail = 1
+        print("FAIL 알 수 없는 테스트 스위트: " .. requestedSuite)
+    end
+end
 
 local t = {}
 function t.ok(cond, label)
@@ -18,6 +30,7 @@ end
 
 function love.load()
     for _, name in ipairs(suites) do
+        if not requestedSuite or name == requestedSuite then
         local path = ROOT .. "/tests/" .. name .. ".lua"
         local f = io.open(path, "rb")
         if f then
@@ -26,6 +39,7 @@ function love.load()
             local chunk = assert(loadfile(path))
             local okRun, err = pcall(chunk(), t)
             if not okRun then fail = fail + 1; print("FAIL (suite error) " .. tostring(err)) end
+        end
         end
     end
     print(("RESULT pass=%d fail=%d"):format(pass, fail))

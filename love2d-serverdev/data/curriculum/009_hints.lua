@@ -12,5 +12,5 @@ function on_tick(self, world)
       danger = e
     end
   end
-  self:attack(danger or world.nearest())
+  self:attack(danger or world.______())
 end

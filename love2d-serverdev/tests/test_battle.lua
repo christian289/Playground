@@ -134,8 +134,9 @@ function on_tick(self, world) self:attack(world.nearest()) end
     run(b9, d.stages[1].countdown + 10)
     t.eq(b9.env.cache.get("last"), "bug", "on_spawn이 적 스냅샷 수신")
 
-    -- 전 스테이지 회귀 (데이터 주도): CSV의 모든 스테이지를 순회하며
-    -- solution_file은 클리어, naive_file이 있으면 그 순진 배치는 반드시 패배임을 증명한다.
+    -- 저장소 기본 Lua 힌트 계약: data/의 원본 템플릿만 검증한다. 런타임은 사용자가
+    -- 수정한 data/ 스크립트를 그대로 실행하며 이 검증으로 거부하지 않는다. 스테이지 순서대로
+    -- 솔루션을 먼저 검증해 정상 보상을 획득한 뒤, 같은 보유 아이템으로 힌트는 반드시 패배해야 한다.
     local function readCode(rel)
         local f = assert(io.open(PROJECT_ROOT .. "/data/" .. rel, "rb"))
         local code = f:read("*a"); f:close()
@@ -179,11 +180,18 @@ function on_tick(self, world) self:attack(world.nearest()) end
             local b = runShellSolution(stageId, owned)
             t.eq(b.status, "clear", ("스테이지 %d 셸 정답(.sh) 클리어"):format(stageId))
         else
-            local b = Battle(d, stageId, { items = owned })
-            t.ok(b:setScript(readCode(stage.solution_file)), ("스테이지 %d 정답 컴파일"):format(stageId))
-            b:start()
-            run(b, 420)
-            t.eq(b.status, "clear", ("스테이지 %d 정답 클리어"):format(stageId))
+            local solution = Battle(d, stageId, { items = owned })
+            t.ok(solution:setScript(readCode(stage.solution_file)), ("스테이지 %d 정답 컴파일"):format(stageId))
+            solution:start()
+            run(solution, 420)
+            t.eq(solution.status, "clear", ("스테이지 %d 정답 클리어"):format(stageId))
+            if stage.hints_file and stage.hints_file ~= "" then
+                local hint = Battle(d, stageId, { items = owned })
+                t.ok(hint:setScript(readCode(stage.hints_file)), ("스테이지 %d 기본 힌트 컴파일"):format(stageId))
+                hint:start()
+                run(hint, 420)
+                t.eq(hint.status, "defeat", ("스테이지 %d 기본 힌트는 미완성으로 패배"):format(stageId))
+            end
             if stage.naive_file and stage.naive_file ~= "" then
                 local bn = Battle(d, stageId, { items = owned })
                 t.ok(bn:setScript(readCode(stage.naive_file)), ("스테이지 %d 순진 배치 컴파일"):format(stageId))
@@ -275,4 +283,11 @@ function on_tick(self, world) self:attack(world.nearest()) end
     t.eq(bf.userFuncs[2], "on_tick", "정렬 둘째 항목")
     bf:setScript("function on_tick( broken")
     t.eq(#bf.userFuncs, 2, "실패 저장 시 기존 목록 유지")
+    local early = Battle(d, 1, {})
+    early:start()
+    t.ok(not early:finishEarly(), "남은 스폰이 있으면 조기 종료 불가")
+    for i, event in ipairs(early.timeline) do early.spawned[i] = event.count end
+    t.ok(early:canFinishEarly(), "모든 적을 처리하면 조기 종료 가능")
+    t.ok(early:finishEarly(), "조기 종료가 클리어 처리")
+    t.eq(early.status, "clear", "조기 종료 상태는 clear")
 end

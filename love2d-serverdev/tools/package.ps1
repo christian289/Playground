@@ -101,9 +101,13 @@ cmd /c copy /b "`"$fuseBase`"+`"$loveFile`"" "`"$exePath`"" | Out-Null
 if (-not (Test-Path $exePath)) { throw "fuse 실패: $exePath" }
 
 # 3) 게임 데이터(data/)를 exe 옆에 동봉(미러링) — CSV/미로/커리큘럼을 고쳐 커스텀 스테이지 가능
-robocopy (Join-Path $projectRoot "data") (Join-Path $distDir "data") /MIR /NFL /NDL /NJH /NJS | Out-Null
-if ($LASTEXITCODE -ge 8 -or -not (Test-Path (Join-Path $distDir "data\towers.csv"))) {
-    throw "data 복사 실패: $distDir\data (robocopy exit $LASTEXITCODE)"
+robocopy (Join-Path $projectRoot "data") (Join-Path $distDir "data") /MIR /IS /IT /NFL /NDL /NJH /NJS | Out-Null
+# 같은 크기·수정시각을 가진 파일도 이전 배포본과 내용이 다를 수 있으므로, 실제 파일 복사를 강제한다.
+Copy-Item (Join-Path $projectRoot "data\*") (Join-Path $distDir "data") -Recurse -Force
+$packagedPractice = Join-Path $distDir "data\editor_practice.lua"
+if ($LASTEXITCODE -ge 8 -or -not (Test-Path (Join-Path $distDir "data\towers.csv")) -or
+    -not (Test-Path $packagedPractice) -or -not ((Get-Content $packagedPractice -Raw) -match "documents\s*=")) {
+    throw "data 복사 실패 또는 워밍업 데이터가 최신이 아님: $distDir\data (robocopy exit $LASTEXITCODE)"
 }
 $global:LASTEXITCODE = 0  # robocopy는 성공도 0이 아닌 코드를 반환하므로 초기화
 

@@ -6,6 +6,6 @@ return {
   { text = "F1~F4 퀵바로 코드 조각을 빠르게 넣을 수 있어요. 다 채웠으면 F5로 저장하세요.",
     anchor = { type = "ui", id = "quickbar" },
     allow = { "textinput", "f5", "f1", "f2", "f3", "f4", "up", "down", "left", "right",
-              "home", "end", "backspace", "delete", "return", "tab" },
+              "home", "end", "backspace", "delete", "return", "tab", "s", "z", "y", "k", "u", "reload_hint" },
     advance = { on = "event", event = "saved" } },
 }

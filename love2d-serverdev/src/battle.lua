@@ -326,6 +326,21 @@ function Battle:resolveAttack(tw)
     tw.cd = tw:effectiveCooldown()
 end
 
+-- 모든 예약 적이 스폰되어 필드에서 사라진 뒤에만 남은 대기 시간을 건너뛴다.
+function Battle:canFinishEarly()
+    if self.status ~= "running" or #self.enemies > 0 then return false end
+    for i, event in ipairs(self.timeline) do
+        if (self.spawned[i] or 0) < event.count then return false end
+    end
+    return true
+end
+
+function Battle:finishEarly()
+    if not self:canFinishEarly() then return false end
+    self.status = "clear"
+    return true
+end
+
 function Battle:update(dt)
     if self.status ~= "running" then return end
 

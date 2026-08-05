@@ -27,4 +27,14 @@ return function(t)
     progress.save(pf)
     t.eq(progress.load().funcbook.on_tick.count, 5, "funcbook 왕복")
     t.ok(type(progress.load().funcbook) == "table", "funcbook 기본값 보강")
+    local practice = progress.load("없는연습진행도.lua")
+    t.eq(practice.editor_practice_done, false, "에디터 워밍업 미완료 기본값")
+    practice.editor_practice_done = true
+    progress.save(practice)
+    t.ok(progress.load().editor_practice_done, "에디터 워밍업 완료 저장/복원")
+    local fresh = progress.load("없는배속진행도.lua")
+    t.eq(fresh.play_speed, 1, "기본 배속은 x1")
+    fresh.play_speed = 4
+    progress.save(fresh)
+    t.eq(progress.load().play_speed, 4, "선호 배속 저장/복원")
 end
