@@ -2,14 +2,20 @@
 
 - 작성일: 2026-08-06
 - 대상: `christian289/Playground` → `christian289-playground` Organization
-- 결과 규모: 저장소 14개 (분할 12 + 이관 2)
+- 결과 규모: 저장소 15개 (분할 13 + 이관 2)
 
 ## 1. 목표와 배경
 
 `christian289/Playground`는 서로 무관한 프로젝트들이 한 저장소에 쌓여 비대해졌다.
 `main`에 폴더 10개, 미병합 브랜치에 3개가 더 있고, 이 중 셋은 한 프로젝트의 개명 이력이라
 독립 저장소로는 12개가 된다(§2.1). 각 프로젝트를 떼어내되 **커밋 히스토리를 각 저장소에 정확히 귀속**시킨다.
-분할 대상 외에 이미 독립 저장소인 `wonderland`, `MewUiBadApple`도 같은 조직으로 모은다.
+
+분할 대상 외에 두 부류를 같은 조직으로 모은다.
+
+- 이미 독립 저장소인 `wonderland`, `MewUiBadApple` → 이관
+- `christian289/dotnet-with-claudecode`의 `samples/PolyLab3DStudio/` → 분할 (§2.3)
+
+따라서 분할은 Playground 12개 + 외부 1개 = 13개다.
 
 성공 기준:
 
@@ -53,13 +59,38 @@ feature/serverdev:      love2d-codedefense → love2d-thisfar → love2d-serverd
 
 포크 `SimYunSup/Playground`는 원본 히스토리를 자체 보유하므로 분할·아카이브의 영향을 받지 않는다.
 
+### 2.3 외부 소스 — `dotnet-with-claudecode`
+
+`christian289/dotnet-with-claudecode`(PUBLIC, "ClaudeCode와 함께하는 .NET 개발 튜토리얼")의
+`samples/PolyLab3DStudio/`를 독립 저장소로 분리한다.
+
+| 항목 | 값 |
+|---|---|
+| 소스 ref | `main` |
+| 경로 | `samples/PolyLab3DStudio/` (파일 104개) |
+| docs | `docs/superpowers/*/*polylab*` (2개) |
+| 커밋 | 폴더 10 + docs 2 = **12** |
+| 내용 | WPF `Viewport3D` 3D 학습 스튜디오. Core / ViewModels / WpfApp 3프로젝트, `net10.0-windows` |
+
+요청에 나온 `feat/polylab3d-learning-studio` 브랜치는 `main`과 **동일하다**(0 ahead / 0 behind).
+이미 병합되어 있으므로 `main`을 소스로 쓴다.
+
+**소스 저장소 `dotnet-with-claudecode`는 수정하지 않는다.** 폴더를 그대로 둔 채 복제 추출만 한다.
+나중에 원본에서 제거하고 싶어지면 히스토리 재작성 없이 일반 `git rm` 커밋으로 처리할 수 있으므로,
+지금 되돌리기 어려운 변경을 가할 이유가 없다.
+
+이 프로젝트 때문에 매니페스트에 **소스 저장소** 개념이 필요해진다(§4). 그 외에는 갈래 A와 완전히 같다.
+
 ## 3. 저장소 매핑
 
-### 3.1 갈래 A — 분할 12개 (`git filter-repo`)
+### 3.1 갈래 A — 분할 13개 (`git filter-repo`)
+
+소스 저장소 표기가 없는 행은 전부 `christian289/Playground`다.
 
 | 저장소 | 소스 ref | 가져올 경로 | 폴더 커밋 |
 |---|---|---|---|
 | `love2d-serverdev` | `feature/serverdev` → `main`<br>`main` → `legacy/codedefense-0.1` | `love2d-codedefense/`, `love2d-thisfar/`, `love2d-serverdev/` (전부 루트로), `docs/superpowers/*/*codedefense*` (16) | 99 |
+| `PolyLab3DStudio` | **소스: `dotnet-with-claudecode`**<br>`main` → `main` | `samples/PolyLab3DStudio/` (루트로), `docs/superpowers/*/*polylab*` (2) | 10 |
 | `PretextWpf` | `main` | `PretextWpf/` (루트로), `docs/superpowers/*/*pretext*` (3) | 12 |
 | `love2d-mario` | `main` | `love2d-mario/` | 3 |
 | `love2d-tetris` | `main` | `love2d-tetris/` | 3 |
@@ -72,8 +103,8 @@ feature/serverdev:      love2d-codedefense → love2d-thisfar → love2d-serverd
 | `Wpf3DTutorial` | `main` | `Wpf3DTutorial/` | 1 |
 | `OldNewThingMcpServer` | `add-old-new-thing-mcp-server` → `main` | `OldNewThingMcpServer/` | 1 |
 
-"폴더 커밋"은 해당 폴더만 기준으로 센 값이다. docs가 붙는 두 저장소는 docs 전용 커밋이 더해져
-`love2d-serverdev` **125**, `PretextWpf` **14**가 된다(실측).
+"폴더 커밋"은 해당 폴더만 기준으로 센 값이다. docs가 붙는 세 저장소는 docs 전용 커밋이 더해져
+`love2d-serverdev` **125**, `PretextWpf` **14**, `PolyLab3DStudio` **12**가 된다(실측).
 `love2d-serverdev`의 `legacy/codedefense-0.1` 브랜치는 그중 24커밋이며 전부 `main`의 조상이다.
 
 **`love2d-serverdev` 기본 브랜치:** `feature/serverdev` 결과를 `main`으로 승격한다.
@@ -93,6 +124,8 @@ feature/serverdev:      love2d-codedefense → love2d-thisfar → love2d-serverd
 **커밋 해시가 유지**되며 옛 URL에서 자동 리다이렉트가 걸린다. filter-repo를 쓰면 이 모두를 잃으므로 순손해다.
 
 갈래 A와 B는 배타적 선택지가 아니라 **대상이 겹치지 않는 동시 진행 작업**이다.
+`PolyLab3DStudio`가 이관이 아니라 분할인 이유도 같은 기준이다 — 저장소가 아니라 폴더이므로
+이관 단위가 될 수 없다.
 
 ### 3.3 루트 파일 처리
 
@@ -119,18 +152,38 @@ feature/serverdev:      love2d-codedefense → love2d-thisfar → love2d-serverd
 |---|---|
 | `love2d-serverdev`, `love2d-mario`, `love2d-tetris`, `WpfOnnxWinUI3Demo` | README, CLAUDE |
 | `WinAppCliOcr` | README, .gitignore |
-| `DotNetOAuth2Learning`, `MultiProcessTabbedBrowser` | README |
+| `DotNetOAuth2Learning`, `MultiProcessTabbedBrowser`, `PolyLab3DStudio` | README |
 | `PretextWpf` | .gitignore |
 | `MewUIPixelAnimation`, `Wpf3DTutorial`, `WpfAutomationDemo`, `OldNewThingMcpServer` | 없음 |
+
+`PretextWpf` 추가 항목: `upstream-manifest.json`이 `LICENSE-PRETEXT`와 `LICENSE-WPF-SAMPLES`를
+산출물로 선언하는데 두 파일이 저장소에 없다. 모노레포 안에 있을 때보다 독립 public 저장소가 되면
+문제가 커지므로(chenglou/pretext와 microsoft/WPF-Samples의 MIT 코드를 고지 없이 배포)
+부트스트랩 커밋에서 상류 라이선스 전문을 함께 넣는다.
+
+`PolyLab3DStudio` 추가 항목: README가 "this repository's WPF coding rules"로
+`dotnet-with-claudecode`의 규칙을 참조하는데, 분리되면 이 참조가 끊긴다.
+부트스트랩 CLAUDE.md에 해당 규칙(CommunityToolkit.Mvvm + GenericHost, UI 비의존 ViewModel,
+`net10.0-windows`)을 옮겨 적는다.
 
 ## 4. 분할 파이프라인
 
 프로젝트마다 독립적으로, scratchpad 안에서 수행한다.
 
+**소스 저장소는 둘이다.** 매니페스트의 각 항목이 어느 쪽에서 나오는지 선언한다.
+
+| 키 | 위치 | 대상 |
+|---|---|---|
+| `Playground` | `C:\Users\chris\personal\Playground` (로컬) | 12개 |
+| `DotnetWithClaudeCode` | `<scratch>/_sources/dotnet-with-claudecode.git` (bare 복제) | `PolyLab3DStudio` |
+
+후자는 로컬에 없으므로 파이프라인 시작 전에 bare 복제를 한 번 만든다.
+검증도 이 로컬 복제를 기준값 원천으로 쓴다.
+
 ```
+0. (외부 소스만) git clone --bare <URL> <scratch>/_sources/<name>.git
 1. git init --bare <scratch>/<repo>.git
-2. git -C <repo>.git remote add src C:\Users\chris\personal\Playground
-   git -C <repo>.git fetch src <소스 ref>:refs/heads/<대상 브랜치>   (필요한 ref 수만큼 반복)
+2. git -C <repo>.git fetch <소스 저장소> <소스 ref>:refs/heads/<대상 브랜치>   (필요한 ref 수만큼 반복)
 3. git -C <repo>.git filter-repo --force \
        --path <폴더>/ --path-rename <폴더>/: \
        --path-glob '<docs 글로브>'
@@ -141,36 +194,43 @@ feature/serverdev:      love2d-codedefense → love2d-thisfar → love2d-serverd
 (`feature/serverdev`→`main`, `main`→`legacy/codedefense-0.1`).
 filter-repo는 저장소의 모든 ref를 한 번에 필터링하므로 3단계는 그대로 한 번만 실행한다.
 
-원본은 **fetch 소스로 읽기만** 한다. 12개 저장소가 서로 독립이므로 하나가 잘못되면
+두 소스 저장소 모두 **fetch 소스로 읽기만** 한다. 13개 저장소가 서로 독립이므로 하나가 잘못되면
 해당 폴더만 지우고 다시 돌린다.
 
 경로 목록은 PowerShell 해시테이블 매니페스트 하나에 선언하고 거기서 filter-repo 인자를 생성한다.
 `love2d-serverdev`처럼 폴더 3개 + docs 글로브가 붙는 경우를 손으로 관리하지 않기 위함이다.
 
-**docs 매칭은 글로브로.** 19개 파일을 나열하는 대신 두 패턴을 쓴다.
+**docs 매칭은 글로브로.** 파일을 나열하는 대신 세 패턴을 쓴다.
 
-- `docs/superpowers/*/*codedefense*` → 16개, 전부 `love2d-serverdev`
-- `docs/superpowers/*/*pretext*` → 3개, 전부 `PretextWpf`
+| 패턴 | 소스 | 개수 | 귀속 |
+|---|---|---|---|
+| `docs/superpowers/*/*codedefense*` | Playground | 16 | `love2d-serverdev` |
+| `docs/superpowers/*/*pretext*` | Playground | 3 | `PretextWpf` |
+| `docs/superpowers/*/*polylab*` | dotnet-with-claudecode | 2 | `PolyLab3DStudio` |
 
-두 패턴은 서로 겹치지 않고 19개 전부를 덮는다(파일명으로 확인). docs 파일은 경로를 유지한다 —
-superpowers 스킬의 기본 경로이므로 각 저장소에서 그대로 이어 쓸 수 있다.
+같은 소스 안에서 패턴끼리 겹치지 않고, Playground의 docs 19개 전부를 덮는다(파일명으로 확인).
+docs 파일은 경로를 유지한다 — superpowers 스킬의 기본 경로이므로 각 저장소에서 그대로 이어 쓸 수 있다.
+
+`dotnet-with-claudecode`의 나머지 docs는 그 저장소에 그대로 남는다. 우리가 가져오는 것은
+polylab 관련 2개뿐이며, 원본에서 삭제하지 않으므로 양쪽에 존재하게 된다.
 
 본 설계서(`2026-08-06-playground-repo-split-design.md`)는 어느 글로브에도 매칭되지 않으므로
 아카이브된 Playground에만 남는다. 분할 자체에 관한 메타 문서이므로 의도된 결과다.
 
 ## 5. 검증
 
-푸시 전에 12개 전부 자동 대조한다. **전부 통과하기 전에는 아무것도 푸시하지 않는다.**
+푸시 전에 13개 전부 자동 대조한다. **전부 통과하기 전에는 아무것도 푸시하지 않는다.**
 
 | 검사 | 방법 | 통과 기준 |
 |---|---|---|
 | 파일 무결성 | 원본 `git ls-tree -r <ref> -- <폴더>`(접두사 제거) vs 새 저장소 `git ls-tree -r <브랜치>` | 경로·모드·blob SHA 완전 일치 |
 | 커밋 개수 | 원본 `git rev-list --count <ref> -- <경로들>` vs 새 저장소 커밋 수 | 일치 |
-
-`<경로들>`은 §4 매니페스트가 filter-repo에 넘긴 것과 **동일한 경로 집합**을 쓴다
-(docs가 붙는 저장소는 docs 글로브까지 포함). 기준값은 `love2d-serverdev` 125, `PretextWpf` 14,
-나머지는 §3.1 "폴더 커밋" 열과 같다.
 | 히스토리 내용 | 저자·날짜·메시지 시퀀스 대조 | 순서까지 일치 |
+
+`<경로들>`은 §4 매니페스트가 filter-repo에 넘긴 것과 **동일한 경로 집합**을 쓰고,
+비교 원천은 해당 항목의 **소스 저장소**다(§4 표). docs가 붙는 저장소는 docs 글로브까지 포함한다.
+기준값은 `love2d-serverdev` 125, `PretextWpf` 14, `PolyLab3DStudio` 12,
+나머지는 §3.1 "폴더 커밋" 열과 같다.
 
 blob SHA까지 비교하므로 파일 한 바이트가 달라져도 잡힌다.
 결과는 12행짜리 표 하나로 출력하고 사용자 확인을 받는다.
@@ -185,17 +245,17 @@ blob SHA까지 비교하므로 파일 한 바이트가 달라져도 잡힌다.
 |---|---|---|
 | 0 | 사전 점검: 워크트리 미커밋 변경 확인 | — |
 | 1 | **갈래 B** — `wonderland`, `MewUiBadApple` 이관 (권한 검증 겸용) | 역방향 이관 |
-| 2 | `git-filter-repo` 설치 + 매니페스트 작성 | 해당 없음 |
-| 3 | **갈래 A** — scratchpad에서 12개 분할 (푸시 없음) | 폴더 삭제 |
+| 2 | `git-filter-repo` 설치 + 외부 소스 복제 + 매니페스트 작성 | 해당 없음 |
+| 3 | **갈래 A** — scratchpad에서 13개 분할 (푸시 없음) | 폴더 삭제 |
 | 4 | **검증 표 출력 → 정지, 사용자 확인** | — |
 | 5 | 부트스트랩 커밋 | 커밋 되돌리기 |
-| 6 | 조직에 12개 저장소 생성 + 푸시 | 저장소 삭제 |
-| 7 | Playground README를 14개 색인으로 교체 후 푸시 | 커밋 되돌리기 |
+| 6 | 조직에 13개 저장소 생성 + 푸시 | 저장소 삭제 |
+| 7 | Playground README를 15개 색인으로 교체 후 푸시 | 커밋 되돌리기 |
 | 8 | Playground 아카이브 | 언제든 해제 가능 |
 | 9 | 로컬 작업 환경 재구성 안내 | — |
 
 갈래 B를 먼저 하는 이유: API 호출 두 번으로 끝나면서 조직 저장소 생성 권한을 위험 없이 검증한다.
-여기서 막히면 12개를 다 만들어 놓고 푸시 단계에서 실패하는 상황을 피할 수 있다.
+여기서 막히면 13개를 다 만들어 놓고 푸시 단계에서 실패하는 상황을 피할 수 있다.
 
 **되돌릴 수 없는 지점은 없다.** 원본을 삭제하지 않기 때문이다.
 단계 4가 유일한 필수 정지점이고 나머지는 연속 진행한다.
@@ -215,9 +275,12 @@ blob SHA까지 비교하므로 파일 한 바이트가 달라져도 잡힌다.
 
 ## 8. 알려진 트레이드오프
 
-- **분할 12개는 커밋 해시가 전부 바뀐다.** 저자·날짜·메시지·변경 내용·순서는 보존되지만
+- **분할 13개는 커밋 해시가 전부 바뀐다.** 저자·날짜·메시지·변경 내용·순서는 보존되지만
   기존 해시를 참조하는 링크와 로컬 클론은 무효가 된다. 히스토리 재작성의 본질적 성질이라 우회로가 없다.
   이관 2개는 해시가 유지된다.
+- **`PolyLab3DStudio`는 원본과 사본이 동시에 존재하게 된다.** `dotnet-with-claudecode`를
+  수정하지 않기로 했으므로 같은 코드가 두 곳에 있고, 이후 수정은 한쪽에만 반영된다.
+  새 저장소를 정본으로 삼고, 원할 때 원본에서 `git rm` 커밋으로 정리하면 된다.
 - **아카이브된 Playground와 새 저장소 사이에 내용 중복이 생긴다.** 아카이브는 읽기 전용이므로
   "어디에 커밋할지" 혼동은 발생하지 않는다.
 - **`docs/` 문서가 프로젝트별로 흩어진다.** 전체를 한눈에 보려면 아카이브를 봐야 한다.
