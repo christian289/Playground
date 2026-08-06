@@ -1,0 +1,22 @@
+# LÖVE 빌드 산출물
+*.love
+build/
+dist/
+
+# Lua
+luac.out
+*.luac
+
+# 에디터
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code 사용자별 설정 (프로젝트 공유 settings.json은 커밋한다)
+.claude/settings.local.json
