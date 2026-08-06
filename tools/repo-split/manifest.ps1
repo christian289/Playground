@@ -106,3 +106,22 @@ $Projects = @(
        Paths  = @('OldNewThingMcpServer'); Globs = @()
        Desc   = 'Microsoft DevBlogs(The Old New Thing) MCP 서버 — stdio / 원격 두 가지' }
 )
+
+# git-filter-repo 를 이 매니페스트를 점 소싱하는 모든 프로세스에서 즉시 쓸 수 있게 만든다.
+# 새 셸에는 pip Scripts 디렉터리가 PATH에 없어 `git filter-repo`가 실패하는 경우가 흔하다.
+# `Get-Command python`은 Windows 앱 실행 별칭 스텁을 가리킬 수 있으므로 sysconfig로 직접 조회한다.
+$null = git filter-repo --version *>&1
+if ($LASTEXITCODE -ne 0) {
+    $scriptsDir = $null
+    try { $scriptsDir = (python -c "import sysconfig; print(sysconfig.get_path('scripts'))" 2>$null) } catch {}
+
+    $exe = if ($scriptsDir) { Join-Path $scriptsDir 'git-filter-repo.exe' } else { $null }
+    if ($exe -and (Test-Path $exe)) {
+        $env:PATH = "$scriptsDir;$env:PATH"
+    }
+
+    $null = git filter-repo --version *>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "git filter-repo 를 찾을 수 없습니다. 확인한 경로: '$scriptsDir'. 'pip install git-filter-repo' 로 설치되어 있는지 확인하세요."
+    }
+}
