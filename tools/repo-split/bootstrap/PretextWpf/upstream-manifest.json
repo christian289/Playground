@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "repository": "https://github.com/chenglou/pretext",
+      "commit": "ac49b09b7d83ede19581fa94a8b892b07d309baf",
+      "licensePath": "LICENSE",
+      "packageVersion": "0.0.8",
+      "capturedUtc": "2026-08-04T10:23:48.343529Z",
+      "copiedFiles": [
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "LICENSE",
+          "sourceSha256": "e9355cb16457e81acd97dac2e50f2f8bbf2a9a464025f9c46db3680cf9598846",
+          "destinationPath": "LICENSE-PRETEXT",
+          "copyMode": "exact"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/analysis.ts",
+          "sourceSha256": "eb6ea5e327b067b0e6a76d8d1b0f83aa8a12b68f09267de1db9fc76d9a70d8fd",
+          "destinationPath": "src/Pretext.Wpf/Internal/Analysis/UnicodeClassifier.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/analysis.ts",
+          "sourceSha256": "eb6ea5e327b067b0e6a76d8d1b0f83aa8a12b68f09267de1db9fc76d9a70d8fd",
+          "destinationPath": "src/Pretext.Wpf/Internal/Analysis/GraphemeMap.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/measurement.ts",
+          "sourceSha256": "7b765b89fb98dd8c9c60749cc83ca692164ecb88bb14b0cb1a232931d4af4db1",
+          "destinationPath": "src/Pretext.Wpf/Internal/Measurement/WpfTextMeasurer.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/line-break.ts",
+          "sourceSha256": "61cbc9f649dbe8a632749d86001d365c1cf7c0486a01d26596aa5babfa324cb6",
+          "destinationPath": "src/Pretext.Wpf/Internal/Analysis/WordSegmenter.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/line-break.ts",
+          "sourceSha256": "61cbc9f649dbe8a632749d86001d365c1cf7c0486a01d26596aa5babfa324cb6",
+          "destinationPath": "src/Pretext.Wpf/Internal/Analysis/SegmentBreakKind.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/line-text.ts",
+          "sourceSha256": "1fa02b5d8a688246dd5a95466bddb43ebc724cfa284b03038f2cf020c4d262e9",
+          "destinationPath": "src/Pretext.Wpf/Internal/Layout/LineTextMaterializer.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/layout.ts",
+          "sourceSha256": "60dd87b6a085e62e41b83b4bcb504945468612581f1f58fede994e07231c401c",
+          "destinationPath": "src/Pretext.Wpf/Internal/Layout/LineWalker.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/layout.ts",
+          "sourceSha256": "60dd87b6a085e62e41b83b4bcb504945468612581f1f58fede994e07231c401c",
+          "destinationPath": "src/Pretext.Wpf/TextLayoutEngine.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/rich-inline.ts",
+          "sourceSha256": "0097d851b1efefaf1327c9a9b9456d3bca14f555ca2e2641713d5497440c3fbd",
+          "destinationPath": "src/Pretext.Wpf/Internal/RichInline/RichInlineWalker.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/rich-inline.ts",
+          "sourceSha256": "0097d851b1efefaf1327c9a9b9456d3bca14f555ca2e2641713d5497440c3fbd",
+          "destinationPath": "src/Pretext.Wpf/RichInlineLayoutEngine.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/bidi.ts",
+          "sourceSha256": "06f22e349451d895a4164465c7b9f03eea0ea3d640f5e301a6f6f287aeb91861",
+          "destinationPath": "src/Pretext.Wpf/Internal/Bidi/BidiLevelResolver.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/generated/bidi-data.ts",
+          "sourceSha256": "200d8ec185b7e951422dea4ae67e9d9aeec6d5908259b8046f08529adbb50fc6",
+          "destinationPath": "src/Pretext.Wpf/Internal/Bidi/BidiData.g.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/test-data.ts",
+          "sourceSha256": "8ddefcf0fe31e2983c0abcbb546ea38d36d71211044b9d99f125224b19dbdcdd",
+          "destinationPath": "tests/Pretext.Wpf.Tests/TestData/layout-corpus.json",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/layout.test.ts",
+          "sourceSha256": "a729750433ef6a91399e94ca249d5d3a77a99fe7a3345ebbbab1dfc12800985f",
+          "destinationPath": "tests/Pretext.Wpf.Tests/TestData/upstream-regressions.json",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/line-break.ts",
+          "destinationPath": "src/Pretext.Wpf/Internal/Layout/LineWalker.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/layout.ts",
+          "destinationPath": "src/Pretext.Wpf/Public/PreparedText.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/measurement.ts",
+          "destinationPath": "src/Pretext.Wpf/Internal/Layout/LayoutProfile.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/measurement.ts",
+          "destinationPath": "src/Pretext.Wpf/Internal/Measurement/ISegmentMeasurer.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/rich-inline.ts",
+          "destinationPath": "src/Pretext.Wpf/Public/PreparedRichInline.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/layout.test.ts",
+          "destinationPath": "tests/Pretext.Wpf.Tests/Parity/CanvasParityMeasurer.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/layout.test.ts",
+          "destinationPath": "tools/parity/fake-canvas.ts",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/chenglou/pretext",
+          "sourcePath": "src/test-data.ts",
+          "destinationPath": "tools/parity/generate.ts",
+          "copyMode": "adapted"
+        }
+      ],
+      "generatedArtifacts": [
+        {
+          "generator": "tools/parity/generate.ts",
+          "sourcePaths": [
+            "src/test-data.ts",
+            "src/layout.ts",
+            "src/rich-inline.ts"
+          ],
+          "outputs": [
+            "tests/Pretext.Wpf.Tests/TestData/upstream-parity-corpus.json",
+            "tests/Pretext.Wpf.Tests/TestData/upstream-rich-corpus.json",
+            "tests/Pretext.Wpf.Tests/TestData/native-word-dictionary.json"
+          ],
+          "note": "Captured output of the upstream engine under its own deterministic fake canvas; native-word-dictionary.json holds ICU word boundaries used only where WPF is unavailable."
+        }
+      ]
+    },
+    {
+      "repository": "https://www.pretext.cool/demos/pretext-playground/",
+      "commit": "deployed-vite-bundle-2026-08-05",
+      "capturedUtc": "2026-08-05T05:30:18.544Z",
+      "note": "Community showcase \"Pretext Playground\" by 0xNyk, reproduced as the WPF demo app. The source repository (github.com/0xNyk/pretext-playground) is no longer public, so the deployed Vite bundle was captured and de-minified. layout-B0URrYGj.js is the upstream pretext engine itself and maps to the already-ported Pretext.Wpf library, not to new files.",
+      "copiedFiles": [
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "index.html",
+          "sourceSha256": "2031e05803c405daf066c477945b97a99d69dd04530b850c7ba4c0feb62c2ed7",
+          "destinationPath": "src/Pretext.Wpf.Demo/MainWindow.xaml",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "ascii.html",
+          "sourceSha256": "6a6aefbb402750e3a0e978d55faba15b62a66fba6d7cb471023fda1d043b3c40",
+          "destinationPath": "src/Pretext.Wpf.Demo/Views/AsciiView.xaml",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/shared-aeVaPDaJ.css",
+          "sourceSha256": "1b55675761d2c21462a3b999927ebcfadb59ac2123cf7e206df4c69c43249c62",
+          "destinationPath": "src/Pretext.Wpf.Demo/App.xaml",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/main-CaY02GpH.js",
+          "sourceSha256": "e2fb9ce0811621b95de9590ae01ca355b907106fe1848fd6211caeaa49ef1dd4",
+          "destinationPath": "src/Pretext.Wpf.Demo/Views/DragonView.xaml",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/dragon-JNptzR-R.js",
+          "sourceSha256": "edca0476c207be2951fff15e8b14078b8409f766d138c822dc962aceb76745f4",
+          "destinationPath": "src/Pretext.Wpf.Demo/Playground/DragonSurface.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/dragon-JNptzR-R.js",
+          "sourceSha256": "edca0476c207be2951fff15e8b14078b8409f766d138c822dc962aceb76745f4",
+          "destinationPath": "src/Pretext.Wpf.Demo/Playground/DragonConfig.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/ascii-CGAS80-L.js",
+          "sourceSha256": "fb86a8bf34ad2dbbcca0ac0ebef548ee6ffadd27da3b35e217e8d2e102ea2323",
+          "destinationPath": "src/Pretext.Wpf.Demo/Playground/AsciiSurface.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://www.pretext.cool/demos/pretext-playground/",
+          "sourcePath": "assets/ascii-CGAS80-L.js",
+          "sourceSha256": "fb86a8bf34ad2dbbcca0ac0ebef548ee6ffadd27da3b35e217e8d2e102ea2323",
+          "destinationPath": "src/Pretext.Wpf.Demo/Playground/Scenes",
+          "copyMode": "adapted"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/microsoft/WPF-Samples",
+      "commit": "71759b6e713098672a99333c8df4358f162e48db",
+      "licensePath": "LICENSE",
+      "capturedUtc": "2026-08-04T10:23:48.343529Z",
+      "copiedFiles": [
+        {
+          "sourceRepository": "https://github.com/microsoft/WPF-Samples",
+          "sourcePath": "LICENSE",
+          "sourceSha256": "cf248820bf1178370bb4f1670a59f8748d46bc96d0f64080cd631511c6046409",
+          "destinationPath": "LICENSE-WPF-SAMPLES",
+          "copyMode": "exact"
+        },
+        {
+          "sourceRepository": "https://github.com/microsoft/WPF-Samples",
+          "sourcePath": "PerMonitorDPI/TextFormatting/GenericTextProperties.cs",
+          "sourceSha256": "e7d127516bb258dd230ae50f4e8c7f73ecce0160fe772b1c29231fe3d7da776a",
+          "destinationPath": "src/Pretext.Wpf/Internal/Measurement/TextRunProperties.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/microsoft/WPF-Samples",
+          "sourcePath": "PerMonitorDPI/TextFormatting/FontRendering.cs",
+          "sourceSha256": "f76334631b41f4dc5cd0e86356cddb474d2c872b63d62034f0140acc6c5f613d",
+          "destinationPath": "src/Pretext.Wpf/Internal/Measurement/TextRunProperties.cs",
+          "copyMode": "adapted"
+        },
+        {
+          "sourceRepository": "https://github.com/microsoft/WPF-Samples",
+          "sourcePath": "PerMonitorDPI/TextFormatting/CustomTextSource.cs",
+          "sourceSha256": "c9ae0112b4df036f33520c3f391b115ba5b64837346a5d756031848a8696750c",
+          "destinationPath": "src/Pretext.Wpf/Internal/Measurement/PlainTextSource.cs",
+          "copyMode": "adapted"
+        }
+      ]
+    }
+  ]
+}
