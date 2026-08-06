@@ -8,8 +8,18 @@
                (저자, 저자일시, 제목) 3튜플의 집합으로 비교한다.
 검사 C (참고): 새 저장소에만 있는 커밋 수. 병합 커밋 단순화 방식의 차이로
                0이 아닐 수 있어 보고만 하고 실패로 처리하지 않는다.
+검사 D (필수): 대상 저장소의 참조(브랜치·태그) 집합이 매니페스트의 Refs.To 집합과
+               정확히 일치해야 한다. 매니페스트에 없는 브랜치나 태그가 하나라도
+               있으면 실패 — Task 7의 `git push --all`이 그걸 그대로 공개 저장소에
+               올려버린다.
 
 검사 A가 권위 있는 검사다. 파일 한 바이트가 달라져도 blob SHA가 달라진다.
+
+주의: 이 pwsh 환경은 $PSNativeCommandUseErrorActionPreference 가 False라
+      $ErrorActionPreference='Stop' 만으로는 git의 실패(0이 아닌 종료 코드)를 잡지
+      못한다. git을 호출하는 모든 헬퍼 함수는 $LASTEXITCODE 를 직접 확인해서 실패 시
+      throw 해야 한다 — 그렇지 않으면 실패한 git 호출이 빈 컬렉션을 반환하고, 원본과
+      대상이 둘 다 비어 있으면 "일치"로 오판(거짓 PASS)한다.
 #>
 [CmdletBinding()]
 param([string]$Repo)
@@ -21,6 +31,9 @@ function Get-TreeMap {
     param([string]$RepoPath, [string]$Ref)
     $map = @{}
     $lines = git -C $RepoPath -c core.quotePath=false ls-tree -r $Ref
+    if ($LASTEXITCODE -ne 0) {
+        throw "git ls-tree 실패 (repo=$RepoPath, ref=$Ref, exit=$LASTEXITCODE)"
+    }
     foreach ($l in $lines) {
         if ($l -match '^(\d{6}) \w+ ([0-9a-f]{40})\t(.+)$') {
             $map[$Matches[3]] = "$($Matches[1]) $($Matches[2])"
@@ -33,9 +46,27 @@ function Get-CommitSet {
     param([string]$RepoPath, [string]$Ref, [string[]]$Pathspec)
     $fmt = '%an%x1f%ad%x1f%s'
     if ($Pathspec) {
-        return @(git -C $RepoPath -c core.quotePath=false log --format=$fmt --date=iso-strict $Ref -- @Pathspec)
+        $out = @(git -C $RepoPath -c core.quotePath=false log --format=$fmt --date=iso-strict $Ref -- @Pathspec)
+    } else {
+        $out = @(git -C $RepoPath -c core.quotePath=false log --format=$fmt --date=iso-strict $Ref)
     }
-    return @(git -C $RepoPath -c core.quotePath=false log --format=$fmt --date=iso-strict $Ref)
+    if ($LASTEXITCODE -ne 0) {
+        throw "git log 실패 (repo=$RepoPath, ref=$Ref, exit=$LASTEXITCODE)"
+    }
+    return $out
+}
+
+function Get-RefSet {
+    param([string]$RepoPath)
+    $heads = @(git -C $RepoPath for-each-ref --format='%(refname:short)' refs/heads)
+    if ($LASTEXITCODE -ne 0) {
+        throw "git for-each-ref(refs/heads) 실패 (repo=$RepoPath, exit=$LASTEXITCODE)"
+    }
+    $tags = @(git -C $RepoPath for-each-ref --format='%(refname:short)' refs/tags)
+    if ($LASTEXITCODE -ne 0) {
+        throw "git for-each-ref(refs/tags) 실패 (repo=$RepoPath, exit=$LASTEXITCODE)"
+    }
+    return @{ Heads = $heads; Tags = $tags }
 }
 
 $targets = if ($Repo) { $Projects | Where-Object { $_.Repo -eq $Repo } } else { $Projects }
@@ -56,57 +87,103 @@ foreach ($proj in $targets) {
             continue
         }
 
-        # --- 기대값: 원본에서 이 프로젝트에 속하는 경로만 추려 접두사 제거 ---
-        $srcAll   = Get-TreeMap $srcRepo $r.From
-        $expected = @{}
-        foreach ($p in $proj.Paths) {
-            foreach ($k in $srcAll.Keys) {
-                if ($k.StartsWith("$p/")) { $expected[$k.Substring($p.Length + 1)] = $srcAll[$k] }
+        try {
+            # --- 기대값: 원본에서 이 프로젝트에 속하는 경로만 추려 접두사 제거 ---
+            $srcAll   = Get-TreeMap $srcRepo $r.From
+            $expected = @{}
+            foreach ($p in $proj.Paths) {
+                foreach ($k in $srcAll.Keys) {
+                    if ($k.StartsWith("$p/")) { $expected[$k.Substring($p.Length + 1)] = $srcAll[$k] }
+                }
+            }
+            foreach ($g in $proj.Globs) {
+                foreach ($k in $srcAll.Keys) {
+                    if ($k -like $g) { $expected[$k] = $srcAll[$k] }   # 글로브 파일은 경로 유지
+                }
+            }
+
+            if ($expected.Count -eq 0) {
+                # Paths/Globs 설정 오류(오타, 잘못된 폴더명 등)로 기대값이 통째로 비면
+                # 대상이 뭐든 "0 == 0"으로 거짓 PASS가 난다. 절대 통과시키지 않는다.
+                $rows += [pscustomobject]@{ Repo=$label; Files='0/0'; Tree='EMPTY-EXPECTED'; Commits='-'; Missing='-'; Extra='-'; Verdict='FAIL' }
+                Write-Warning "[$label] 기대 파일 집합이 비었습니다 — Paths/Globs 설정을 확인하세요 (source=$srcRepo, ref=$($r.From))"
+                continue
+            }
+
+            # --- 실제값 ---
+            $actual = Get-TreeMap $dest $r.To
+
+            $missingFiles = @($expected.Keys | Where-Object { -not $actual.ContainsKey($_) })
+            $extraFiles   = @($actual.Keys   | Where-Object { -not $expected.ContainsKey($_) })
+            $diffFiles    = @($expected.Keys | Where-Object { $actual.ContainsKey($_) -and $actual[$_] -ne $expected[$_] })
+            $treeOk       = ($missingFiles.Count + $extraFiles.Count + $diffFiles.Count) -eq 0
+
+            # --- 커밋 ---
+            $srcCommits = Get-CommitSet $srcRepo $r.From @($proj.Paths + $proj.Globs)
+            $dstCommits = Get-CommitSet $dest $r.To $null
+            $dstLookup  = @{}; foreach ($c in $dstCommits) { $dstLookup[$c] = $true }
+            $srcLookup  = @{}; foreach ($c in $srcCommits) { $srcLookup[$c] = $true }
+            $missingCommits = @($srcCommits | Where-Object { -not $dstLookup.ContainsKey($_) })
+            $extraCommits   = @($dstCommits | Where-Object { -not $srcLookup.ContainsKey($_) })
+
+            $verdict = if ($treeOk -and $missingCommits.Count -eq 0) { 'PASS' } else { 'FAIL' }
+
+            $rows += [pscustomobject]@{
+                Repo    = $label
+                Files   = "$($actual.Count)/$($expected.Count)"
+                Tree    = if ($treeOk) { 'OK' } else { "-$($missingFiles.Count) +$($extraFiles.Count) ~$($diffFiles.Count)" }
+                Commits = "$($dstCommits.Count)/$($srcCommits.Count)"
+                Missing = $missingCommits.Count
+                Extra   = $extraCommits.Count
+                Verdict = $verdict
+            }
+
+            if (-not $treeOk) {
+                Write-Warning "[$label] 파일 불일치 — 누락 $($missingFiles.Count) / 초과 $($extraFiles.Count) / 내용다름 $($diffFiles.Count)"
+                $missingFiles | Select-Object -First 10 | ForEach-Object { Write-Warning "  누락: $_" }
+                $extraFiles   | Select-Object -First 10 | ForEach-Object { Write-Warning "  초과: $_" }
+                $diffFiles    | Select-Object -First 10 | ForEach-Object { Write-Warning "  다름: $_" }
+            }
+            if ($missingCommits.Count -gt 0) {
+                Write-Warning "[$label] 커밋 누락 $($missingCommits.Count)건"
+                $missingCommits | Select-Object -First 5 | ForEach-Object { Write-Warning "  $($_ -replace [char]31, ' | ')" }
             }
         }
-        foreach ($g in $proj.Globs) {
-            foreach ($k in $srcAll.Keys) {
-                if ($k -like $g) { $expected[$k] = $srcAll[$k] }   # 글로브 파일은 경로 유지
+        catch {
+            # git 호출 실패(잘못된 ref, 손상된 저장소 등)를 침묵시키지 않는다.
+            # 여기서 잡지 않으면 스크립트 전체가 죽어 나머지 13개 행을 못 보게 되므로,
+            # 이 행만 FAIL 처리하고 다음 ref로 넘어간다.
+            $rows += [pscustomobject]@{ Repo=$label; Files='-'; Tree='ERROR'; Commits='-'; Missing='-'; Extra='-'; Verdict='FAIL' }
+            Write-Warning "[$label] 검증 중 오류 — $($_.Exception.Message)"
+            continue
+        }
+    }
+
+    # --- 검사 D: 대상 저장소에 매니페스트에 없는 브랜치/태그가 없는지 (프로젝트당 1회) ---
+    if (Test-Path $dest) {
+        try {
+            $refSet       = Get-RefSet $dest
+            $expectedHeads = @($proj.Refs | ForEach-Object { $_.To })
+            $extraHeads    = @($refSet.Heads | Where-Object { $expectedHeads -notcontains $_ })
+            $extraTags     = @($refSet.Tags)
+            $extraRefs     = @($extraHeads) + @($extraTags)
+
+            if ($extraRefs.Count -gt 0) {
+                $rows += [pscustomobject]@{
+                    Repo    = "$($proj.Repo) [refs]"
+                    Files   = '-'
+                    Tree    = '-'
+                    Commits = '-'
+                    Missing = '-'
+                    Extra   = ($extraRefs -join ', ')
+                    Verdict = 'FAIL'
+                }
+                Write-Warning "[$($proj.Repo)] 매니페스트에 없는 참조 발견 — $($extraRefs -join ', ') (`git push --all`로 그대로 공개될 수 있음)"
             }
         }
-
-        # --- 실제값 ---
-        $actual = Get-TreeMap $dest $r.To
-
-        $missingFiles = @($expected.Keys | Where-Object { -not $actual.ContainsKey($_) })
-        $extraFiles   = @($actual.Keys   | Where-Object { -not $expected.ContainsKey($_) })
-        $diffFiles    = @($expected.Keys | Where-Object { $actual.ContainsKey($_) -and $actual[$_] -ne $expected[$_] })
-        $treeOk       = ($missingFiles.Count + $extraFiles.Count + $diffFiles.Count) -eq 0
-
-        # --- 커밋 ---
-        $srcCommits = Get-CommitSet $srcRepo $r.From @($proj.Paths + $proj.Globs)
-        $dstCommits = Get-CommitSet $dest $r.To $null
-        $dstLookup  = @{}; foreach ($c in $dstCommits) { $dstLookup[$c] = $true }
-        $srcLookup  = @{}; foreach ($c in $srcCommits) { $srcLookup[$c] = $true }
-        $missingCommits = @($srcCommits | Where-Object { -not $dstLookup.ContainsKey($_) })
-        $extraCommits   = @($dstCommits | Where-Object { -not $srcLookup.ContainsKey($_) })
-
-        $verdict = if ($treeOk -and $missingCommits.Count -eq 0) { 'PASS' } else { 'FAIL' }
-
-        $rows += [pscustomobject]@{
-            Repo    = $label
-            Files   = "$($actual.Count)/$($expected.Count)"
-            Tree    = if ($treeOk) { 'OK' } else { "-$($missingFiles.Count) +$($extraFiles.Count) ~$($diffFiles.Count)" }
-            Commits = "$($dstCommits.Count)/$($srcCommits.Count)"
-            Missing = $missingCommits.Count
-            Extra   = $extraCommits.Count
-            Verdict = $verdict
-        }
-
-        if (-not $treeOk) {
-            Write-Warning "[$label] 파일 불일치 — 누락 $($missingFiles.Count) / 초과 $($extraFiles.Count) / 내용다름 $($diffFiles.Count)"
-            $missingFiles | Select-Object -First 10 | ForEach-Object { Write-Warning "  누락: $_" }
-            $extraFiles   | Select-Object -First 10 | ForEach-Object { Write-Warning "  초과: $_" }
-            $diffFiles    | Select-Object -First 10 | ForEach-Object { Write-Warning "  다름: $_" }
-        }
-        if ($missingCommits.Count -gt 0) {
-            Write-Warning "[$label] 커밋 누락 $($missingCommits.Count)건"
-            $missingCommits | Select-Object -First 5 | ForEach-Object { Write-Warning "  $($_ -replace [char]31, ' | ')" }
+        catch {
+            $rows += [pscustomobject]@{ Repo="$($proj.Repo) [refs]"; Files='-'; Tree='-'; Commits='-'; Missing='-'; Extra='-'; Verdict='FAIL' }
+            Write-Warning "[$($proj.Repo)] 참조 목록 확인 중 오류 — $($_.Exception.Message)"
         }
     }
 }
