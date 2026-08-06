@@ -33,6 +33,7 @@ foreach ($r in $proj.Refs) {
 
 # 첫 ref가 기본 브랜치
 git -C $dest symbolic-ref HEAD "refs/heads/$($proj.Refs[0].To)"
+if ($LASTEXITCODE -ne 0) { throw "symbolic-ref 설정 실패: $Repo -> refs/heads/$($proj.Refs[0].To)" }
 
 # 폴더는 루트로 승격, 글로브 파일은 경로 유지
 $frArgs = @('--force')
@@ -43,8 +44,16 @@ Write-Host "filter-repo $($frArgs -join ' ')" -ForegroundColor DarkGray
 git -C $dest filter-repo @frArgs
 if ($LASTEXITCODE -ne 0) { throw "filter-repo 실패: $Repo" }
 
+# filter-repo가 ref를 재작성하므로, 그 이후에 HEAD가 여전히 기대한 기본 브랜치를
+# 가리키는지 재확인한다 — 사전 설정만으로는 증명이 안 된다.
+$expectedHead = "refs/heads/$($proj.Refs[0].To)"
+$actualHead = git -C $dest symbolic-ref HEAD
+if ($LASTEXITCODE -ne 0) { throw "symbolic-ref 확인 실패: $Repo" }
+if ($actualHead -ne $expectedHead) { throw "$Repo : HEAD 불일치 — 기대 '$expectedHead', 실제 '$actualHead'" }
+
 foreach ($r in $proj.Refs) {
     $n = git -C $dest rev-list --count $r.To
+    if ($LASTEXITCODE -ne 0) { throw "$Repo : rev-list 실패 — ref '$($r.To)'" }
     Write-Host ("  {0,-26} {1,4} commits" -f $r.To, $n)
 }
 Write-Host "OK  $Repo -> $dest" -ForegroundColor Green
