@@ -11,9 +11,10 @@
 ## Global Constraints
 
 - 셸은 **PowerShell 7**. Bash 문법 금지 (`$env:VAR`, `Test-Path`, `-ErrorAction Stop` 사용).
-- 소스 저장소 둘 다 **읽기 전용**. fetch 소스로만 접근한다.
-  - `C:\Users\chris\personal\Playground` — Task 8 전까지 쓰기 금지
-  - `christian289/dotnet-with-claudecode` — **끝까지 수정 금지.** `samples/PolyLab3DStudio/`를 복제 추출만 하고 원본에서 지우지 않는다
+- **분할이 읽는 ref는 건드리지 않는다.** 분할은 아래 ref들만 fetch 소스로 읽으며, Task 8 전까지 이 ref들에 커밋·리베이스·삭제를 하지 않는다.
+  - `C:\Users\chris\personal\Playground`의 `main`, `feature/serverdev`, `claude/multi-process-tabbed-browser-BIML2`, `add-old-new-thing-mcp-server`
+  - `christian289/dotnet-with-claudecode`의 `main` — **이 저장소는 끝까지 수정 금지.** `samples/PolyLab3DStudio/`를 복제 추출만 하고 원본에서 지우지 않는다
+- 이 계획의 산출물(`tools/repo-split/`, 문서)은 현재 워크트리의 **`main-2` 브랜치에 커밋한다.** `main-2`는 분할 소스가 아니므로 검증에 영향을 주지 않는다. Task 8에서 `main-2`를 `origin/main`으로 푸시하면서 비로소 `main`이 갱신된다.
 - 작업 루트: `$env:TEMP\repo-split` — 모든 중간 산출물은 여기에만 생성.
 - Organization: `christian289-playground` (이미 생성됨, Free 플랜).
 - `gh` 활성 계정은 **`christian289`** (scope: `admin:org, gist, repo, workflow`). 확인 명령: `gh auth status`.
